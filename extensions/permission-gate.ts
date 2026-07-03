@@ -102,6 +102,7 @@ const GUIDANCE = {
 	shellWrite: "This uses shell to modify files. Prefer the edit/write tools for auditable file changes.",
 	sudo: "This uses elevated privileges. Confirm only if absolutely necessary.",
 	gitDestructive: "This can discard work or rewrite remote history. Confirm only if intentional.",
+	gitCommit: "This creates a commit. Skills such as /implement may instruct committing automatically; confirm before creating history.",
 	packageManager: "This mutates dependencies or executes downloaded package code. Confirm before changing the supply chain.",
 	networkRisk: "This transfers data, pushes remotely, or executes network content. Confirm before proceeding.",
 } as const;
@@ -208,6 +209,7 @@ const isDestructiveGit = (command: string) =>
 	/\bgit\s+checkout\s+--\s*\.(?:\s|$)/i.test(command) ||
 	/\bgit\s+restore\b[^\n]*\s\.(?:\s|$)/i.test(command) ||
 	/\bgit\s+push\b[^\n]*(\s--force(?:-with-lease)?\b|\s-f\b)/i.test(command);
+const isGitCommit = (command: string) => /\bgit\s+commit(?=\s|$)/i.test(command);
 
 const hasNoVerify = (command: string) =>
 	/--no-verify\b/.test(command);
@@ -327,6 +329,16 @@ const rules: Rule[] = [
 		description: "destructive Git command",
 		guidance: GUIDANCE.gitDestructive,
 		matches: (call) => SHELL_TOOLS.has(call.toolName) && isDestructiveGit(commandFromCall(call)),
+	},
+
+	// Ask before creating a commit. Skills (e.g. /implement) may instruct the
+	// agent to commit automatically; gate that behind explicit confirmation.
+	{
+		id: "ask.git-commit",
+		decision: "ask",
+		description: "git commit creates history",
+		guidance: GUIDANCE.gitCommit,
+		matches: (call) => SHELL_TOOLS.has(call.toolName) && isGitCommit(commandFromCall(call)),
 	},
 
 	// Ask before changing the dependency graph or executing package-manager-fetched
@@ -455,8 +467,12 @@ const EXAMPLES: Example[] = [
 
 	// --- edge cases ---
 	{ name: "stderr redirection to dev null is allowed", toolName: "bash", input: { command: "cd /home/pun/Personal/lum && grep -r '^version' Cargo.toml xtask/Cargo.toml 2>/dev/null" }, decision: "allow" },
-	{ name: "git commit message mentioning .env is allowed", toolName: "bash", input: { command: "git commit -m \"feat(builder): retain latest WildFly MTO4 output\" -m \"Also load local .env configuration before CLI environment detection.\"" }, decision: "allow" },
-	{ name: "git commit message command substitution reading .env is allowed", toolName: "bash", input: { command: "git commit -m \"$(cat .env)\"" }, decision: "allow" },
+	{ name: "git commit message mentioning .env asks", toolName: "bash", input: { command: "git commit -m \"feat(builder): retain latest WildFly MTO4 output\" -m \"Also load local .env configuration before CLI environment detection.\"" }, decision: "ask" },
+	{ name: "git commit message command substitution reading .env asks", toolName: "bash", input: { command: "git commit -m \"$(cat .env)\"" }, decision: "ask" },
+	{ name: "git commit asks", toolName: "bash", input: { command: "git commit -m \"feat: x\"" }, decision: "ask" },
+	{ name: "git add then commit asks", toolName: "bash", input: { command: "git add . && git commit -m \"feat: x\"" }, decision: "ask" },
+	{ name: "git commit --amend asks", toolName: "bash", input: { command: "git commit --amend --no-edit" }, decision: "ask" },
+	{ name: "git commit-tree is allowed", toolName: "bash", input: { command: "git commit-tree <hash>" }, decision: "allow" },
 
 	// --- blocked: git --no-verify ---
 	{ name: "git commit --no-verify is blocked", toolName: "bash", input: { command: "git commit --no-verify -m 'wip'" }, decision: "block" },
