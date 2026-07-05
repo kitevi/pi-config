@@ -10,6 +10,8 @@ type SupportedVerbosityApi = "openai-responses" | "openai-codex-responses" | "az
 const DEFAULT_SHOW_MODEL_INFO = false;
 const GPT_VERBOSITY: Verbosity = "low";
 const TOGGLE_MODEL_INFO_SHORTCUT = "ctrl+p" as KeyId;
+const DUMB_ZONE_TOKEN_THRESHOLD = 128_000;
+const DUMB_ZONE_LABEL = "dumb";
 const SUPPORTED_APIS = new Set<SupportedVerbosityApi>([
 	"openai-responses",
 	"openai-codex-responses",
@@ -44,6 +46,42 @@ export function patchPayloadVerbosity(payload: unknown, verbosity: Verbosity): u
 			verbosity,
 		},
 	};
+}
+
+export function formatFooterTokenCount(count: number): string {
+	if (count < 1000) return count.toString();
+	if (count < 10000) return `${(count / 1000).toFixed(1)}k`;
+	if (count < 1000000) return `${Math.round(count / 1000)}k`;
+	if (count < 10000000) return `${(count / 1000000).toFixed(1)}M`;
+	return `${Math.round(count / 1000000)}M`;
+}
+
+export function shouldShowDumbZone(
+	usage: { tokens: number | null } | undefined,
+	threshold = DUMB_ZONE_TOKEN_THRESHOLD,
+): boolean {
+	return typeof usage?.tokens === "number" && usage.tokens > threshold;
+}
+
+export function injectDumbZoneIntoFooterLine(
+	line: string,
+	contextWindow: number | undefined,
+	label: string,
+	width: number,
+): string {
+	if (!contextWindow || width <= 0) return line;
+
+	const contextWindowMarker = `/${formatFooterTokenCount(contextWindow)}`;
+	const markerStart = line.indexOf(contextWindowMarker);
+	if (markerStart === -1) return line;
+	const insertAt = markerStart + contextWindowMarker.length;
+
+	const insertText = ` ${label}`;
+	const suffix = line.slice(insertAt);
+	const removableSpaces = suffix.match(/^ */)?.[0].length ?? 0;
+	const spacesToRemove = Math.min(removableSpaces, visibleWidth(insertText));
+
+	return truncateToWidth(`${line.slice(0, insertAt)}${insertText}${suffix.slice(spacesToRemove)}`, width, "");
 }
 
 export function buildFooterRightSideCandidates(
@@ -113,7 +151,10 @@ export function injectVerbosityIntoFooterLine(
 	return `${prefix}${nextPadding}${fittedRightSide}${suffixAnsi}`;
 }
 
-function patchFooterRender(getShowModelInfo: () => boolean): void {
+function patchFooterRender(
+	getShowModelInfo: () => boolean,
+	getDumbZoneLabel: () => string,
+): void {
 	if (footerPatched) return;
 
 	originalFooterRender = FooterComponent.prototype.render;
@@ -121,20 +162,33 @@ function patchFooterRender(getShowModelInfo: () => boolean): void {
 		const lines = originalFooterRender?.call(this, width) ?? [];
 		if (lines.length < 2) return lines;
 
-		const session = (this as unknown as { session?: { state?: { model?: Model<Api>; thinkingLevel?: string } } }).session;
+		const session = (this as unknown as {
+			session?: {
+				state?: { model?: Model<Api>; thinkingLevel?: string };
+				getContextUsage?: () => { tokens: number | null; contextWindow: number; percent: number | null } | undefined;
+			};
+		}).session;
 		const model = session?.state?.model;
-		if (!model) return lines;
-
 		const nextLines = [...lines];
-		if (!getShowModelInfo()) {
-			nextLines[1] = stripModelInfoFromFooterLine(lines[1] ?? "", model, session?.state?.thinkingLevel);
-			return nextLines;
+		let footerLine = lines[1] ?? "";
+
+		if (model) {
+			if (!getShowModelInfo()) {
+				footerLine = stripModelInfoFromFooterLine(footerLine, model, session?.state?.thinkingLevel);
+			} else {
+				const verbosity = getModelVerbosity(model);
+				if (verbosity) {
+					footerLine = injectVerbosityIntoFooterLine(footerLine, model, session?.state?.thinkingLevel, verbosity);
+				}
+			}
 		}
 
-		const verbosity = getModelVerbosity(model);
-		if (!verbosity) return nextLines;
+		const usage = session?.getContextUsage?.();
+		if (shouldShowDumbZone(usage)) {
+			footerLine = injectDumbZoneIntoFooterLine(footerLine, usage?.contextWindow, getDumbZoneLabel(), width);
+		}
 
-		nextLines[1] = injectVerbosityIntoFooterLine(lines[1] ?? "", model, session?.state?.thinkingLevel, verbosity);
+		nextLines[1] = footerLine;
 		return nextLines;
 	};
 	footerPatched = true;
@@ -162,9 +216,12 @@ export default function modelInfoToggleExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	pi.on("session_start", async () => {
+	pi.on("session_start", async (_event, ctx) => {
 		showModelInfo = DEFAULT_SHOW_MODEL_INFO;
-		patchFooterRender(() => showModelInfo);
+		patchFooterRender(
+			() => showModelInfo,
+			() => ctx.ui.theme.fg("warning", DUMB_ZONE_LABEL),
+		);
 	});
 
 	pi.on("session_shutdown", async () => {
