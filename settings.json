@@ -46,6 +46,12 @@
         "skills/productivity/handoff",
         "skills/engineering/code-review"
       ]
+    },
+    {
+      "source": "https://github.com/anthropics/skills",
+      "skills": [
+        "skills/frontend-design"
+      ]
     }
   ],
   "compaction": {
