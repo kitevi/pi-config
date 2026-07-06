@@ -27,10 +27,6 @@
     "npm:@dustydonkey/pi-spinner",
     "npm:pi-system-reminders",
     {
-      "source": "npm:@plannotator/pi-extension",
-      "extensions": []
-    },
-    {
       "source": "https://github.com/mattpocock/skills",
       "skills": [
         "skills/engineering/ask-matt",
