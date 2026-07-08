@@ -1,11 +1,3 @@
 {
-  "providers": {
-    "lilac": {
-      "modelOverrides": {
-        "zai-org/glm-5.2": {
-          "maxTokens": 131072
-        }
-      }
-    }
-  }
+  "providers": {}
 }
