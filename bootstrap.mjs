@@ -159,12 +159,6 @@ function getThemeVariantFromArgs(args = process.argv.slice(2)) {
   return "light";
 }
 
-const WORK_DEFAULT_MODEL_CONFIG = join(PI_EXTENSIONS_DIR, "work-default-model.json");
-
-function shouldEnableWorkDefaultModel(args = process.argv.slice(2)) {
-  return args.includes("--ds4");
-}
-
 async function switchTheme(variant = getThemeVariantFromArgs()) {
   const themeDir = PI_THEMES_DIR;
   const linkPath = join(themeDir, "github-colorblind.json");
@@ -194,10 +188,6 @@ async function main() {
   await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
   await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
-  if (shouldEnableWorkDefaultModel()) {
-    await writeManagedJsonFile(WORK_DEFAULT_MODEL_CONFIG, { enabled: true });
-    console.log(`enabled work default model via ${WORK_DEFAULT_MODEL_CONFIG}`);
-  }
   await installJsonConfig(WEB_TOOLS_OVERLAY, PI_WEB_TOOLS, "pi web-tools");
   await installJsonConfig(HASHLINE_READMAP_OVERLAY, PI_HASHLINE_READMAP_SETTINGS, "hashline-readmap settings");
   console.log("bootstrap complete");
