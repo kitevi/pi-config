@@ -10,7 +10,7 @@
     {
       "source": "npm:@aliou/pi-synthetic",
       "extensions": [
-        "src/extensions/provider/index.ts"
+        "extensions/provider/index.ts"
       ],
       "skills": [],
       "prompts": [],
