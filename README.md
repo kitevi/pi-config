@@ -88,6 +88,20 @@ npm run setup-dark
 
 No `npm install` needed — the bootstrap script uses only Node.js built-ins.
 
+## Nested Pi subprocess guard
+
+`extensions/permission-gate.ts` declines agent-issued `bash`/`nu` tool calls that start another Pi agent. This prevents a skill from simulating an unavailable subagent with commands such as `pi --no-session -p @prompt.md`.
+
+The guard does **not** affect Pi started directly in a terminal or commands you run through Pi's `!` user-shell prefix. Non-agent operations—including diagnostics, package/config commands, export, RPC mode, and promptless startup—remain available to the agent.
+
+For deliberate nested-agent troubleshooting, opt in on the **parent** process:
+
+```bash
+PI_PERMISSION_GATE_ALLOW_NESTED_PI=1 pi
+```
+
+Putting that variable inside an agent's child command does not bypass the gate.
+
 ## What setup does
 
 `npm run setup` runs `bootstrap.mjs`, which:

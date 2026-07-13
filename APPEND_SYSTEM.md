@@ -5,6 +5,9 @@
 - If a reasonable low-risk assumption lets you continue, state it briefly and proceed.
 - Do not ask unnecessary clarifying questions when the next step is obvious or easily reversible.
 
+# Subagents
+- Do not invoke `pi` recursively from bash, nu, or another shell tool to simulate a subagent. If a skill asks for an Agent/subagent tool that is unavailable, continue in the current context when feasible or explain the limitation.
+
 # Context Hygiene
 - Keep context lean. Prefer bounded reads with offsets/limits.
 - Search first, then `read` the best 1-3 files or symbols.
