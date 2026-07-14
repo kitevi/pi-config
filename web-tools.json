@@ -1,3 +1,3 @@
 {
-  "filterModel": "openrouter/deepseek/deepseek-v4-flash"
+  "filterModel": "synthetic/syn:small:text"
 }
