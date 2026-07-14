@@ -1,8 +1,10 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import {
 	collectSkillGuideEntries,
+	loadSkillGuideConfig,
 	parseSkillGuideConfig,
 	registerSkillGuide,
 	renderSkillGuide,
@@ -18,11 +20,11 @@ const plainTheme = {
 const config: SkillGuideConfig = {
 	title: "Skill index",
 	showOnStartup: true,
-	hideAfterFirstInput: true,
+	hideOnPrompt: true,
 	placement: "aboveEditor",
-	maxSummaryLength: 80,
+	maxSummaryLength: 30,
 	summaryOverrides: {
-		"code-review": "Review a diff against standards and its spec.",
+		"code-review": "Review a diff vs its spec.",
 	},
 };
 
@@ -55,10 +57,21 @@ void describe("skill guide config", () => {
 
 		assert.strictEqual(parsed.title, "Skill index");
 		assert.strictEqual(parsed.showOnStartup, true);
-		assert.strictEqual(parsed.hideAfterFirstInput, true);
+		assert.strictEqual(parsed.hideOnPrompt, true);
 		assert.strictEqual(parsed.placement, "aboveEditor");
-		assert.strictEqual(parsed.maxSummaryLength, 110);
+		assert.strictEqual(parsed.maxSummaryLength, 30);
 		assert.strictEqual(parsed.summaryOverrides["code-review"], "Review a diff.");
+	});
+
+	void it("keeps every configured summary within the display budget", () => {
+		const configured = loadSkillGuideConfig(
+			fileURLToPath(new URL("../extensions/skill-guide.json", import.meta.url)),
+		);
+
+		assert.strictEqual(configured.maxSummaryLength, 30);
+		for (const [skill, summary] of Object.entries(configured.summaryOverrides)) {
+			assert.ok(summary.length <= 30, `${skill} summary is ${summary.length} characters`);
+		}
 	});
 
 	void it("rejects malformed display settings", () => {
@@ -76,8 +89,8 @@ void describe("skill guide entries", () => {
 			entries.map((entry) => entry.command),
 			["/skill:code-review", "/skill:improve-codebase-architecture"],
 		);
-		assert.strictEqual(entries[0]?.summary, "Review a diff against standards and its spec.");
-		assert.strictEqual(entries[1]?.summary, "Scan a codebase for deepening opportunities, then grill through one.");
+		assert.strictEqual(entries[0]?.summary, "Review a diff vs its spec.");
+		assert.strictEqual(entries[1]?.summary, "Scan a codebase for…");
 	});
 
 	void it("shortens long descriptions without cutting the final word in half", () => {
@@ -101,16 +114,19 @@ void describe("skill guide entries", () => {
 });
 
 void describe("skill guide extension", () => {
-	void it("shows a TUI-only widget at startup and removes it after the first prompt", async () => {
+	void it("hides after every prompt when reopened", async () => {
 		const handlers = new Map<string, Array<(event: any, ctx: any) => any>>();
 		const widgetCalls: Array<{ content: unknown; options?: unknown }> = [];
 		const notifications: string[] = [];
+		let commandHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
 
 		const pi = {
 			on(event: string, handler: (event: any, ctx: any) => any) {
 				handlers.set(event, [...(handlers.get(event) ?? []), handler]);
 			},
-			registerCommand() {},
+			registerCommand(_name: string, command: { handler: (args: string, ctx: any) => Promise<void> }) {
+				commandHandler = command.handler;
+			},
 			getCommands: () => commands,
 		};
 		const ctx = {
@@ -137,5 +153,12 @@ void describe("skill guide extension", () => {
 		const result = await handlers.get("input")?.[0]?.({ source: "interactive", text: "hello" }, ctx);
 		assert.deepStrictEqual(result, { action: "continue" });
 		assert.strictEqual(widgetCalls.at(-1)?.content, undefined);
+
+		await commandHandler?.("", ctx);
+		assert.strictEqual(typeof widgetCalls.at(-1)?.content, "function");
+
+		await handlers.get("input")?.[0]?.({ source: "interactive", text: "again" }, ctx);
+		assert.strictEqual(widgetCalls.at(-1)?.content, undefined);
+		assert.strictEqual(widgetCalls.length, 4);
 	});
 });

@@ -10,13 +10,13 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const WIDGET_ID = "skill-guide";
 const DEFAULT_CONFIG_PATH = fileURLToPath(new URL("./skill-guide.json", import.meta.url));
-const DEFAULT_MAX_SUMMARY_LENGTH = 110;
+const DEFAULT_MAX_SUMMARY_LENGTH = 30;
 const WIDE_LAYOUT_MIN_WIDTH = 76;
 
 export interface SkillGuideConfig {
 	title: string;
 	showOnStartup: boolean;
-	hideAfterFirstInput: boolean;
+	hideOnPrompt: boolean;
 	placement: "aboveEditor" | "belowEditor";
 	maxSummaryLength: number;
 	summaryOverrides: Record<string, string>;
@@ -80,7 +80,7 @@ export function parseSkillGuideConfig(value: unknown): SkillGuideConfig {
 	return {
 		title: optionalString(value.title, "Skill index", "title"),
 		showOnStartup: optionalBoolean(value.showOnStartup, true, "showOnStartup"),
-		hideAfterFirstInput: optionalBoolean(value.hideAfterFirstInput, true, "hideAfterFirstInput"),
+		hideOnPrompt: optionalBoolean(value.hideOnPrompt, true, "hideOnPrompt"),
 		placement,
 		maxSummaryLength: maxSummaryLength as number,
 		summaryOverrides,
@@ -166,7 +166,7 @@ export function renderSkillGuide(
 	}
 
 	lines.push("");
-	const behavior = config.hideAfterFirstInput ? " · hides after first prompt" : "";
+	const behavior = config.hideOnPrompt ? " · hides on next prompt" : "";
 	const footer = `/skill-guide toggles · edit extensions/skill-guide.json${behavior}`;
 	lines.push(truncateToWidth(theme.fg("dim", footer), safeWidth, "…"));
 	return lines;
@@ -219,7 +219,7 @@ export function registerSkillGuide(pi: ExtensionAPI, loadConfig: ConfigLoader = 
 	});
 
 	pi.on("input", (event, ctx) => {
-		if (event.source === "interactive" && visible && config?.hideAfterFirstInput) hide(ctx);
+		if (event.source === "interactive" && visible && config?.hideOnPrompt) hide(ctx);
 		return { action: "continue" };
 	});
 

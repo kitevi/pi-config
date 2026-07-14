@@ -90,14 +90,14 @@ No `npm install` needed — the bootstrap script uses only Node.js built-ins.
 
 ## Skill index
 
-`extensions/skill-guide.ts` renders every loaded skill command and a short summary in a TUI-only widget when a session starts. The widget is not added to the conversation or sent to the model provider. It hides after the first prompt by default; use `/skill-guide` to toggle it again.
+`extensions/skill-guide.ts` renders every loaded skill command and a short summary in a TUI-only widget when a session starts. The widget is not added to the conversation or sent to the model provider. It hides whenever you submit a prompt; use `/skill-guide` to reopen it until your next prompt.
 
 Configure it in `extensions/skill-guide.json`:
 
 - `showOnStartup` — show the index when a session starts.
-- `hideAfterFirstInput` — reclaim the screen after the first interactive prompt.
+- `hideOnPrompt` — hide the index whenever an interactive prompt is submitted.
 - `placement` — `aboveEditor` or `belowEditor`.
-- `maxSummaryLength` — maximum source-description length before shortening.
+- `maxSummaryLength` — maximum summary length before shortening (30 characters by default).
 - `summaryOverrides` — replace unclear upstream descriptions by skill name.
 
 ## Nested Pi subprocess guard
