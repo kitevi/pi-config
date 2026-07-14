@@ -6,6 +6,10 @@
     "--legacy-peer-deps",
     "--dangerously-allow-all-scripts"
   ],
+  "skills": [
+    "git/github.com/dmmulroy/skills/tech-spec",
+    "git/github.com/dmmulroy/skills/bro"
+  ],
   "packages": [
     {
       "source": "npm:@aliou/pi-synthetic",
@@ -49,6 +53,10 @@
       "skills": [
         "skills/frontend-design"
       ]
+    },
+    {
+      "source": "https://github.com/dmmulroy/skills",
+      "skills": []
     }
   ],
   "compaction": {
