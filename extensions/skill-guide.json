@@ -5,7 +5,7 @@
   "placement": "aboveEditor",
   "maxSummaryLength": 30,
   "summaryOverrides": {
-    "bro": "Make the last answer concise.",
+    "bro": "Rephrase last reply, no jargon.",
     "code-review": "Review a diff vs spec & rules.",
     "codebase-design": "Design a deep module or seam.",
     "diagnosing-bugs": "Reproduce, isolate, and fix.",
@@ -18,10 +18,10 @@
     "implement": "Implement an existing spec.",
     "improve-codebase-architecture": "Find deeper module boundaries.",
     "prototype": "Prototype to answer questions.",
-    "resolving-merge-conflicts": "Resolve merge/rebase conflicts",
+    "resolving-merge-conflicts": "Resolve merge/rebase conflicts.",
     "tdd": "Work test-first: red, green.",
     "teach": "Teach from workspace context.",
-    "tech-spec": "Design typed handoff contracts",
+    "tech-spec": "Write typed call-stack specs.",
     "writing-great-skills": "Write clear, reliable skills."
   }
 }
