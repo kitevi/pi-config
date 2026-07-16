@@ -28,9 +28,9 @@ const WEB_TOOLS_OVERLAY = join(REPO_DIR, "web-tools.json");
 const PI_WEB_TOOLS = join(HOME, ".pi", "web-tools.json");
 const HASHLINE_READMAP_OVERLAY = join(REPO_DIR, "hashline-readmap-settings.json");
 const PI_HASHLINE_READMAP_SETTINGS = join(PI_DIR, "hashline-readmap", "settings.json");
-const QUOTAS_OVERLAY = join(REPO_DIR, "quotas.json");
+const SYNTHETIC_OVERLAY = join(REPO_DIR, "synthetic.json");
 const NEURALWATT_OVERLAY = join(REPO_DIR, "neuralwatt.json");
-const PI_QUOTAS = join(PI_EXTENSIONS_DIR, "quotas.json");
+const PI_SYNTHETIC = join(PI_EXTENSIONS_DIR, "synthetic.json");
 const PI_NEURALWATT = join(PI_EXTENSIONS_DIR, "neuralwatt.json");
 const PI_VCC_CONFIG_OVERLAY = join(REPO_DIR, "pi-vcc-config.json");
 const PI_VCC_CONFIG = join(PI_DIR, "pi-vcc-config.json");
@@ -184,7 +184,7 @@ async function main() {
   await syncDirectoryLinks(EXTENSIONS_DIR, PI_EXTENSIONS_DIR);
   await syncDirectoryLinks(THEMES_DIR, PI_THEMES_DIR);
 
-  await installJsonConfig(QUOTAS_OVERLAY, PI_QUOTAS, "pi-quotas settings");
+  await installJsonConfig(SYNTHETIC_OVERLAY, PI_SYNTHETIC, "pi-synthetic settings");
   await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
   await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");

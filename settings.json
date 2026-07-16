@@ -14,14 +14,15 @@
     {
       "source": "npm:@aliou/pi-synthetic",
       "extensions": [
-        "extensions/provider/index.ts"
+        "extensions/provider/index.ts",
+        "extensions/usage-status/index.ts"
       ],
       "skills": [],
       "prompts": [],
       "themes": []
     },
     "npm:@pborck/pi-de",
-    "npm:@latentminds/pi-quotas",
+    "npm:@narumitw/pi-codex-usage",
     "https://github.com/monotykamary/pi-vcc",
     "https://github.com/monotykamary/pi-neuralwatt-provider",
     "https://github.com/monotykamary/pi-lilac-provider",

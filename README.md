@@ -1,7 +1,7 @@
 # pi-config
 
 My personal pi agent config repo.
-It keeps prompts/extensions/skills/themes/reminders plus repo-managed pi config files (settings, models, keybindings, quotas, neuralwatt, etc.) in version control and bootstraps them into `~/.pi/agent`.
+It keeps prompts/extensions/skills/themes/reminders plus repo-managed pi config files (settings, models, keybindings, Synthetic, Neuralwatt, etc.) in version control and bootstraps them into `~/.pi/agent`.
 
 ## Prerequisites
 
@@ -134,7 +134,7 @@ Putting that variable inside an agent's child command does not bypass the gate.
 
 4. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
    - `settings.json` → `~/.pi/agent/settings.json`
-   - `quotas.json` → `~/.pi/agent/extensions/quotas.json`
+   - `synthetic.json` → `~/.pi/agent/extensions/synthetic.json`
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
    - `web-tools.json` → `~/.pi/web-tools.json`
@@ -156,7 +156,7 @@ Putting that variable inside an agent's child command does not bypass the gate.
 - `models.json` — custom provider/model definitions symlinked into pi (for example OpenRouter via `OPENROUTER_API_KEY`)
 - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
 
-- `quotas.json` — pi-quotas configuration installed into `~/.pi/agent/extensions/quotas.json`
+- `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
 - `pi-vcc-config.json` — pi-vcc extension configuration installed into `~/.pi/agent/pi-vcc-config.json`
 - `web-tools.json` — web-tools configuration installed into `~/.pi/web-tools.json`
@@ -173,6 +173,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `quotas.json`, `neuralwatt.json`, `pi-vcc-config.json`, `web-tools.json`, `hashline-readmap-settings.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `web-tools.json`, `hashline-readmap-settings.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.

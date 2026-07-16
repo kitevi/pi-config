@@ -13,20 +13,46 @@ interface Settings {
 	packages: Array<string | PackageFilter>;
 }
 
+interface SyntheticConfig {
+	quotasCommand?: boolean;
+	usageStatus?: boolean;
+	quotaWarnings?: boolean;
+}
+
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function loadSettings(): Settings {
 	return JSON.parse(readFileSync(join(repoRoot, "settings.json"), "utf8")) as Settings;
 }
 
-void describe("pi-synthetic package filter", () => {
-	void it("loads the provider from its current package entrypoint", () => {
+function loadSyntheticConfig(): SyntheticConfig {
+	return JSON.parse(readFileSync(join(repoRoot, "synthetic.json"), "utf8")) as SyntheticConfig;
+}
+
+void describe("provider quota packages", () => {
+	void it("loads Synthetic's provider and response-header-backed usage status", () => {
 		const synthetic = loadSettings().packages.find(
 			(entry): entry is PackageFilter =>
 				typeof entry !== "string" && entry.source === "npm:@aliou/pi-synthetic",
 		);
 
 		assert.ok(synthetic, "Expected an @aliou/pi-synthetic package entry");
-		assert.deepStrictEqual(synthetic.extensions, ["extensions/provider/index.ts"]);
+		assert.deepStrictEqual(synthetic.extensions, [
+			"extensions/provider/index.ts",
+			"extensions/usage-status/index.ts",
+		]);
+	});
+
+	void it("keeps Synthetic's direct quota command disabled until it drops AuthStorage", () => {
+		const config = loadSyntheticConfig();
+		assert.equal(config.usageStatus, true);
+		assert.equal(config.quotasCommand, false);
+		assert.equal(config.quotaWarnings, false);
+	});
+
+	void it("uses the maintained Codex usage extension instead of pi-quotas", () => {
+		const packages = loadSettings().packages;
+		assert.ok(packages.includes("npm:@narumitw/pi-codex-usage"));
+		assert.ok(!packages.includes("npm:@latentminds/pi-quotas"));
 	});
 });
