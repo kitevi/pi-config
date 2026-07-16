@@ -12,5 +12,8 @@
   },
   "display": {
     "previewLines": 0
+  },
+  "contextHygiene": {
+    "staleResults": "append-only"
   }
 }
