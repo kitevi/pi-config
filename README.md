@@ -100,6 +100,21 @@ Configure it in `extensions/skill-guide.json`:
 - `maxSummaryLength` — maximum summary length before shortening (30 characters by default).
 - `summaryOverrides` — replace unclear upstream descriptions by skill name.
 
+## Agent loop explainer
+
+`extensions/zz-export-agent/` registers `/export-agent [name]`. It writes a standalone, dependency-free HTML report to the system temporary directory (`/tmp` on Linux) and keeps the file private with mode `0600`.
+
+```text
+/export-agent
+/export-agent work-agent-demo
+```
+
+The report is a big-picture explanation of how Pi wraps repeated model calls. It distinguishes Pi’s local session from the provider API and model; shows what enters every request; explains uncached input, cache reads, cache writes, and output; and shows why a model-emitted tool call makes Pi execute locally and issue another request automatically.
+
+Run the command after Pi settles to include the latest provider request, each completed model call in the latest agent run, measured cache/output usage, model output, and tool results. Run it before a prompt for a configuration-only preflight report. The observer retains only the latest run rather than exporting the full session transcript.
+
+The `zz-` directory prefix makes this observer load late among repo-managed extensions, improving its view of the provider request body. HTTP authorization headers are deliberately omitted. Reports contain sensitive prompt, message, project, output, and tool-result content, so review them before sharing.
+
 ## Nested Pi subprocess guard
 
 `extensions/permission-gate.ts` declines agent-issued `bash`/`nu` tool calls that start another Pi agent. This prevents a skill from simulating an unavailable subagent with commands such as `pi --no-session -p @prompt.md`.
@@ -148,6 +163,7 @@ Putting that variable inside an agent's child command does not bypass the gate.
 - `prompts/` — prompt files
 - `extensions/` — pi extensions
   - `extensions/skill-guide.json` — startup skill-index display settings and summary overrides
+  - `extensions/zz-export-agent/` — standalone `/export-agent` request, cache, and tool-loop explainer
 - `skills/` — pi skills
 - `themes/` — pi themes
 - `reminders/` — global reminder definitions for `pi-system-reminders`
