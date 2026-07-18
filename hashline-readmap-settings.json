@@ -9,8 +9,5 @@
     "maxBytes": 6144,
     "headLines": 12,
     "tailLines": 35
-  },
-  "display": {
-    "previewLines": 0
   }
 }
