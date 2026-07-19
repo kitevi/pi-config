@@ -70,6 +70,9 @@ void describe("Fabric code-mode context guard", () => {
 
 		assert.deepStrictEqual(persisted, [aggregate]);
 		assert.ok(preview.includes("Fabric code-mode context guard"));
+		assert.ok(preview.includes("Every combined final fabric_exec return"));
+		assert.ok(preview.includes("pi.read({ path, offset, limit: 40 })"));
+		assert.ok(!preview.includes("[Full output:"));
 		assert.ok(Buffer.byteLength(preview, "utf8") <= limits.maxBytes);
 		assert.ok(preview.split("\n").length <= limits.maxLines);
 	});
@@ -106,7 +109,9 @@ void describe("Fabric code-mode context guard", () => {
 			});
 			const content = patch?.content as Array<{ type: string; text?: string }> | undefined;
 			const preview = content?.find((block) => block.type === "text")?.text ?? "";
-			const pathMatch = preview.match(/\[Full output: (.+)\]/);
+			const pathMatch = preview.match(
+				/\[Oversized output saved for bounded inspection: (.+)\]/,
+			);
 			assert.ok(pathMatch?.[1]);
 			outputPath = JSON.parse(pathMatch[1]) as string;
 			assert.strictEqual(patch?.isError, undefined);

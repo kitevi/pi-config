@@ -18,6 +18,11 @@ export const DEFAULT_LIMITS: FabricCodeModeContextGuardLimits = {
 	tailLines: 35,
 };
 
+export const FABRIC_CODE_MODE_CONTEXT_GUARD_MARKER =
+	"Fabric code-mode context guard";
+
+const PREVIEW_METADATA_LINE_COUNT = 4;
+
 type GuardEvent = Pick<ToolResultEvent, "toolName" | "content">;
 type GuardPatch = Pick<ToolResultEvent, "content">;
 
@@ -45,7 +50,10 @@ function parseLimits(value: unknown): FabricCodeModeContextGuardLimits {
 		headLines: integer("headLines", 0),
 		tailLines: integer("tailLines", 0),
 	};
-	if (limits.headLines + limits.tailLines + 3 > limits.maxLines) {
+	if (
+		limits.headLines + limits.tailLines + PREVIEW_METADATA_LINE_COUNT >
+			limits.maxLines
+	) {
 		throw new Error("head/tail lines leave no room for guard metadata");
 	}
 	return limits;
@@ -114,8 +122,9 @@ function buildPreview(
 	const tail = lines.slice(tailStart);
 	const omittedLines = Math.max(0, lines.length - head.length - tail.length);
 	const header = [
-		`[Fabric code-mode context guard: ${lines.length} lines / ${Buffer.byteLength(text, "utf8")} bytes exceeded ${limits.maxLines} lines / ${limits.maxBytes} bytes.]`,
-		`[Full output: ${JSON.stringify(path)}]`,
+		`[${FABRIC_CODE_MODE_CONTEXT_GUARD_MARKER}: ${lines.length} lines / ${Buffer.byteLength(text, "utf8")} bytes exceeded ${limits.maxLines} lines / ${limits.maxBytes} bytes.]`,
+		`[Oversized output saved for bounded inspection: ${JSON.stringify(path)}]`,
+		"[Recovery: The guard itself is not a retry signal. Every combined final fabric_exec return—including one that returns this file—is guarded. Use this preview if sufficient; otherwise process the data inside the sandbox and return only a grep, summary, or pi.read({ path, offset, limit: 40 }) slice. Do not return the saved file wholesale or repeat the same broad call.]",
 	];
 	const marker =
 		`[… output shortened; ${omittedLines} whole lines omitted; long lines may be shortened …]`;
