@@ -20,14 +20,23 @@ const links = [
   { link: join(PI_DIR, "APPEND_SYSTEM.md"), target: join(REPO_DIR, "APPEND_SYSTEM.md") },
   { link: join(PI_DIR, "models.json"), target: join(REPO_DIR, "models.json") },
   { link: join(PI_DIR, "keybindings.json"), target: join(REPO_DIR, "keybindings.json") },
+  {
+    link: join(PI_DIR, "fabric-code-mode-context-guard.json"),
+    target: join(REPO_DIR, "fabric-code-mode-context-guard.json"),
+  },
 ];
 
 const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
 const PI_SETTINGS = join(PI_DIR, "settings.json");
 const WEB_TOOLS_OVERLAY = join(REPO_DIR, "web-tools.json");
 const PI_WEB_TOOLS = join(HOME, ".pi", "web-tools.json");
-const HASHLINE_READMAP_OVERLAY = join(REPO_DIR, "hashline-readmap-settings.json");
-const PI_HASHLINE_READMAP_SETTINGS = join(PI_DIR, "hashline-readmap", "settings.json");
+const FABRIC_CONFIG_OVERLAY = join(REPO_DIR, "fabric.json");
+const PI_FABRIC_CONFIG = join(PI_DIR, "fabric.json");
+const CODE_PREVIEW_CONFIG_OVERLAYS = {
+  light: join(REPO_DIR, "code-previews-light.json"),
+  dark: join(REPO_DIR, "code-previews-dark.json"),
+};
+const PI_CODE_PREVIEW_CONFIG = join(PI_DIR, "code-previews.json");
 const SYNTHETIC_OVERLAY = join(REPO_DIR, "synthetic.json");
 const NEURALWATT_OVERLAY = join(REPO_DIR, "neuralwatt.json");
 const PI_SYNTHETIC = join(PI_EXTENSIONS_DIR, "synthetic.json");
@@ -37,6 +46,8 @@ const PI_VCC_CONFIG = join(PI_DIR, "pi-vcc-config.json");
 const RESETTABLE_PI_PATHS = [
   // Fully managed by this repo.
   ...links.map(({link}) => link),
+  // Remove the pre-simplification config link if it was installed previously.
+  join(PI_DIR, "context-guard.json"),
   PI_EXTENSIONS_DIR,
   PI_THEMES_DIR,
 ];
@@ -171,6 +182,8 @@ async function switchTheme(variant = getThemeVariantFromArgs()) {
 }
 
 async function main() {
+  const themeVariant = getThemeVariantFromArgs();
+
   if (!existsSync(PI_DIR)) {
     await mkdir(PI_DIR, { recursive: true });
   }
@@ -189,9 +202,14 @@ async function main() {
   await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
   await installJsonConfig(WEB_TOOLS_OVERLAY, PI_WEB_TOOLS, "pi web-tools");
-  await installJsonConfig(HASHLINE_READMAP_OVERLAY, PI_HASHLINE_READMAP_SETTINGS, "hashline-readmap settings");
+  await installJsonConfig(FABRIC_CONFIG_OVERLAY, PI_FABRIC_CONFIG, "Pi Fabric config");
+  await installJsonConfig(
+    CODE_PREVIEW_CONFIG_OVERLAYS[themeVariant],
+    PI_CODE_PREVIEW_CONFIG,
+    "Pi code previews config",
+  );
   console.log("bootstrap complete");
-  await switchTheme();
+  await switchTheme(themeVariant);
 }
 
 main().catch((err) => {

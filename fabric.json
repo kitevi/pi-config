@@ -1,0 +1,50 @@
+{
+  "fullCodeMode": true,
+  "executor": {
+    "maxOutputChars": 100000,
+    "maxNestedResultChars": 100000,
+    "resultFormat": "auto"
+  },
+  "approvals": {
+    "read": "allow",
+    "write": "allow",
+    "execute": "allow",
+    "network": "deny",
+    "agent": "deny"
+  },
+  "capture": {
+    "enabled": true,
+    "hideFromModel": true,
+    "keepVisible": [
+      "fabric_exec"
+    ]
+  },
+  "mcp": {
+    "enabled": false,
+    "disableOAuth": true,
+    "allowDynamicServers": false
+  },
+  "subagents": {
+    "enabled": false,
+    "maxDepth": 0,
+    "retainRuns": false,
+    "notifyOnComplete": false
+  },
+  "ui": {
+    "enabled": false,
+    "widget": "hidden",
+    "showNestedToolCalls": false
+  },
+  "compaction": {
+    "engine": "pi"
+  },
+  "mesh": {
+    "enabled": false
+  },
+  "memory": {
+    "enabled": false
+  },
+  "schema": {
+    "mode": "off"
+  }
+}
