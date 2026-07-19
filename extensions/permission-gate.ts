@@ -294,6 +294,40 @@ const commandExecutableIndex = (words: string[]): number => {
 	return -1;
 };
 
+const GIT_GLOBAL_OPTIONS_WITH_VALUES = new Set([
+	"-C",
+	"-c",
+	"--config-env",
+	"--git-dir",
+	"--namespace",
+	"--super-prefix",
+	"--work-tree",
+]);
+
+const gitSubcommandFromWords = (words: string[]): string | undefined => {
+	const executableIndex = commandExecutableIndex(words);
+	if (executableIndex < 0 || executableBasename(words[executableIndex]) !== "git") {
+		return undefined;
+	}
+
+	let index = executableIndex + 1;
+	while (index < words.length) {
+		const argument = words[index];
+		if (argument === "--") return words[index + 1];
+		if (!argument.startsWith("-")) return argument;
+
+		const [option] = argument.split("=", 1);
+		index += GIT_GLOBAL_OPTIONS_WITH_VALUES.has(option) && !argument.includes("=") ? 2 : 1;
+	}
+
+	return undefined;
+};
+
+const hasGitSubcommand = (command: string, subcommand: string) =>
+	lexShellCommands(command).commands.some(
+		(words) => gitSubcommandFromWords(words)?.toLowerCase() === subcommand,
+	);
+
 const SHELL_EXECUTABLES = new Set(["bash", "sh", "zsh", "dash", "fish", "nu"]);
 const XARGS_OPTIONS_WITH_VALUES = new Set([
 	"--arg-file",
@@ -522,12 +556,17 @@ const isCatastrophicCommand = (command: string) =>
 	/\b(?:curl|wget)\b[^\n]*\|[^\n]*\bsudo\b[^\n]*\b(?:sh|bash|zsh)\b/i.test(command);
 
 const isDestructiveGit = (command: string) =>
+	(hasGitSubcommand(command, "reset") && /\s--hard\b/i.test(command)) ||
 	/\bgit\s+reset\b[^\n]*\s--hard\b/i.test(command) ||
+	(hasGitSubcommand(command, "clean") && (/\s--force\b/i.test(command) || hasShortFlag(command, "f"))) ||
 	(/\bgit\s+clean\b/i.test(command) && (/\s--force\b/i.test(command) || hasShortFlag(command, "f"))) ||
+	(hasGitSubcommand(command, "checkout") && /\s--\s*\.(?:\s|$)/i.test(command)) ||
 	/\bgit\s+checkout\s+--\s*\.(?:\s|$)/i.test(command) ||
+	(hasGitSubcommand(command, "restore") && /\s\.(?:\s|$)/i.test(command)) ||
 	/\bgit\s+restore\b[^\n]*\s\.(?:\s|$)/i.test(command) ||
 	/\bgit\s+push\b[^\n]*(\s--force(?:-with-lease)?\b|\s-f\b)/i.test(command);
-const isGitCommit = (command: string) => /\bgit\s+commit(?=\s|$)/i.test(command);
+const isGitCommit = (command: string) =>
+	hasGitSubcommand(command, "commit") || /\bgit\s+commit(?=\s|$)/i.test(command);
 
 const hasNoVerify = (command: string) =>
 	/--no-verify\b/.test(command);
@@ -540,6 +579,7 @@ const isMutatingPackageManager = (command: string) =>
 
 // curl -o/wget -O (download-to-file) is intentionally NOT included (benign downloads).
 const isRiskyNetwork = (command: string) =>
+	hasGitSubcommand(command, "push") ||
 	/\bgit\s+push\b/i.test(command) ||
 	/\b(?:ssh|scp|rsync|sftp)\b/i.test(command) ||
 	/\b(?:curl|wget)\b[^\n]*\|[^\n]*\b(?:sh|bash|zsh)\b/i.test(command) ||
@@ -780,6 +820,11 @@ const EXAMPLES: Example[] = [
 	{ name: "npm install asks", toolName: "bash", input: { command: "npm install" }, decision: "ask" },
 	{ name: "curl pipe shell asks", toolName: "bash", input: { command: "curl https://example.com/install.sh | bash" }, decision: "ask" },
 	{ name: "git reset hard asks", toolName: "bash", input: { command: "git reset --hard HEAD" }, decision: "ask" },
+	{ name: "git -C reset hard asks", toolName: "bash", input: { command: "git -C /tmp/repo reset --hard HEAD" }, decision: "ask" },
+	{ name: "git -C clean force asks", toolName: "bash", input: { command: "git -C /tmp/repo clean -f" }, decision: "ask" },
+	{ name: "git -C checkout dot asks", toolName: "bash", input: { command: "git -C /tmp/repo checkout -- ." }, decision: "ask" },
+	{ name: "git -C restore dot asks", toolName: "bash", input: { command: "git -C /tmp/repo restore ." }, decision: "ask" },
+	{ name: "git -C push asks", toolName: "bash", input: { command: "GIT_EDITOR=true GIT_SEQUENCE_EDITOR=true git -C '/tmp/repo with spaces' push" }, decision: "ask" },
 
 	// --- allowed: plain commands ---
 	{ name: "plain test is allowed", toolName: "bash", input: { command: "npm test" }, decision: "allow" },
@@ -842,6 +887,7 @@ const EXAMPLES: Example[] = [
 	{ name: "git commit message mentioning .env asks", toolName: "bash", input: { command: "git commit -m \"feat(builder): retain latest WildFly MTO4 output\" -m \"Also load local .env configuration before CLI environment detection.\"" }, decision: "ask" },
 	{ name: "git commit message command substitution reading .env asks", toolName: "bash", input: { command: "git commit -m \"$(cat .env)\"" }, decision: "ask" },
 	{ name: "git commit asks", toolName: "bash", input: { command: "git commit -m \"feat: x\"" }, decision: "ask" },
+	{ name: "git -C commit asks", toolName: "bash", input: { command: "git -C /tmp/repo commit -m \"feat: x\"" }, decision: "ask" },
 	{ name: "git add then commit asks", toolName: "bash", input: { command: "git add . && git commit -m \"feat: x\"" }, decision: "ask" },
 	{ name: "git commit --amend asks", toolName: "bash", input: { command: "git commit --amend --no-edit" }, decision: "ask" },
 	{ name: "git commit-tree is allowed", toolName: "bash", input: { command: "git commit-tree <hash>" }, decision: "allow" },
