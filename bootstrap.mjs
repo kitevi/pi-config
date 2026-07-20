@@ -28,10 +28,10 @@ const links = [
 
 const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
 const PI_SETTINGS = join(PI_DIR, "settings.json");
-const WEB_TOOLS_OVERLAY = join(REPO_DIR, "web-tools.json");
-const PI_WEB_TOOLS = join(HOME, ".pi", "web-tools.json");
 const FABRIC_CONFIG_OVERLAY = join(REPO_DIR, "fabric.json");
 const PI_FABRIC_CONFIG = join(PI_DIR, "fabric.json");
+const MCP_CONFIG_OVERLAY = join(REPO_DIR, "mcp.json");
+const PI_MCP_CONFIG = join(PI_DIR, "mcp.json");
 const CODE_PREVIEW_CONFIG_OVERLAYS = {
   light: join(REPO_DIR, "code-previews-light.json"),
   dark: join(REPO_DIR, "code-previews-dark.json"),
@@ -201,7 +201,7 @@ async function main() {
   await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
   await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
-  await installJsonConfig(WEB_TOOLS_OVERLAY, PI_WEB_TOOLS, "pi web-tools");
+  await installJsonConfig(MCP_CONFIG_OVERLAY, PI_MCP_CONFIG, "MCP config");
   await installJsonConfig(FABRIC_CONFIG_OVERLAY, PI_FABRIC_CONFIG, "Pi Fabric config");
   await installJsonConfig(
     CODE_PREVIEW_CONFIG_OVERLAYS[themeVariant],

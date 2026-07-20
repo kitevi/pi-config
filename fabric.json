@@ -9,7 +9,7 @@
     "read": "allow",
     "write": "allow",
     "execute": "allow",
-    "network": "deny",
+    "network": "ask",
     "agent": "deny"
   },
   "capture": {
@@ -20,7 +20,8 @@
     ]
   },
   "mcp": {
-    "enabled": false,
+    "enabled": true,
+    "configPath": "~/.pi/agent/mcp.json",
     "disableOAuth": true,
     "allowDynamicServers": false
   },

@@ -124,7 +124,7 @@ Putting that variable inside an agent's child command does not bypass the gate.
    - `synthetic.json` → `~/.pi/agent/extensions/synthetic.json`
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
-   - `web-tools.json` → `~/.pi/web-tools.json`
+   - `mcp.json` → `~/.pi/agent/mcp.json`
    - `fabric.json` → `~/.pi/agent/fabric.json`
    - selected `code-previews-{light,dark}.json` → `~/.pi/agent/code-previews.json`
 
@@ -151,7 +151,7 @@ Putting that variable inside an agent's child command does not bypass the gate.
 - `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
 - `pi-vcc-config.json` — pi-vcc extension configuration installed into `~/.pi/agent/pi-vcc-config.json`
-- `web-tools.json` — web-tools configuration installed into `~/.pi/web-tools.json`
+- `mcp.json` — Exa web search and Context7 documentation MCP servers, installed into `~/.pi/agent/mcp.json`
 - `fabric.json` — minimal full-code Pi Fabric profile installed into `~/.pi/agent/fabric.json`
 - `code-previews-light.json` / `code-previews-dark.json` — matching Shiki theme selected by `setup-light` / `setup-dark` and installed into `~/.pi/agent/code-previews.json`
 
@@ -166,6 +166,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `web-tools.json`, `fabric.json`, and the selected `code-previews-{light,dark}.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `mcp.json`, `fabric.json`, and the selected `code-previews-{light,dark}.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.
