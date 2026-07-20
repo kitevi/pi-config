@@ -9,7 +9,7 @@
     "read": "allow",
     "write": "allow",
     "execute": "allow",
-    "network": "ask",
+    "network": "allow",
     "agent": "deny"
   },
   "capture": {
