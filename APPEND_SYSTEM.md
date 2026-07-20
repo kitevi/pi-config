@@ -6,6 +6,14 @@
 # Pi Fabric
 - Every `pi.*`, `extensions.*`, `tools.*`, and provider action call is asynchronous. Always `await` it or place it in an awaited `Promise.all`; never inspect, stringify, nest, or return an unresolved call.
 
+# MCP Tools
+- MCP tools are exposed inside `fabric_exec`; they do not appear as separate top-level tools.
+- Before claiming web search or current documentation is unavailable, call `await tools.list({ provider: "mcp", limit: 100 })`.
+- One empty `tools.search()` result is not proof that a capability is unavailable. Retry with a single keyword or list the MCP provider.
+- For current, recent, latest, or news-related information, use `await mcp.exa.web_search_exa({ query, numResults: 5 })`. Fetch full pages with `await mcp.exa.web_fetch_exa({ urls })`.
+- For current library or framework documentation, use `await mcp.context7.resolve_library_id({ libraryName, query })`, then `await mcp.context7.query_docs({ libraryId, query })`.
+- If arguments are uncertain, inspect them with `await tools.describe({ ref: "mcp.<server>.<tool>" })`.
+
 # Subagents
 - Do not invoke `pi` recursively from bash  or another shell tool to simulate a subagent. If a skill asks for an Agent/subagent tool that is unavailable, continue in the current context when feasible or explain the limitation.
 
