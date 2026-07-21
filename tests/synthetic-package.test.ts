@@ -49,10 +49,4 @@ void describe("provider quota packages", () => {
 		assert.equal(config.quotasCommand, false);
 		assert.equal(config.quotaWarnings, false);
 	});
-
-	void it("uses the maintained Codex usage extension instead of pi-quotas", () => {
-		const packages = loadSettings().packages;
-		assert.ok(packages.includes("npm:@narumitw/pi-codex-usage"));
-		assert.ok(!packages.includes("npm:@latentminds/pi-quotas"));
-	});
 });

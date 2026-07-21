@@ -28,7 +28,7 @@
       ]
     },
     "npm:@pborck/pi-de",
-    "npm:@narumitw/pi-codex-usage",
+    "npm:@narumitw/pi-usage",
     "https://github.com/monotykamary/pi-vcc",
     "https://github.com/monotykamary/pi-neuralwatt-provider",
     "https://github.com/monotykamary/pi-tps",
