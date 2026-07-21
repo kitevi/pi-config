@@ -2,7 +2,7 @@
   "fullCodeMode": true,
   "executor": {
     "maxOutputChars": 100000,
-    "maxNestedResultChars": 100000,
+    "maxNestedResultChars": 2000000,
     "resultFormat": "auto"
   },
   "approvals": {
