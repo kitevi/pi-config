@@ -136,7 +136,6 @@ Putting that variable inside an agent's child command does not bypass the gate.
 - `prompts/` — prompt files
 - `extensions/` — pi extensions
   - `extensions/fabric-code-mode-context-guard.ts` — recoverable guard for model-facing Fabric code-mode output
-  - `extensions/fabric-exec-skill-autoload.ts` — injects the canonical fabric-exec skill whenever the tool is active
   - `extensions/skill-guide.json` — startup skill-index display settings and summary overrides
   - `extensions/zz-export-agent/` — standalone `/export-agent` request, cache, and tool-loop explainer
 - `skills/` — pi skills
