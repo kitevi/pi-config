@@ -37,6 +37,7 @@
     "https://github.com/monotykamary/pi-invisible-continue",
     "npm:@dustydonkey/pi-spinner",
     "npm:pi-system-reminders",
+    "npm:pi-streaming-guard",
     {
       "source": "https://github.com/mattpocock/skills",
       "skills": [
