@@ -122,6 +122,34 @@ const SHELL_TOOLS = new Set(["bash", "nu"]);
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 const HOME = process.env.HOME ? resolve(process.env.HOME) : undefined;
+
+// Permission-gate "ask" dialogs are auto-aborted after this many ms via an
+// AbortController (set up in the handler below). MUST stay below the host's
+// tool-call/execution timeout; otherwise the host hard-kills the ask first and the
+// abort path never runs (the original bug). Override with PI_GATE_ASK_TIMEOUT_MS.
+const askTimeoutOverride = Number(process.env.PI_GATE_ASK_TIMEOUT_MS);
+const ASK_TIMEOUT_MS = askTimeoutOverride > 0 ? askTimeoutOverride : 60000;
+
+const ASK_ALLOW = "Yes, allow once";
+const ASK_DENY = "No, block it";
+
+// Pure classification of a finished yes/no ask, kept separate from the handler so
+// the decline/timeout logic is testable. `choice` is what ctx.ui.select resolved to
+// (ASK_ALLOW, ASK_DENY, or undefined for a dismissal / abort / caught throw).
+// `aborted` is whether the AbortController fired (the timer elapsed). A timeout is
+// reported distinctly from an explicit decline, but both block + abort the turn.
+function describeAskOutcome(choice: string | undefined, aborted: boolean, askSecs: number) {
+	const declined = choice === ASK_DENY || !aborted;
+	return {
+		declined,
+		notify: declined
+			? "Permission gate ask declined by user; aborting turn."
+			: "Permission gate ask timed out after " + askSecs + "s (no response); aborting turn.",
+		reason: declined
+			? "Blocked by permission gate: the user declined (explicitly or by dismissing). Do not retry or bypass the gate."
+			: "Blocked by permission gate: the ask timed out after " + askSecs + "s with no response (the user may be away). Do not retry or bypass the gate.",
+	};
+}
 const NESTED_PI_OVERRIDE_ENV = "PI_PERMISSION_GATE_ALLOW_NESTED_PI";
 const nestedPiOverrideEnabled = () => /^(?:1|true|yes|on)$/i.test(process.env[NESTED_PI_OVERRIDE_ENV]?.trim() ?? "");
 
@@ -899,6 +927,21 @@ const EXAMPLES: Example[] = [
 	{ name: "sudo rm blocks even though rm alone would ask", toolName: "bash", input: { command: "sudo rm /tmp/foo.txt" }, decision: "block" },
 ];
 
+const ASK_OUTCOME_EXAMPLES: Array<{
+	name: string;
+	choice: string | undefined;
+	aborted: boolean;
+	askSecs: number;
+	declined: boolean;
+	notifyIncludes: string;
+	reasonIncludes: string;
+}> = [
+	{ name: "explicit deny is a decline", choice: ASK_DENY, aborted: false, askSecs: 60, declined: true, notifyIncludes: "declined by user", reasonIncludes: "declined (explicitly or by dismissing)" },
+	{ name: "dismissal (undefined, not aborted) is a decline", choice: undefined, aborted: false, askSecs: 60, declined: true, notifyIncludes: "declined by user", reasonIncludes: "declined (explicitly or by dismissing)" },
+	{ name: "timeout (undefined, aborted) is reported as timed out", choice: undefined, aborted: true, askSecs: 60, declined: false, notifyIncludes: "timed out after 60s", reasonIncludes: "timed out after 60s" },
+	{ name: "explicit deny wins over a concurrent abort (race)", choice: ASK_DENY, aborted: true, askSecs: 60, declined: true, notifyIncludes: "declined by user", reasonIncludes: "declined (explicitly or by dismissing)" },
+];
+
 function runSelfTests() {
 	const failures: string[] = [];
 	const previousNestedPiOverride = process.env[NESTED_PI_OVERRIDE_ENV];
@@ -917,6 +960,19 @@ function runSelfTests() {
 		if (optedInDecision !== "allow") {
 			failures.push(`parent nested-Pi override: expected allow, got ${optedInDecision}`);
 		}
+
+		for (const example of ASK_OUTCOME_EXAMPLES) {
+			const outcome = describeAskOutcome(example.choice, example.aborted, example.askSecs);
+			if (outcome.declined !== example.declined) {
+				failures.push(`${example.name}: declined expected ${example.declined}, got ${outcome.declined}`);
+			}
+			if (!outcome.notify.includes(example.notifyIncludes)) {
+				failures.push(`${example.name}: notify expected to include "${example.notifyIncludes}", got "${outcome.notify}"`);
+			}
+			if (!outcome.reason.includes(example.reasonIncludes)) {
+				failures.push(`${example.name}: reason expected to include "${example.reasonIncludes}", got "${outcome.reason}"`);
+			}
+		}
 	} finally {
 		if (previousNestedPiOverride === undefined) delete process.env[NESTED_PI_OVERRIDE_ENV];
 		else process.env[NESTED_PI_OVERRIDE_ENV] = previousNestedPiOverride;
@@ -926,7 +982,7 @@ function runSelfTests() {
 		throw new Error(`Permission gate self-tests failed:\n${formatList(failures)}`);
 	}
 
-	console.log(`Permission gate self-tests passed (${EXAMPLES.length + 1} examples).`);
+	console.log(`Permission gate self-tests passed (${EXAMPLES.length + ASK_OUTCOME_EXAMPLES.length + 1} examples).`);
 }
 
 if (process.env.PERMISSION_GATE_SELF_TEST === "1") {
@@ -949,16 +1005,32 @@ export default function (pi: ExtensionAPI) {
 
 		if (!ctx.hasUI) return { block: true, reason: `${reason}\n\nConfirmation requires UI.` };
 
-		const allow = "Yes, allow once";
-		const choice = await ctx.ui.select(
-			`⚠️ Permission gate ask\n\n${reason}\n\nAllow?`,
-			["No, block it", allow],
-		);
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), ASK_TIMEOUT_MS);
+		// ctx.ui.select resolves to undefined when the signal aborts, but defend
+		// against a host that rejects instead: either way, no answer was given.
+		let choice: string | undefined;
+		try {
+			choice = await ctx.ui.select(
+				`⚠️ Permission gate ask\n\n${reason}\n\nAllow?`,
+				[ASK_DENY, ASK_ALLOW],
+				{ signal: controller.signal },
+			);
+		} catch {
+			choice = undefined;
+		}
+		clearTimeout(timer);
 
-		if (choice === allow) return undefined;
+		if (choice === ASK_ALLOW) return undefined;
 
-		if (ctx.hasUI) ctx.ui.notify("Operation aborted by user.", "warning");
+		// Decline covers an explicit "No, block it" and a user dismissal (Esc): on a
+		// yes/no gate, cancel can't mean "yes", so it's a decline. A timeout (timer
+		// fired, nobody answered) is reported distinctly. Abort the whole turn (not
+		// just this call) so the model cannot route around the gate.
+		const askSecs = Math.round(ASK_TIMEOUT_MS / 1000);
+		const outcome = describeAskOutcome(choice, controller.signal.aborted, askSecs);
+		if (ctx.hasUI) ctx.ui.notify(outcome.notify, "warning");
 		await ctx.abort();
-		return { block: true, reason: "Blocked by user" };
+		return { block: true, reason: outcome.reason };
 	});
 }
