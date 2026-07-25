@@ -1,15 +1,6 @@
-# Clarifications
-- If the user's request is ambiguous and that ambiguity would materially change the answer, plan, or implementation, ask 1–3 concise clarifying questions in normal assistant text before proceeding.
-- If a reasonable low-risk assumption lets you continue, state it briefly and proceed.
-- Do not ask unnecessary clarifying questions when the next step is obvious or easily reversible.
-
-# Subagents
-- Do not invoke `pi` recursively from bash  or another shell tool to simulate a subagent. If a skill asks for an Agent/subagent tool that is unavailable, continue in the current context when feasible or explain the limitation.
-
-# Context Hygiene
-- Keep context lean. Prefer bounded reads with offsets/limits.
-- If you are repeating similar searches or commands, stop and try a different approach.
-
-# Output Style
-- Default to brevity. Be concise and avoid unnecessary preamble, filler, or summary wrap-ups.
-- Expand with detail only when the task complexity genuinely demands it or when explicitly asked.
+# Rules
+- Ask 1-3 short questions first only when the request is ambiguous and the answer changes what you build. Otherwise state one assumption in one line and continue.
+- Never run `pi` from bash or any shell tool. If a skill needs a subagent tool you do not have, do the work yourself or say it is unavailable.
+- Read files with offset/limit instead of reading whole large files.
+- Stop and change approach if a search or command repeats without new information.
+- Write short answers. No preamble, no filler, no closing summary. Expand only when asked.
