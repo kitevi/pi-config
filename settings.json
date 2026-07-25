@@ -21,14 +21,10 @@
       "prompts": [],
       "themes": []
     },
-    {
-      "source": "npm:pi-fabric",
-      "skills": [
-        "skills/fabric-exec"
-      ]
-    },
     "npm:@pborck/pi-de",
     "npm:@narumitw/pi-usage",
+    "https://github.com/ppowo/pi-hashline-readmap",
+    "https://github.com/coctostan/pi-web-tools",
     "https://github.com/monotykamary/pi-vcc",
     "https://github.com/monotykamary/pi-neuralwatt-provider",
     "https://github.com/monotykamary/pi-tps",

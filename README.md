@@ -80,12 +80,6 @@ Run the command after Pi settles to include the latest provider request, each co
 
 The `zz-` directory prefix makes this observer load late among repo-managed extensions, improving its view of the provider request body. HTTP authorization headers are deliberately omitted. Reports contain sensitive prompt, message, project, output, and tool-result content, so review them before sharing.
 
-## Fabric code-mode context guard
-
-`extensions/fabric-code-mode-context-guard.ts` guards only the model-facing `fabric_exec` result. Nested `pi.bash`, `pi.grep`, and other lifecycle results are deliberately left intact for sandbox processing, subject to Pi and Fabric's native execution limits. This avoids producing a final preview of ten already-truncated previews.
-
-Oversized text is saved completely to a unique mode-`0600` OS-temp file before Pi receives a bounded head/tail preview. Images and other non-text blocks are preserved separately and remain outside the text budget. Limits live in `fabric-code-mode-context-guard.json`, symlinked to `~/.pi/agent/fabric-code-mode-context-guard.json` by reconciliation.
-
 ## Nested Pi subprocess guard
 
 `extensions/permission-gate.ts` declines agent-issued `bash`/`nu` tool calls that start another Pi agent. This prevents a skill from simulating an unavailable subagent with commands such as `pi --no-session -p @prompt.md`.
@@ -104,7 +98,7 @@ Putting that variable inside an agent's child command does not bypass the gate.
 
 `npm run setup` runs `bootstrap.mjs`, which:
 
-1. **Clears** all repo-managed paths under `~/.pi/agent/` (prompts, skills, reminders, APPEND_SYSTEM.md, models.json, keybindings.json, fabric-code-mode-context-guard.json, extensions/, themes/) — stale symlinks and files are cleaned out before re-creation.
+1. **Clears** all repo-managed paths under `~/.pi/agent/` (prompts, skills, reminders, APPEND_SYSTEM.md, models.json, keybindings.json, extensions/, themes/) — stale symlinks and files are cleaned out before re-creation.
 
 2. **Symlinks** directories and files into `~/.pi/agent`:
    - `prompts/`
@@ -113,7 +107,6 @@ Putting that variable inside an agent's child command does not bypass the gate.
    - `APPEND_SYSTEM.md`
    - `models.json`
    - `keybindings.json`
-   - `fabric-code-mode-context-guard.json`
 
 3. **Symlinks** extension and theme directories from the repo into `~/.pi/agent`:
    - `extensions/` → `~/.pi/agent/extensions/`
@@ -124,9 +117,8 @@ Putting that variable inside an agent's child command does not bypass the gate.
    - `synthetic.json` → `~/.pi/agent/extensions/synthetic.json`
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
-   - `mcp.json` → `~/.pi/agent/mcp.json`
-   - `fabric.json` → `~/.pi/agent/fabric.json`
-   - selected `code-previews-{light,dark}.json` → `~/.pi/agent/code-previews.json`
+   - `web-tools.json` → `~/.pi/web-tools.json`
+   - `hashline-readmap-settings.json` → `~/.pi/agent/hashline-readmap/settings.json`
 
 5. **Switches the active theme** — symlinks the `github-colorblind.json` theme to the light or dark variant (defaults to light unless `--dark` or `--light` is passed to the script).
 
@@ -135,7 +127,6 @@ Putting that variable inside an agent's child command does not bypass the gate.
 - `bootstrap.mjs` — setup/link/merge script
 - `prompts/` — prompt files
 - `extensions/` — pi extensions
-  - `extensions/fabric-code-mode-context-guard.ts` — recoverable guard for model-facing Fabric code-mode output
   - `extensions/skill-guide.json` — startup skill-index display settings and summary overrides
   - `extensions/zz-export-agent/` — standalone `/export-agent` request, cache, and tool-loop explainer
 - `skills/` — pi skills
@@ -145,14 +136,11 @@ Putting that variable inside an agent's child command does not bypass the gate.
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
 - `models.json` — custom provider/model definitions symlinked into pi (for example OpenRouter via `OPENROUTER_API_KEY`)
 - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
-- `fabric-code-mode-context-guard.json` — line/UTF-8-byte limits for model-facing `fabric_exec` output
-
 - `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
 - `pi-vcc-config.json` — pi-vcc extension configuration installed into `~/.pi/agent/pi-vcc-config.json`
-- `mcp.json` — Exa web search and Context7 documentation MCP servers, installed into `~/.pi/agent/mcp.json`
-- `fabric.json` — minimal full-code Pi Fabric profile installed into `~/.pi/agent/fabric.json`
-- `code-previews-light.json` / `code-previews-dark.json` — matching Shiki theme selected by `setup-light` / `setup-dark` and installed into `~/.pi/agent/code-previews.json`
+- `web-tools.json` — pi-web-tools configuration installed into `~/.pi/web-tools.json`
+- `hashline-readmap-settings.json` — hashline-readmap configuration installed into `~/.pi/agent/hashline-readmap/settings.json`
 
 The bootstrap script is plain Node.js, but pi extensions in `extensions/` can still stay TypeScript.
 Reminder files tracked in `reminders/` become global reminders via `~/.pi/agent/reminders`; project-specific reminders for some other repo should still live in that repo's `.pi/reminders/` directory.
@@ -165,6 +153,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `mcp.json`, `fabric.json`, and the selected `code-previews-{light,dark}.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `web-tools.json`, and `hashline-readmap-settings.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.
