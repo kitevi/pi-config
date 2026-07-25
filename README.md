@@ -59,32 +59,26 @@ npm run setup-dark
 
 Configure it in `extensions/skill-guide.json`:
 
+- `title` — widget heading text (`"Skill index"` by default).
 - `showOnStartup` — show the index when a session starts.
 - `hideOnPrompt` — hide the index whenever an interactive prompt is submitted.
 - `placement` — `aboveEditor` or `belowEditor`.
 - `maxSummaryLength` — maximum summary length before shortening (30 characters by default).
 - `summaryOverrides` — replace unclear upstream descriptions by skill name.
 
-## Agent loop explainer
+## Permission gate
 
-`extensions/zz-export-agent/` registers `/export-agent [name]`. It writes a standalone, dependency-free HTML report to the system temporary directory (`/tmp` on Linux) and keeps the file private with mode `0600`.
+`extensions/permission-gate.ts` is a rule-based guard over agent-issued `bash`/`nu` tool calls. It is behavior shaping, not a sandbox: ordinary work — including reads and writes outside the workspace and `/tmp`, tests, builds, and plain network fetches — runs unhindered, while higher-stakes calls are **blocked** outright or raised as an **ask** you confirm.
 
-```text
-/export-agent
-/export-agent work-agent-demo
-```
+**Blocked** (never run): credential and private-material reads or writes (SSH keys, GPG, `.pem`/`.key`/`.p12`/`.pfx`, AWS/gcloud/Azure/Docker auth — `.env`, `.envrc`, `.npmrc`, `.netrc` are intentionally allowed); catastrophic disk/system commands (`mkfs`, `dd` to `/dev/*`, `sudo rm`, `chmod -R 777 /`, `curl … | sudo sh`); writes to `/dev`, `/proc`, `/sys`; git with `--no-verify`; and agent-launched nested Pi agents (below).
 
-The report is a big-picture explanation of how Pi wraps repeated model calls. It distinguishes Pi’s local session from the provider API and model; shows what enters every request; explains uncached input, cache reads, cache writes, and output; and shows why a model-emitted tool call makes Pi execute locally and issue another request automatically.
+**Asked** (confirmed before running): file deletion; shell-side file mutation (`chmod`, `chown`, `tee`, `truncate`, `dd`, in-place `sed`/`perl`, nushell `save`); inline interpreter code that writes files, spawns processes, or sends data; running a script created this session; `sudo`/elevated commands; destructive git (`reset --hard`, `clean -f`, `checkout -- .`, `restore .`, force push); commits; mutating package-manager commands; and outbound network upload, push, or remote execution (`git push`, `ssh`, `scp`, `rsync`, `nc`, `socat`, mutating or authenticated `curl`/`wget`, `curl | sh`). Plain download-to-file is not asked.
 
-Run the command after Pi settles to include the latest provider request, each completed model call in the latest agent run, measured cache/output usage, model output, and tool results. Run it before a prompt for a configuration-only preflight report. The observer retains only the latest run rather than exporting the full session transcript.
+An **ask** you decline or dismiss blocks the call and aborts the turn, so the model cannot immediately retry another form; an ask that times out blocks the call but lets the turn continue. The matching rule is quoted back to the model both as the tool result and again on the next turn.
 
-The `zz-` directory prefix makes this observer load late among repo-managed extensions, improving its view of the provider request body. HTTP authorization headers are deliberately omitted. Reports contain sensitive prompt, message, project, output, and tool-result content, so review them before sharing.
+### Nested Pi subprocess guard
 
-## Nested Pi subprocess guard
-
-`extensions/permission-gate.ts` declines agent-issued `bash`/`nu` tool calls that start another Pi agent. This prevents a skill from simulating an unavailable subagent with commands such as `pi --no-session -p @prompt.md`.
-
-The guard does **not** affect Pi started directly in a terminal or commands you run through Pi's `!` user-shell prefix. Non-agent operations—including diagnostics, package/config commands, export, RPC mode, and promptless startup—remain available to the agent.
+As one block rule, the gate declines agent `bash`/`nu` calls that start another Pi agent, preventing a skill from simulating an unavailable subagent with commands such as `pi --no-session -p @prompt.md`. It does **not** affect Pi started directly in a terminal or via Pi’s `!` user-shell prefix. Non-agent Pi operations — help/version, `--list-models`, `--export`, management commands (`config`, `install`, `list`, `remove`, `uninstall`, `update`), and promptless startup — remain available to the agent.
 
 For deliberate nested-agent troubleshooting, opt in on the **parent** process:
 
@@ -92,7 +86,7 @@ For deliberate nested-agent troubleshooting, opt in on the **parent** process:
 PI_PERMISSION_GATE_ALLOW_NESTED_PI=1 pi
 ```
 
-Putting that variable inside an agent's child command does not bypass the gate.
+Setting that variable inside an agent’s child command does not bypass the gate.
 
 ## What setup does
 
@@ -127,8 +121,12 @@ Putting that variable inside an agent's child command does not bypass the gate.
 - `bootstrap.mjs` — setup/link/merge script
 - `prompts/` — prompt files
 - `extensions/` — pi extensions
+  - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide`
   - `extensions/skill-guide.json` — startup skill-index display settings and summary overrides
-  - `extensions/zz-export-agent/` — standalone `/export-agent` request, cache, and tool-loop explainer
+  - `extensions/permission-gate.ts` — rule-based permission gate for `bash`/`nu` tool calls (see [Permission gate](#permission-gate))
+  - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus GPT verbosity and context "dumb zone" hints
+  - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
+  - `extensions/glm-max-reasoning.ts` — raises the thinking level to a GLM model’s highest supported level on model select/start
 - `skills/` — pi skills
 - `themes/` — pi themes
 - `reminders/` — global reminder definitions for `pi-system-reminders`
@@ -141,6 +139,7 @@ Putting that variable inside an agent's child command does not bypass the gate.
 - `pi-vcc-config.json` — pi-vcc extension configuration installed into `~/.pi/agent/pi-vcc-config.json`
 - `web-tools.json` — pi-web-tools configuration installed into `~/.pi/web-tools.json`
 - `hashline-readmap-settings.json` — hashline-readmap configuration installed into `~/.pi/agent/hashline-readmap/settings.json`
+- `tests/` — `node:test` suites for the extensions, run with `npm test`
 
 The bootstrap script is plain Node.js, but pi extensions in `extensions/` can still stay TypeScript.
 Reminder files tracked in `reminders/` become global reminders via `~/.pi/agent/reminders`; project-specific reminders for some other repo should still live in that repo's `.pi/reminders/` directory.
