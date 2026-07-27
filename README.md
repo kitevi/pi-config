@@ -126,7 +126,7 @@ Setting that variable inside an agent’s child command does not bypass the gate
   - `extensions/permission-gate.ts` — rule-based permission gate for `bash`/`nu` tool calls (see [Permission gate](#permission-gate))
   - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus GPT verbosity and context "dumb zone" hints
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
-  - `extensions/glm-max-reasoning.ts` — raises the thinking level to a GLM model’s highest supported level on model select/start
+  - `extensions/max-reasoning.ts` — raises the thinking level to a GLM/DeepSeek/Kimi model’s highest supported level on model select/start
 - `skills/` — pi skills
 - `themes/` — pi themes
 - `reminders/` — global reminder definitions for `pi-system-reminders`

@@ -1,15 +1,18 @@
 /**
- * GLM Max Reasoning
+ * Max Reasoning
  *
- * When a GLM model (any model whose id contains "glm" — e.g. zai-org/glm-5.2,
- * zai-org/glm-5.1, glm-4.6) becomes active, automatically raise pi's thinking
- * level to the highest level that model supports, if it isn't already there.
+ * When a matched model family (GLM, DeepSeek, Kimi — any model whose id
+ * contains one of MATCHED_FAMILIES, e.g. zai-org/glm-5.2,
+ * deepseek/deepseek-v4-pro, moonshotai/kimi-k3) becomes active,
+ * automatically raise pi's thinking level to the highest level that model
+ * supports, if it isn't already there.
  *
  * Different providers expose different top levels — lilac's GLM 5.2 offers
- * "max", others cap at "xhigh" or "high" — so the target is read from the live
- * model's `thinkingLevelMap` rather than hard-coded. The level-support logic
- * mirrors @earendil-works/pi-ai's getSupportedThinkingLevels() so the chosen
- * level always matches what the runtime would clamp "max" down to:
+ * "max", openrouter's deepseek v4 and kimi-k3 cap at "xhigh", models with
+ * no map cap at "high" — so the target is read from the live model's
+ * `thinkingLevelMap` rather than hard-coded. The level-support logic mirrors
+ * @earendil-works/pi-ai's getSupportedThinkingLevels() so the chosen level
+ * always matches what the runtime would clamp "max" down to:
  *   - non-reasoning models only support "off"
  *   - a map entry of `null` hides a level
  *   - extended levels (xhigh, max) are unsupported unless explicitly mapped
@@ -18,7 +21,7 @@
  * It acts only on model selection and session start, so a manual Shift+Tab
  * change afterwards is respected for the rest of the session.
  *
- * Loaded as a global extension via ~/.pi/agent/extensions/glm-max-reasoning.ts
+ * Loaded as a global extension via ~/.pi/agent/extensions/max-reasoning.ts
  * (symlinked from this repo by bootstrap.mjs).
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -39,12 +42,15 @@ export interface ThinkingModel {
 	thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
 }
 
-/** Matches GLM model ids across providers: zai-org/glm-5.2, glm-4.6, chatglm3, … */
-const GLM_ID = /glm/i;
+/** Model families auto-raised to their top thinking level. Case-insensitive
+ *  substring match against model.id. Known matching ids include
+ *  zai-org/glm-5.2, z-ai/glm-5.2, deepseek/deepseek-v4-pro, moonshotai/kimi-k3. */
+const MATCHED_FAMILIES = ["glm", "deepseek", "kimi"] as const;
 
-/** True for any model whose id contains "glm". */
-export function isGlmModel(model: { id?: string } | undefined): model is ThinkingModel & { id: string } {
-	return !!model?.id && GLM_ID.test(model.id);
+/** True for any model whose id contains a matched family token. */
+export function isMatchedModel(model: { id?: string } | undefined): model is ThinkingModel & { id: string } {
+	const id = model?.id?.toLowerCase();
+	return !!id && MATCHED_FAMILIES.some((family) => id.includes(family));
 }
 
 /**
@@ -79,44 +85,44 @@ export interface NotifyUi {
 }
 
 /**
- * If `model` is a GLM reasoning model, raise the thinking level to the highest
+ * If `model` is a matched reasoning model, raise the thinking level to the highest
  * level it supports — unless it is already there. Returns the level it set or
- * kept, or undefined if it did nothing (non-GLM model, non-reasoning model, or
+ * kept, or undefined if it did nothing (unmatched family, non-reasoning model, or
  * already at the top). The runtime's setThinkingLevel clamps and only
  * persists/emits on real change, but we short-circuit the no-op case ourselves
  * so we don't fire a spurious "set to max" notification.
  */
-export function applyGlmMaxReasoning(
+export function applyMaxReasoning(
 	api: ThinkingLevelApi,
 	model: ThinkingModel | undefined,
 	ui: NotifyUi | undefined,
 ): ThinkingLevel | undefined {
-	if (!isGlmModel(model)) return undefined;
+	if (!isMatchedModel(model)) return undefined;
 	const target = highestThinkingLevel(model);
-	// Non-reasoning GLM model, or a degenerate map with no supported levels.
+	// Non-reasoning matched model, or a degenerate map with no supported levels.
 	if (!target || target === "off") return undefined;
 	const current = api.getThinkingLevel();
 	if (current === target) return current;
 	api.setThinkingLevel(target);
 	try {
-		ui?.notify(`GLM ${model.id}: reasoning set to ${target}`, "info");
+		ui?.notify(`${model.id}: reasoning set to ${target}`, "info");
 	} catch {
 		// ui may be unavailable (print mode / stale runner) — level still applied.
 	}
 	return target;
 }
 
-export default function glmMaxReasoning(pi: ExtensionAPI): void {
+export default function maxReasoning(pi: ExtensionAPI): void {
 	// /model, Ctrl+P cycling, and session restore. The runtime has already
 	// re-clamped the thinking level for the new model before this event fires.
 	pi.on("model_select", async (event, ctx) => {
-		applyGlmMaxReasoning(pi, event.model ?? ctx.model, ctx.ui);
+		applyMaxReasoning(pi, event.model ?? ctx.model, ctx.ui);
 	});
 
 	// model_select does not fire on a fresh startup, so cover the initial model
 	// here. Also re-runs on /new, /resume, /fork, and /reload. Idempotent: a
 	// no-op when the level is already at the model's top.
 	pi.on("session_start", async (_event, ctx) => {
-		applyGlmMaxReasoning(pi, ctx.model, ctx.ui);
+		applyMaxReasoning(pi, ctx.model, ctx.ui);
 	});
 }
