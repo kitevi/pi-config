@@ -336,35 +336,35 @@ void describe("running scripts the session created", () => {
 void describe("ask outcomes", () => {
 	void it("treats an explicit deny as a decline that aborts the turn", () => {
 		const outcome = describeAskOutcome(ASK_DENY, false, 60);
-		assert.strictEqual(outcome.declined, true);
-		assert.strictEqual(outcome.abortTurn, true);
+		assert.strictEqual(outcome.kind, "declined");
 		assert.match(outcome.notify, /declined by user/);
 		assert.match(outcome.reason, /declined \(explicitly or by dismissing\)/);
 	});
 
 	void it("treats a dismissal as a decline", () => {
 		const outcome = describeAskOutcome(undefined, false, 60);
-		assert.strictEqual(outcome.declined, true);
-		assert.strictEqual(outcome.abortTurn, true);
+		assert.strictEqual(outcome.kind, "declined");
 	});
 
-	void it("treats a timeout as a block that keeps the turn alive", () => {
+	void it("treats a timeout as an abort with its own message", () => {
 		const outcome = describeAskOutcome(undefined, true, 60);
-		assert.strictEqual(outcome.declined, false);
-		assert.strictEqual(outcome.abortTurn, false);
+		assert.strictEqual(outcome.kind, "timedOut");
 		assert.match(outcome.notify, /timed out after 60s/);
+		assert.match(outcome.notify, /aborted the turn/);
 		assert.match(outcome.reason, /timed out after 60s/);
+		assert.match(outcome.reason, /turn was aborted/);
+		assert.doesNotMatch(outcome.reason, /continue with work/);
+		assert.doesNotMatch(outcome.reason, /declined/);
 	});
 
 	void it("lets an explicit deny win a race with the countdown", () => {
 		const outcome = describeAskOutcome(ASK_DENY, true, 60);
-		assert.strictEqual(outcome.declined, true);
-		assert.strictEqual(outcome.abortTurn, true);
+		assert.strictEqual(outcome.kind, "declined");
 	});
 });
 
 void describe("tool_call handling", () => {
-	const install = (choice: string | undefined) => {
+	const install = (choice: string | undefined, honorTimeout = false) => {
 		const sent: Array<{ content: unknown; deliverAs: unknown }> = [];
 		const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
 		const pi = {
@@ -377,7 +377,14 @@ void describe("tool_call handling", () => {
 		let aborted = false;
 		const ctx = {
 			hasUI: true,
-			ui: { select: async () => choice, notify: () => {} },
+			ui: {
+				select: honorTimeout
+					? // Mimic the host's own countdown: resolve unanswered after `timeout`.
+						(_title: unknown, _choices: unknown, options: { timeout?: number }) =>
+							new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), options?.timeout ?? 0))
+					: async () => choice,
+				notify: () => {},
+			},
 			abort: () => {
 				aborted = true;
 			},
@@ -426,6 +433,26 @@ void describe("tool_call handling", () => {
 		assert.strictEqual(wasAborted(), false, "abort must not beat the block reason");
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		assert.strictEqual(wasAborted(), true);
+	});
+	void it("a timeout blocks, queues the reason for the next turn, and defers the abort", async () => {
+		process.env.PI_GATE_ASK_TIMEOUT_MS = "50";
+		try {
+			const { call, sent, wasAborted } = install(undefined, true);
+			const result = await call("bash", shell("rm foo.txt"));
+
+			assert.strictEqual(result?.block, true);
+			assert.match(result?.reason ?? "", /timed out/);
+			assert.match(result?.reason ?? "", /turn was aborted/);
+			assert.strictEqual(sent.length, 1);
+			assert.strictEqual(sent[0].deliverAs, "nextTurn");
+			assert.match(String(sent[0].content), /timed out/);
+
+			assert.strictEqual(wasAborted(), false, "abort must not beat the block reason");
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			assert.strictEqual(wasAborted(), true);
+		} finally {
+			delete process.env.PI_GATE_ASK_TIMEOUT_MS;
+		}
 	});
 });
 

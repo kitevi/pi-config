@@ -74,7 +74,7 @@ Configure it in `extensions/skill-guide.json`:
 
 **Asked** (confirmed before running): file deletion; shell-side file mutation (`chmod`, `chown`, `tee`, `truncate`, `dd`, in-place `sed`/`perl`, nushell `save`); inline interpreter code that writes files, spawns processes, or sends data; running a script created this session; `sudo`/elevated commands; destructive git (`reset --hard`, `clean -f`, `checkout -- .`, `restore .`, force push); commits; mutating package-manager commands; and outbound network upload, push, or remote execution (`git push`, `ssh`, `scp`, `rsync`, `nc`, `socat`, mutating or authenticated `curl`/`wget`, `curl | sh`). Plain download-to-file is not asked.
 
-An **ask** you decline or dismiss blocks the call and aborts the turn, so the model cannot immediately retry another form; an ask that times out blocks the call but lets the turn continue. The matching rule is quoted back to the model both as the tool result and again on the next turn.
+An **ask** you decline or dismiss blocks the call and aborts the turn, so the model cannot immediately retry another form; an ask that times out (you stepped away) also blocks the call and aborts the turn — unattended work stops there — but the model gets timeout wording rather than decline wording. Stepping away mid-ask therefore stops the run. In every blocked case the matching rule is quoted back to the model both as the tool result and again on the next turn.
 
 ### Nested Pi subprocess guard
 

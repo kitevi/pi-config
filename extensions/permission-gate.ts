@@ -83,8 +83,10 @@
  * - Allowed: the call runs.
  * - Declined (explicit "no" or dismissal): the call is blocked and the turn is
  *   aborted, so the model cannot immediately try another form.
- * - Timed out (nobody answered): the call is blocked but the turn continues. A
- *   timeout means the user stepped away, not that the work was rejected.
+ * - Timed out (nobody answered): the call is blocked and the turn is aborted
+ *   too — the user stepped away, so unattended work stops there rather than
+ *   continuing without permission. The model gets timeout wording, not the
+ *   decline wording: "nobody answered" is not "you said no".
  * - In every blocked case the reason is delivered to the model twice: as the tool
  *   result, and as a next-turn message. The second delivery matters because pi's
  *   agent loop checks the abort signal before the block reason, so an aborted
@@ -185,8 +187,12 @@ const SHELL_TOOLS = new Set(["bash", "nu"]);
 const HOME = process.env.HOME ? resolve(process.env.HOME) : undefined;
 
 // Ask dialogs auto-dismiss after this many ms. Override with PI_GATE_ASK_TIMEOUT_MS.
-const askTimeoutOverride = Number(process.env.PI_GATE_ASK_TIMEOUT_MS);
-const ASK_TIMEOUT_MS = askTimeoutOverride > 0 ? askTimeoutOverride : 60000;
+// Read per ask, not at module load, so tests can shorten the countdown and a
+// mid-session env change takes effect without a restart.
+const askTimeoutMs = () => {
+	const override = Number(process.env.PI_GATE_ASK_TIMEOUT_MS);
+	return override > 0 ? override : 60000;
+};
 // Backstop abort in case the host dialog ignores its own timeout, plus the slack
 // used to tell "the countdown ran out" from "the user dismissed it at the end".
 const ASK_TIMEOUT_BACKSTOP_MS = 2000;
@@ -1338,22 +1344,25 @@ const formatReason = (assessment: Assessment, hits = 0) => {
 // (ASK_ALLOW, ASK_DENY, or undefined for a dismissal / timeout / caught throw).
 // `timedOut` is whether the dialog ran out its countdown rather than being answered.
 //
-// A decline is a decision, so it aborts the turn: the model does not get to try a
-// different shape of the same action. A timeout is not a decision, only an absent
-// user, so the call is blocked but the turn survives.
+// Both non-allow outcomes abort the turn — a decline is a decision the model must
+// not route around, and a timeout means the user stepped away, so unattended work
+// stops too. They differ only in wording: the model (and user) should be able to
+// tell "you said no" from "nobody was there".
 function describeAskOutcome(choice: string | undefined, timedOut: boolean, askSecs: number) {
-	const declined = choice === ASK_DENY || !timedOut;
-	return {
-		declined,
-		abortTurn: declined,
-		notify: declined
-			? "Permission gate ask declined by user; aborting turn."
-			: "Permission gate ask timed out after " + askSecs + "s (no response); blocking this call.",
-		reason: declined
-			? "Blocked by permission gate: the user declined (explicitly or by dismissing). Do not retry this in another form."
-			: "Blocked by permission gate: the ask timed out after " +
+	if (choice !== ASK_DENY && timedOut) {
+		return {
+			kind: "timedOut" as const,
+			notify: `Permission gate ask timed out after ${askSecs}s with no response; blocked the call and aborted the turn.`,
+			reason:
+				"Blocked by permission gate: the ask timed out after " +
 				askSecs +
-				"s with no response (the user is away). Do not retry this call; continue with work that needs no permission, or stop and report.",
+				"s with no response — the user is away, so the turn was aborted. Do not retry this call in another form; wait for the user to return and ask before attempting it again.",
+		};
+	}
+	return {
+		kind: "declined" as const,
+		notify: "Permission gate ask declined by user; aborting turn.",
+		reason: "Blocked by permission gate: the user declined (explicitly or by dismissing). Do not retry this in another form.",
 	};
 }
 
@@ -1382,14 +1391,15 @@ export default function (pi: ExtensionAPI) {
 		// The dialog renders its own countdown from `timeout`; the controller is a
 		// backstop for a host that does not honour it. Either way "nobody answered"
 		// is told apart from "answered no" by how long the dialog stayed up.
+		const timeoutMs = askTimeoutMs();
 		const controller = new AbortController();
-		const timer = setTimeout(() => controller.abort(), ASK_TIMEOUT_MS + ASK_TIMEOUT_BACKSTOP_MS);
+		const timer = setTimeout(() => controller.abort(), timeoutMs + ASK_TIMEOUT_BACKSTOP_MS);
 		const startedAt = Date.now();
 		let choice: string | undefined;
 		try {
 			choice = await ctx.ui.select(`⚠️ Permission gate ask\n\n${reason}\n\nAllow?`, [ASK_DENY, ASK_ALLOW], {
 				signal: controller.signal,
-				timeout: ASK_TIMEOUT_MS,
+				timeout: timeoutMs,
 			});
 		} catch {
 			choice = undefined;
@@ -1398,31 +1408,31 @@ export default function (pi: ExtensionAPI) {
 
 		if (choice === ASK_ALLOW) return undefined;
 
-		const askSecs = Math.round(ASK_TIMEOUT_MS / 1000);
-		const timedOut = controller.signal.aborted || Date.now() - startedAt >= ASK_TIMEOUT_MS - ASK_TIMEOUT_SLACK_MS;
+		// A dismissal in the countdown's final slack window is misread as a
+		// timeout. Harmless: both kinds abort the turn; only the wording differs.
+		const askSecs = Math.round(timeoutMs / 1000);
+		const timedOut = controller.signal.aborted || Date.now() - startedAt >= timeoutMs - ASK_TIMEOUT_SLACK_MS;
 		const outcome = describeAskOutcome(choice, timedOut, askSecs);
 		const outcomeReason = `${outcome.reason}\n\n${reason}`;
 		ctx.ui.notify(outcome.notify, "warning");
 
-		if (outcome.abortTurn) {
-			// pi's agent loop checks the abort signal before it reads this block
-			// reason, so an aborted turn would otherwise hand the model a bare
-			// "Operation aborted" with no sign a gate exists. Deliver the reason as a
-			// next-turn message, which survives the abort, and defer the abort by a
-			// macrotask so the block reason still wins the race inside the loop.
-			try {
-				pi.sendMessage({ customType: "permission_gate", content: outcomeReason, display: false }, { deliverAs: "nextTurn" });
-			} catch {
-				// Older hosts may not support custom messages; the block still stands.
-			}
-			setTimeout(() => {
-				try {
-					ctx.abort();
-				} catch {
-					// The run may already have ended; nothing to abort.
-				}
-			}, 0);
+		// pi's agent loop checks the abort signal before it reads this block
+		// reason, so an aborted turn would otherwise hand the model a bare
+		// "Operation aborted" with no sign a gate exists. Deliver the reason as a
+		// next-turn message, which survives the abort, and defer the abort by a
+		// macrotask so the block reason still wins the race inside the loop.
+		try {
+			pi.sendMessage({ customType: "permission_gate", content: outcomeReason, display: false }, { deliverAs: "nextTurn" });
+		} catch {
+			// Older hosts may not support custom messages; the block still stands.
 		}
+		setTimeout(() => {
+			try {
+				ctx.abort();
+			} catch {
+				// The run may already have ended; nothing to abort.
+			}
+		}, 0);
 
 		return { block: true, reason: outcomeReason };
 	});
