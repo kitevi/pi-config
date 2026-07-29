@@ -23,7 +23,7 @@
     },
     "npm:@pborck/pi-de",
     "npm:@narumitw/pi-usage",
-    "https://github.com/ppowo/pi-hashline-readmap",
+    "npm:pi-readseek",
     "https://github.com/coctostan/pi-web-tools",
     "https://github.com/monotykamary/pi-vcc",
     "https://github.com/monotykamary/pi-neuralwatt-provider",
@@ -65,5 +65,26 @@
   "compaction": {
     "enabled": false
   },
-  "showCacheMissNotices": true
+  "showCacheMissNotices": true,
+  "readseek": {
+    "replacedTools": [
+      "read",
+      "edit",
+      "write",
+      "grep"
+    ],
+    "imageMode": "auto",
+    "syntaxValidation": "warn",
+    "timeoutMs": 120000,
+    "grep": {
+      "maxLines": 50,
+      "maxBytes": 4096
+    },
+    "display": {
+      "read": "compact",
+      "grep": "compact",
+      "edit": "compact",
+      "write": "compact"
+    }
+  }
 }

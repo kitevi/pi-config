@@ -112,7 +112,6 @@ Setting that variable inside an agent’s child command does not bypass the gate
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
    - `web-tools.json` → `~/.pi/web-tools.json`
-   - `hashline-readmap-settings.json` → `~/.pi/agent/hashline-readmap/settings.json`
 
 5. **Switches the active theme** — symlinks the `github-colorblind.json` theme to the light or dark variant (defaults to light unless `--dark` or `--light` is passed to the script).
 
@@ -138,7 +137,6 @@ Setting that variable inside an agent’s child command does not bypass the gate
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
 - `pi-vcc-config.json` — pi-vcc extension configuration installed into `~/.pi/agent/pi-vcc-config.json`
 - `web-tools.json` — pi-web-tools configuration installed into `~/.pi/web-tools.json`
-- `hashline-readmap-settings.json` — hashline-readmap configuration installed into `~/.pi/agent/hashline-readmap/settings.json`
 - `tests/` — `node:test` suites for the extensions, run with `npm test`
 
 The bootstrap script is plain Node.js, but pi extensions in `extensions/` can still stay TypeScript.
@@ -152,6 +150,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `web-tools.json`, and `hashline-readmap-settings.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, and `web-tools.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.
