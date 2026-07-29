@@ -366,11 +366,15 @@ void describe("ask outcomes", () => {
 void describe("tool_call handling", () => {
 	const install = (choice: string | undefined, honorTimeout = false) => {
 		const sent: Array<{ content: unknown; deliverAs: unknown }> = [];
+		const emitted: Array<{ channel: string; data: unknown }> = [];
 		const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
 		const pi = {
 			on: (event: string, handler: (event: unknown, ctx: unknown) => unknown) => handlers.set(event, handler),
 			sendMessage: (message: { content: unknown }, options: { deliverAs?: unknown }) =>
 				sent.push({ content: message.content, deliverAs: options?.deliverAs }),
+			events: {
+				emit: (channel: string, data: unknown) => emitted.push({ channel, data }),
+			},
 		};
 		gate(pi as never);
 
@@ -393,7 +397,7 @@ void describe("tool_call handling", () => {
 		const call = (toolName: string, input: Record<string, unknown>) =>
 			handlers.get("tool_call")?.({ toolName, input }, ctx) as Promise<{ block?: boolean; reason?: string } | undefined>;
 
-		return { call, sent, wasAborted: () => aborted };
+		return { call, emitted, sent, wasAborted: () => aborted };
 	};
 
 	void it("lets an allowed call through untouched", async () => {
@@ -412,9 +416,12 @@ void describe("tool_call handling", () => {
 	});
 
 	void it("runs an approved ask", async () => {
-		const { call, sent } = install("Yes, allow once");
+		const { call, emitted, sent } = install("Yes, allow once");
 		assert.strictEqual(await call("bash", shell("rm foo.txt")), undefined);
 		assert.strictEqual(sent.length, 0);
+		assert.strictEqual(emitted.length, 1);
+		assert.strictEqual(emitted[0].channel, "permission_gate:ask");
+		assert.deepStrictEqual(emitted[0].data, { ids: ["ask.rm"], target: "rm foo.txt", timeoutMs: 60_000 });
 	});
 
 	// The reason has to reach the model twice: pi's loop reads the abort signal

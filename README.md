@@ -88,6 +88,12 @@ PI_PERMISSION_GATE_ALLOW_NESTED_PI=1 pi
 
 Setting that variable inside an agent’s child command does not bypass the gate.
 
+## Desktop notifications
+
+`extensions/desktop-notifications.ts` requests terminal focus reporting and sends an attention notification only when Pi's terminal surface is known to be unfocused. It handles permission-gate asks (`Pi needs permission`) and the final `agent_settled` lifecycle event (`Pi is waiting for you`). Unknown focus is treated conservatively as focused, so unsupported or headless sessions stay silent.
+
+Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact surface focus, and OSC 777 raises the native desktop notification. The extension also supports Kitty's OSC 99 protocol. When no native notification protocol is recognized, it falls back to `notify-send` on Linux or `osascript` on macOS. If no terminal focus report has arrived, focus detection falls back to X11's active window when `DISPLAY` and `WINDOWID` are available, or the frontmost terminal application on macOS. Terminal reports take precedence over these best-effort fallbacks.
+
 ## What setup does
 
 `npm run setup` runs `bootstrap.mjs`, which:

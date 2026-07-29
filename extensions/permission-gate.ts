@@ -1394,6 +1394,12 @@ export default function (pi: ExtensionAPI) {
 		const timeoutMs = askTimeoutMs();
 		const controller = new AbortController();
 		const timer = setTimeout(() => controller.abort(), timeoutMs + ASK_TIMEOUT_BACKSTOP_MS);
+		const notifyAsk = { ids, target: assessment.target, timeoutMs };
+		try {
+			pi.events.emit("permission_gate:ask", notifyAsk);
+		} catch {
+			// Notification listeners are advisory; the ask must still run.
+		}
 		const startedAt = Date.now();
 		let choice: string | undefined;
 		try {
