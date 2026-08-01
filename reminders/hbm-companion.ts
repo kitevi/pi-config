@@ -30,13 +30,10 @@ type ReminderArgs = {
 	};
 };
 
-type Companion = {
-	javaPath: string;
-	hbmPaths: string[];
-};
-
 const HBM_SUFFIX = ".hbm.xml";
 const MAX_INDEXED_ENTRIES = 100_000;
+const INDEX_TTL_MS = 60_000;
+const MAX_CACHE_SIZE = 8;
 const IGNORED_JAVA_FILES = new Set(["abean.java", "basic.java", "loggable.java"]);
 const SKIPPED_DIR_NAMES = new Set([
 	".git",
@@ -52,8 +49,16 @@ const SKIPPED_DIR_NAMES = new Set([
 	"out",
 	"target",
 ]);
+/** Source-directory names: an .hbm.xml under one of these is the authoritative
+ *  source mapping rather than a copied build artifact. */
+const SOURCE_DIR_NAMES = new Set(["src", "source", "resources"]);
 
-const hbmIndexByRoot = new Map<string, Map<string, string[]>>();
+type CachedIndex = {
+	index: Map<string, string[]>;
+	builtAt: number;
+};
+
+const hbmIndexByRoot = new Map<string, CachedIndex>();
 
 const toAbsolutePath = (filePath: string, cwd?: string) =>
 	path.isAbsolute(filePath) ? path.normalize(filePath) : path.resolve(cwd ?? process.cwd(), filePath);
@@ -99,9 +104,23 @@ const addHbmPathToIndex = (index: Map<string, string[]>, hbmPath: string) => {
 	index.set(stem, existing);
 };
 
+/** Prefer the authoritative source mapping over copied build artifacts. */
+const scoreHbmPath = (hbmPath: string) => {
+	const segments = hbmPath.split(path.sep).map((s) => s.toLowerCase());
+	return segments.some((s) => SOURCE_DIR_NAMES.has(s)) ? 0 : 1;
+};
+
+/** Drop copied build artifacts when an authoritative source mapping exists. */
+const dedupeHbmPaths = (hbmPaths: string[]) => {
+	if (hbmPaths.length <= 1) return hbmPaths;
+	const sourcePaths = hbmPaths.filter((p) => scoreHbmPath(p) === 0);
+	return sourcePaths.length > 0 ? sourcePaths : hbmPaths;
+};
+
 const buildHbmIndex = (searchRoot: string) => {
+	const now = Date.now();
 	const cached = hbmIndexByRoot.get(searchRoot);
-	if (cached) return cached;
+	if (cached && now - cached.builtAt < INDEX_TTL_MS) return cached.index;
 
 	const index = new Map<string, string[]>();
 	const stack = [searchRoot];
@@ -134,15 +153,31 @@ const buildHbmIndex = (searchRoot: string) => {
 		}
 	}
 
-	for (const hbmPaths of index.values()) {
-		hbmPaths.sort();
+	// Dedupe build artifacts, then sort for deterministic output.
+	for (const [stem, hbmPaths] of index) {
+		const deduped = dedupeHbmPaths(hbmPaths);
+		deduped.sort();
+		index.set(stem, deduped);
 	}
 
-	hbmIndexByRoot.set(searchRoot, index);
+	// Bound the cache so long sessions across many roots don't grow unbounded.
+	if (hbmIndexByRoot.size >= MAX_CACHE_SIZE && !hbmIndexByRoot.has(searchRoot)) {
+		let oldestRoot: string | null = null;
+		let oldestTime = Infinity;
+		for (const [root, entry] of hbmIndexByRoot) {
+			if (entry.builtAt < oldestTime) {
+				oldestTime = entry.builtAt;
+				oldestRoot = root;
+			}
+		}
+		if (oldestRoot) hbmIndexByRoot.delete(oldestRoot);
+	}
+
+	hbmIndexByRoot.set(searchRoot, { index, builtAt: now });
 	return index;
 };
 
-const companionForJavaRead = (event: ToolResultEvent, cwd?: string): Companion | null => {
+const companionHbmPaths = (event: ToolResultEvent, cwd?: string): string[] | null => {
 	if (event.toolName !== "read" || event.isError) return null;
 
 	const rawPath = event.input?.path;
@@ -156,7 +191,7 @@ const companionForJavaRead = (event: ToolResultEvent, cwd?: string): Companion |
 	const searchRoot = searchRootForJavaPath(javaPath, cwd);
 	const hbmPaths = buildHbmIndex(searchRoot).get(javaStem) ?? [];
 
-	return hbmPaths.length > 0 ? { javaPath, hbmPaths } : null;
+	return hbmPaths.length > 0 ? hbmPaths : null;
 };
 
 const formatHbmPaths = (hbmPaths: string[], cwd?: string) =>
@@ -167,25 +202,25 @@ export default function (_pi: ExtensionAPI) {
 
 	return {
 		on: "tool_result",
-		when: ({ event, ctx }: ReminderArgs) => {
-			const companion = companionForJavaRead(event, ctx?.cwd);
-			if (!companion) return false;
+	when: ({ event, ctx }: ReminderArgs) => {
+		const hbmPaths = companionHbmPaths(event, ctx?.cwd);
+		if (!hbmPaths) return false;
 
-			const unseenHbmPaths = companion.hbmPaths.filter((hbmPath) => !reminded.has(hbmPath));
-			if (unseenHbmPaths.length === 0) return false;
+		const unseenHbmPaths = hbmPaths.filter((hbmPath) => !reminded.has(hbmPath));
+		if (unseenHbmPaths.length === 0) return false;
 
-			for (const hbmPath of unseenHbmPaths) {
-				reminded.add(hbmPath);
-			}
+		for (const hbmPath of unseenHbmPaths) {
+			reminded.add(hbmPath);
+		}
 
-			return true;
+		return true;
 		},
-		message: ({ event, ctx }: ReminderArgs) => {
-			const companion = companionForJavaRead(event, ctx?.cwd);
-			const hbmPaths = companion ? formatHbmPaths(companion.hbmPaths, ctx?.cwd) : "the companion .hbm.xml file";
-			const plural = companion && companion.hbmPaths.length > 1 ? "s" : "";
+	message: ({ event, ctx }: ReminderArgs) => {
+		const hbmPaths = companionHbmPaths(event, ctx?.cwd);
+		const formatted = hbmPaths ? formatHbmPaths(hbmPaths, ctx?.cwd) : "the companion .hbm.xml file";
+		const plural = hbmPaths && hbmPaths.length > 1 ? "s" : "";
 
-			return `This Java file has companion Hibernate HBM mapping${plural}: ${hbmPaths}. In Hibernate codebases that use XML mapping, the HBM file often contains the authoritative table/column mapping, relationships, fetch/lazy behavior, cascade/orphan rules, filters, and ordering. Read it before reasoning about persistence behavior.`;
+		return `This Java file has companion Hibernate HBM mapping${plural}: ${formatted}. In Hibernate codebases that use XML mapping, the HBM file often contains the authoritative table/column mapping, relationships, fetch/lazy behavior, cascade/orphan rules, filters, and ordering. Read it before reasoning about persistence behavior.`;
 		},
 	};
 }
