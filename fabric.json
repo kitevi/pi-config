@@ -37,7 +37,7 @@
     "showNestedToolCalls": false
   },
   "compaction": {
-    "engine": "pi"
+    "engine": "fabric"
   },
   "mesh": {
     "enabled": false
