@@ -1,7 +1,0 @@
-{
-  "overrideDefaultCompaction": true,
-  "globalThreshold": {
-    "compactPercent": 64
-  },
-  "debug": false
-}

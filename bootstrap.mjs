@@ -28,8 +28,8 @@ const SYNTHETIC_OVERLAY = join(REPO_DIR, "synthetic.json");
 const NEURALWATT_OVERLAY = join(REPO_DIR, "neuralwatt.json");
 const PI_SYNTHETIC = join(PI_EXTENSIONS_DIR, "synthetic.json");
 const PI_NEURALWATT = join(PI_EXTENSIONS_DIR, "neuralwatt.json");
-const PI_VCC_CONFIG_OVERLAY = join(REPO_DIR, "pi-vcc-config.json");
-const PI_VCC_CONFIG = join(PI_DIR, "pi-vcc-config.json");
+const CODE_PREVIEWS_CONFIG = join(PI_DIR, "code-previews.json");
+const SHIKI_THEME_BY_VARIANT = { light: "solarized-light", dark: "solarized-dark" };
 const FABRIC_CONFIG_OVERLAY = join(REPO_DIR, "fabric.json");
 const PI_FABRIC_CONFIG = join(PI_DIR, "fabric.json");
 const MCP_CONFIG_OVERLAY = join(REPO_DIR, "mcp.json");
@@ -167,6 +167,13 @@ async function switchTheme(variant = getThemeVariantFromArgs()) {
   try { await rm(linkPath, { force: true }); } catch {}
   await symlink(symlinkTarget, linkPath);
   console.log(`linked theme (${variant}): github-colorblind.json → ${symlinkTarget}`);
+
+  // pi-fabric layers ~/.pi/agent/code-previews.json after settings.json, so this
+  // per-variant value wins over the base codePreview.shikiTheme in settings.json.
+  await writeManagedJsonFile(CODE_PREVIEWS_CONFIG, {
+    codePreview: { shikiTheme: SHIKI_THEME_BY_VARIANT[variant] ?? SHIKI_THEME_BY_VARIANT.light },
+  });
+  console.log(`wrote code preview shiki theme (${variant}) to ${CODE_PREVIEWS_CONFIG}`);
 }
 
 async function main() {
@@ -187,7 +194,6 @@ async function main() {
 
   await installJsonConfig(SYNTHETIC_OVERLAY, PI_SYNTHETIC, "pi-synthetic settings");
   await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
-  await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
   await installJsonConfig(FABRIC_CONFIG_OVERLAY, PI_FABRIC_CONFIG, "Pi Fabric config");
   await installJsonConfig(MCP_CONFIG_OVERLAY, PI_MCP_CONFIG, "MCP config");

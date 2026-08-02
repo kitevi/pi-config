@@ -120,7 +120,6 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
    - `settings.json` → `~/.pi/agent/settings.json`
    - `synthetic.json` → `~/.pi/agent/extensions/synthetic.json`
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
-   - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
    - `fabric.json` → `~/.pi/agent/fabric.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
 
@@ -146,7 +145,6 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
 - `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
-- `pi-vcc-config.json` — pi-vcc extension configuration installed into `~/.pi/agent/pi-vcc-config.json`
 - `fabric.json` — Pi Fabric configuration installed into `~/.pi/agent/fabric.json` (see [Pi Fabric](#pi-fabric))
 - `mcp.json` — Pi Fabric MCP server configuration installed into `~/.pi/agent/mcp.json`
 - `tests/` — `node:test` suites for the extensions, run with `npm test`
@@ -162,6 +160,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `fabric.json`, and `mcp.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `fabric.json`, and `mcp.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.

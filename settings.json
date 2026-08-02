@@ -29,7 +29,6 @@
         "skills/fabric-exec"
       ]
     },
-    "https://github.com/monotykamary/pi-vcc",
     "https://github.com/monotykamary/pi-neuralwatt-provider",
     "https://github.com/monotykamary/pi-tps",
     "https://github.com/monotykamary/pi-lilac-provider",
@@ -66,8 +65,8 @@
       "skills": []
     }
   ],
-  "compaction": {
-    "enabled": false
-  },
-  "showCacheMissNotices": true
+  "showCacheMissNotices": true,
+  "codePreview": {
+    "shikiTheme": "solarized-light"
+  }
 }
