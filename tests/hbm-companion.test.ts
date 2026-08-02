@@ -1,6 +1,6 @@
 import plugin from "../reminders/hbm-companion.ts";
-import { describe, it, beforeEach, afterEach } from "node:test";
-import assert from "node:assert";
+import { describe, it, beforeEach, afterEach } from "vitest";
+import { assert } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -121,7 +121,7 @@ void describe("hbm-companion", () => {
 		assert.strictEqual(r.when({ event, ctx: { cwd: root } }), true);
 		const msg = r.message({ event, ctx: { cwd: root } });
 		assert.match(msg, /src\/main\/resources\/Foo\.hbm\.xml/);
-		assert.doesNotMatch(msg, /copied\/Foo\.hbm\.xml/);
+		assert.notMatch(msg, /copied\/Foo\.hbm\.xml/);
 	});
 
 	void it("keeps all source mappings when there are genuinely several", () => {

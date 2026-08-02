@@ -7,14 +7,14 @@
     "setup": "node bootstrap.mjs",
     "setup-light": "node bootstrap.mjs --light",
     "setup-dark": "node bootstrap.mjs --dark",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "latest",
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "latest",
-    "tsx": "latest",
+    "typebox": "latest",
     "typescript": "latest",
-    "typebox": "latest"
+    "vitest": "latest"
   }
 }

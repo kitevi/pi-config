@@ -1,5 +1,5 @@
-import assert from "node:assert";
-import { describe, it } from "node:test";
+import { assert } from "vitest";
+import { describe, it } from "vitest";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import plugin, {
 	formatFooterTokenCount,

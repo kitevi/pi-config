@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
-import assert from "node:assert";
+import { describe, it } from "vitest";
+import { assert } from "vitest";
 import extension, { guardBashOutput } from "../extensions/bash-context-guard.ts";
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";

@@ -8,8 +8,8 @@ import gate, {
 	rememberWrittenPath,
 	resetGateState,
 } from "../extensions/permission-gate.ts";
-import { beforeEach, describe, it } from "node:test";
-import assert from "node:assert";
+import { beforeEach, describe, it } from "vitest";
+import { assert } from "vitest";
 
 type Decision = "allow" | "ask" | "block";
 type Case = [name: string, toolName: string, input: Record<string, unknown>, decision: Decision];
@@ -353,8 +353,8 @@ void describe("ask outcomes", () => {
 		assert.match(outcome.notify, /aborted the turn/);
 		assert.match(outcome.reason, /timed out after 60s/);
 		assert.match(outcome.reason, /turn was aborted/);
-		assert.doesNotMatch(outcome.reason, /continue with work/);
-		assert.doesNotMatch(outcome.reason, /declined/);
+		assert.notMatch(outcome.reason, /continue with work/);
+		assert.notMatch(outcome.reason, /declined/);
 	});
 
 	void it("lets an explicit deny win a race with the countdown", () => {
