@@ -94,6 +94,10 @@ Setting that variable inside an agent’s child command does not bypass the gate
 
 Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact surface focus, and OSC 777 raises the native desktop notification. The extension also supports Kitty's OSC 99 protocol. When no native notification protocol is recognized, it falls back to `notify-send` on Linux or `osascript` on macOS. If no terminal focus report has arrived, focus detection falls back to X11's active window when `DISPLAY` and `WINDOWID` are available, or the frontmost terminal application on macOS. Terminal reports take precedence over these best-effort fallbacks.
 
+## Pi Fabric
+
+The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. Subagents are disabled (`approvals.agent: "deny"`, `subagents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (30,000 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
+
 ## What setup does
 
 `npm run setup` runs `bootstrap.mjs`, which:
@@ -117,7 +121,8 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
    - `synthetic.json` → `~/.pi/agent/extensions/synthetic.json`
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
-   - `web-tools.json` → `~/.pi/web-tools.json`
+   - `fabric.json` → `~/.pi/agent/fabric.json`
+   - `mcp.json` → `~/.pi/agent/mcp.json`
 
 5. **Switches the active theme** — symlinks the `github-colorblind.json` theme to the light or dark variant (defaults to light unless `--dark` or `--light` is passed to the script).
 
@@ -131,7 +136,6 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
   - `extensions/permission-gate.ts` — rule-based permission gate for `bash`/`nu` tool calls (see [Permission gate](#permission-gate))
   - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus GPT verbosity and context "dumb zone" hints
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
-  - `extensions/bash-context-guard.ts` — replaces oversized `bash` results with a small head/tail preview linked to the complete output
   - `extensions/max-reasoning.ts` — raises the thinking level to a GLM/DeepSeek/Kimi model’s highest supported level on model select/start
 - `skills/` — pi skills
 - `themes/` — pi themes
@@ -143,7 +147,8 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
 - `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
 - `pi-vcc-config.json` — pi-vcc extension configuration installed into `~/.pi/agent/pi-vcc-config.json`
-- `web-tools.json` — pi-web-tools configuration installed into `~/.pi/web-tools.json`
+- `fabric.json` — Pi Fabric configuration installed into `~/.pi/agent/fabric.json` (see [Pi Fabric](#pi-fabric))
+- `mcp.json` — Pi Fabric MCP server configuration installed into `~/.pi/agent/mcp.json`
 - `tests/` — `node:test` suites for the extensions, run with `npm test`
 
 The bootstrap script is plain Node.js, but pi extensions in `extensions/` can still stay TypeScript.
@@ -157,6 +162,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, and `web-tools.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `fabric.json`, and `mcp.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.

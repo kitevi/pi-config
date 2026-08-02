@@ -24,23 +24,22 @@ const links = [
 
 const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
 const PI_SETTINGS = join(PI_DIR, "settings.json");
-const WEB_TOOLS_OVERLAY = join(REPO_DIR, "web-tools.json");
-const PI_WEB_TOOLS = join(HOME, ".pi", "web-tools.json");
 const SYNTHETIC_OVERLAY = join(REPO_DIR, "synthetic.json");
 const NEURALWATT_OVERLAY = join(REPO_DIR, "neuralwatt.json");
 const PI_SYNTHETIC = join(PI_EXTENSIONS_DIR, "synthetic.json");
 const PI_NEURALWATT = join(PI_EXTENSIONS_DIR, "neuralwatt.json");
 const PI_VCC_CONFIG_OVERLAY = join(REPO_DIR, "pi-vcc-config.json");
 const PI_VCC_CONFIG = join(PI_DIR, "pi-vcc-config.json");
+const FABRIC_CONFIG_OVERLAY = join(REPO_DIR, "fabric.json");
+const PI_FABRIC_CONFIG = join(PI_DIR, "fabric.json");
+const MCP_CONFIG_OVERLAY = join(REPO_DIR, "mcp.json");
+const PI_MCP_CONFIG = join(PI_DIR, "mcp.json");
 const RESETTABLE_PI_PATHS = [
   // Fully managed by this repo.
   ...links.map(({link}) => link),
-  // Remove the pre-simplification config link if it was installed previously.
-  join(PI_DIR, "context-guard.json"),
   PI_EXTENSIONS_DIR,
   PI_THEMES_DIR,
 ];
-
 
 function pathIsInside(root, targetPath) {
   const rel = relative(root, targetPath);
@@ -190,7 +189,8 @@ async function main() {
   await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
   await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
-  await installJsonConfig(WEB_TOOLS_OVERLAY, PI_WEB_TOOLS, "pi web-tools");
+  await installJsonConfig(FABRIC_CONFIG_OVERLAY, PI_FABRIC_CONFIG, "Pi Fabric config");
+  await installJsonConfig(MCP_CONFIG_OVERLAY, PI_MCP_CONFIG, "MCP config");
   console.log("bootstrap complete");
   await switchTheme(themeVariant);
 }
