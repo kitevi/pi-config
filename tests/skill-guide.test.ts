@@ -1,5 +1,5 @@
-import assert from "node:assert";
-import { describe, it } from "node:test";
+import { assert } from "vitest";
+import { describe, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import {
@@ -101,7 +101,7 @@ void describe("skill guide entries", () => {
 
 		assert.ok(summary.endsWith("…"));
 		assert.ok(summary.length <= 48);
-		assert.doesNotMatch(summary, /configur…$/);
+		assert.notMatch(summary, /configur…$/);
 	});
 
 	void it("never renders a line wider than the terminal", () => {

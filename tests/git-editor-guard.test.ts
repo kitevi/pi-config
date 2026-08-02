@@ -1,6 +1,6 @@
 import plugin from "../extensions/git-editor-guard.ts";
-import { describe, it } from "node:test";
-import assert from "node:assert";
+import { describe, it } from "vitest";
+import { assert } from "vitest";
 
 function createMockPi() {
 	const handlers: Array<{

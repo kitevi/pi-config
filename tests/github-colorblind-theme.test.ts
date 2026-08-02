@@ -1,7 +1,7 @@
-import assert from "node:assert";
+import { assert } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { fileURLToPath } from "node:url";
 
 interface ThemeJson {
