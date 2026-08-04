@@ -29,6 +29,7 @@
         "skills/fabric-exec"
       ]
     },
+    "https://github.com/monotykamary/pi-opencode-go-provider",
     "https://github.com/monotykamary/pi-neuralwatt-provider",
     "https://github.com/monotykamary/pi-tps",
     "https://github.com/monotykamary/pi-lilac-provider",
