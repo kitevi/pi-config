@@ -29,12 +29,12 @@
         "skills/fabric-exec"
       ]
     },
-    "https://github.com/monotykamary/pi-opencode-go-provider",
-    "https://github.com/monotykamary/pi-neuralwatt-provider",
-    "https://github.com/monotykamary/pi-tps",
-    "https://github.com/monotykamary/pi-lilac-provider",
-    "https://github.com/monotykamary/pi-model-sort",
-    "https://github.com/monotykamary/pi-invisible-continue",
+    "npm:pi-opencode-go-provider",
+    "npm:pi-neuralwatt-provider",
+    "npm:@monotykamary/pi-tps",
+    "npm:pi-lilac-provider",
+    "npm:pi-model-sort",
+    "npm:pi-invisible-continue",
     "npm:@dustydonkey/pi-spinner",
     "npm:pi-system-reminders",
     "npm:pi-streaming-guard",
