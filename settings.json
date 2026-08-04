@@ -23,12 +23,7 @@
     },
     "npm:@pborck/pi-de",
     "npm:@narumitw/pi-usage",
-    {
-      "source": "npm:pi-fabric",
-      "skills": [
-        "skills/fabric-exec"
-      ]
-    },
+    "npm:pi-fabric",
     "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",
     "npm:pi-lilac-provider",
