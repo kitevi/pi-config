@@ -96,7 +96,7 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
 
 ## Pi Fabric
 
-The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. Subagents are disabled (`approvals.agent: "deny"`, `subagents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (30,000 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
+The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. During reconciliation, bootstrap fetches the latest `fabric-exec` skill from Pi Fabric’s `main` branch and embeds it into the global system prompt so the complete API contract is available without a tool call. Subagents are disabled (`approvals.agent: "deny"`, `subagents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (8,192 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
 
 ## What setup does
 
@@ -108,22 +108,23 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
    - `prompts/`
    - `skills/`
    - `reminders/`
-   - `APPEND_SYSTEM.md`
    - `models.json`
    - `keybindings.json`
 
-3. **Symlinks** extension and theme directories from the repo into `~/.pi/agent`:
+3. **Fetches and validates** Pi Fabric’s current `fabric-exec` skill from GitHub, then writes `~/.pi/agent/APPEND_SYSTEM.md` by combining it with the repository-owned rules in `APPEND_SYSTEM.md`. Fetching happens before cleanup, so a network or validation failure leaves the existing managed configuration untouched.
+
+4. **Symlinks** extension and theme directories from the repo into `~/.pi/agent`:
    - `extensions/` → `~/.pi/agent/extensions/`
    - `themes/` → `~/.pi/agent/themes/`
 
-4. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
+5. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
    - `settings.json` → `~/.pi/agent/settings.json`
    - `synthetic.json` → `~/.pi/agent/extensions/synthetic.json`
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `fabric.json` → `~/.pi/agent/fabric.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
 
-5. **Switches the active theme** — symlinks the `github-colorblind.json` theme to the light or dark variant (defaults to light unless `--dark` or `--light` is passed to the script).
+6. **Switches the active theme** — symlinks the `github-colorblind.json` theme to the light or dark variant (defaults to light unless `--dark` or `--light` is passed to the script).
 
 ## Repo layout
 
@@ -139,7 +140,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `skills/` — pi skills
 - `themes/` — pi themes
 - `reminders/` — global reminder definitions for `pi-system-reminders`
-- `APPEND_SYSTEM.md` — extra system prompt text appended into pi
+- `APPEND_SYSTEM.md` — repository-owned base rules combined with the fetched `fabric-exec` skill during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
 - `models.json` — custom provider/model definitions symlinked into pi (for example OpenRouter via `OPENROUTER_API_KEY`)
 - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
@@ -147,14 +148,14 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
 - `fabric.json` — Pi Fabric configuration installed into `~/.pi/agent/fabric.json` (see [Pi Fabric](#pi-fabric))
 - `mcp.json` — Pi Fabric MCP server configuration installed into `~/.pi/agent/mcp.json`
-- `tests/` — `node:test` suites for the extensions, run with `npm test`
+- `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
 The bootstrap script is plain Node.js, but pi extensions in `extensions/` can still stay TypeScript.
 Reminder files tracked in `reminders/` become global reminders via `~/.pi/agent/reminders`; project-specific reminders for some other repo should still live in that repo's `.pi/reminders/` directory.
 
 ## Re-run / update
 
-Re-run `npm run setup` any time you change files in this repo or set up a new machine.
+Re-run `npm run setup` any time you change files in this repo or set up a new machine. Reconciliation requires network access to GitHub and refreshes the embedded `fabric-exec` skill on every run.
 
 `bootstrap.mjs` resolves the repo from the script location, so it works even if you invoke it outside the repo root.
 

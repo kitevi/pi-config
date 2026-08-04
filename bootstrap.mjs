@@ -12,12 +12,18 @@ const EXTENSIONS_DIR = join(REPO_DIR, "extensions");
 const PI_EXTENSIONS_DIR = join(PI_DIR, "extensions");
 const THEMES_DIR = join(REPO_DIR, "themes");
 const PI_THEMES_DIR = join(PI_DIR, "themes");
+const APPEND_SYSTEM_SOURCE = join(REPO_DIR, "APPEND_SYSTEM.md");
+const PI_APPEND_SYSTEM = join(PI_DIR, "APPEND_SYSTEM.md");
+const DEFAULT_FABRIC_EXEC_SKILL_URL =
+  "https://raw.githubusercontent.com/monotykamary/pi-fabric/main/skills/fabric-exec/SKILL.md";
+const FABRIC_EXEC_SKILL_URL =
+  process.env.PI_CONFIG_FABRIC_EXEC_SKILL_URL ?? DEFAULT_FABRIC_EXEC_SKILL_URL;
+const MAX_FABRIC_EXEC_SKILL_CHARS = 100_000;
 
 const links = [
   { link: join(PI_DIR, "prompts"), target: join(REPO_DIR, "prompts") },
   { link: join(PI_DIR, "skills"), target: join(REPO_DIR, "skills") },
   { link: join(PI_DIR, "reminders"), target: join(REPO_DIR, "reminders") },
-  { link: join(PI_DIR, "APPEND_SYSTEM.md"), target: join(REPO_DIR, "APPEND_SYSTEM.md") },
   { link: join(PI_DIR, "models.json"), target: join(REPO_DIR, "models.json") },
   { link: join(PI_DIR, "keybindings.json"), target: join(REPO_DIR, "keybindings.json") },
 ];
@@ -37,6 +43,7 @@ const PI_MCP_CONFIG = join(PI_DIR, "mcp.json");
 const RESETTABLE_PI_PATHS = [
   // Fully managed by this repo.
   ...links.map(({link}) => link),
+  PI_APPEND_SYSTEM,
   PI_EXTENSIONS_DIR,
   PI_THEMES_DIR,
 ];
@@ -106,6 +113,62 @@ async function writeManagedJsonFile(path, value) {
   await ensureParentDir(path);
   await rm(path, { recursive: true, force: true });
   await writeFile(path, JSON.stringify(value, null, 2) + "\n");
+}
+
+async function writeManagedTextFile(path, content) {
+  assertSafePath(path, [HOME]);
+  await ensureParentDir(path);
+  await rm(path, { recursive: true, force: true });
+  await writeFile(path, content, "utf-8");
+}
+
+async function fetchFabricExecSkill(url = FABRIC_EXEC_SKILL_URL) {
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        accept: "text/plain",
+        "cache-control": "no-cache",
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to fetch fabric-exec skill from ${url}: ${detail}`, { cause: error });
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch fabric-exec skill from ${url}: HTTP ${response.status}`);
+  }
+
+  const contentLength = response.headers.get("content-length");
+  if (contentLength !== null && Number(contentLength) > MAX_FABRIC_EXEC_SKILL_CHARS) {
+    throw new Error(`Fetched fabric-exec skill is unexpectedly large: ${contentLength} characters`);
+  }
+
+  const content = await response.text();
+  if (content.length > MAX_FABRIC_EXEC_SKILL_CHARS) {
+    throw new Error(`Fetched fabric-exec skill is unexpectedly large: ${content.length} characters`);
+  }
+
+  if (!/^name:\s*fabric-exec\s*$/m.test(content) || !/^# fabric_exec\b/m.test(content)) {
+    throw new Error(`Fetched content from ${url} is not the fabric-exec skill`);
+  }
+
+  return content;
+}
+
+function composeAppendSystem(baseRules, fabricSkill) {
+  return `${baseRules.trimEnd()}\n\n${fabricSkill.trimEnd()}\n`;
+}
+
+async function prepareAppendSystem() {
+  const [baseRules, fabricSkill] = await Promise.all([
+    readFile(APPEND_SYSTEM_SOURCE, "utf-8"),
+    fetchFabricExecSkill(),
+  ]);
+
+  return composeAppendSystem(baseRules, fabricSkill);
 }
 
 async function installJsonConfig(sourcePath, targetPath, label) {
@@ -178,6 +241,7 @@ async function switchTheme(variant = getThemeVariantFromArgs()) {
 
 async function main() {
   const themeVariant = getThemeVariantFromArgs();
+  const appendSystem = await prepareAppendSystem();
 
   if (!existsSync(PI_DIR)) {
     await mkdir(PI_DIR, { recursive: true });
@@ -188,6 +252,9 @@ async function main() {
   for (const { link, target } of links) {
     await relink(link, target);
   }
+
+  await writeManagedTextFile(PI_APPEND_SYSTEM, appendSystem);
+  console.log(`wrote generated APPEND_SYSTEM.md to ${PI_APPEND_SYSTEM}`);
 
   await syncDirectoryLinks(EXTENSIONS_DIR, PI_EXTENSIONS_DIR);
   await syncDirectoryLinks(THEMES_DIR, PI_THEMES_DIR);

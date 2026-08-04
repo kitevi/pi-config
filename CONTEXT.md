@@ -66,7 +66,10 @@ the appropriate variant based on OS appearance mode.
 (`settings.json`, `verbosity.json`). The repo
 owns leaf paths; local additions survive reconciliation.
 - **Symlink** is used for static assets that pi only reads (`prompts/`,
-`skills/`, `themes/`, `extensions/`, `APPEND_SYSTEM.md`, `models.json`).
+`skills/`, `themes/`, `extensions/`, `models.json`).
+- **Generated system prompt** is used for `APPEND_SYSTEM.md`: reconciliation
+combines repository-owned rules with the validated `fabric-exec` skill fetched
+from Pi Fabric’s `main` branch. Fetching completes before managed paths are reset.
 - **Reconciliation** is idempotent — re-running it is safe and intended to be
 done after any change to this repo or on a fresh machine.
 - **Reminders** are static assets managed via symlink, but their *semantics*
@@ -100,7 +103,7 @@ manages *configuration*, not *credentials*.
 - "Prompt" was historically used for both **Skill** definitions and the
   `prompts/` directory. Resolved: **Skills** are behavioral task guidance
   (markdown instructions), while `prompts/` is for raw prompt text fragments
-  (currently unused). `APPEND_SYSTEM.md` serves as the de facto system prompt overlay.
+  (currently unused). The generated `~/.pi/agent/APPEND_SYSTEM.md` serves as the de facto system prompt overlay; the repository file supplies its base rules.
 - "Bootstrap" is sometimes used casually for "first-time setup." Resolved:
   **Reconciliation** is the correct term — the script is idempotent and meant to
   be run repeatedly, not just once.
