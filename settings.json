@@ -32,6 +32,7 @@
     "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",
     "npm:pi-lilac-provider",
+    "npm:pi-opencode-go-provider",
     "npm:pi-model-sort",
     "npm:pi-invisible-continue",
     "npm:@dustydonkey/pi-spinner",
