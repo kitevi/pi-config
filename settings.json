@@ -24,13 +24,13 @@
     "npm:@pborck/pi-de",
     "npm:@narumitw/pi-usage",
     "npm:pi-readseek",
-    "https://github.com/coctostan/pi-web-tools",
-    "https://github.com/monotykamary/pi-vcc",
-    "https://github.com/monotykamary/pi-neuralwatt-provider",
-    "https://github.com/monotykamary/pi-tps",
-    "https://github.com/monotykamary/pi-lilac-provider",
-    "https://github.com/monotykamary/pi-model-sort",
-    "https://github.com/monotykamary/pi-invisible-continue",
+    "npm:pi-web-tools",
+    "npm:@monotykamary/pi-vcc",
+    "npm:pi-neuralwatt-provider",
+    "npm:@monotykamary/pi-tps",
+    "npm:pi-lilac-provider",
+    "npm:pi-model-sort",
+    "npm:pi-invisible-continue",
     "npm:@dustydonkey/pi-spinner",
     "npm:pi-system-reminders",
     "npm:pi-streaming-guard",
@@ -52,7 +52,7 @@
       ]
     },
     {
-      "source": "https://github.com/anthropics/skills",
+      "source": "npm:@sentiolabs/pi-frontend-design",
       "skills": [
         "skills/frontend-design"
       ]
