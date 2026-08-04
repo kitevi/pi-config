@@ -29,7 +29,6 @@
         "skills/fabric-exec"
       ]
     },
-    "npm:pi-opencode-go-provider",
     "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",
     "npm:pi-lilac-provider",
@@ -56,10 +55,11 @@
       ]
     },
     {
-      "source": "https://github.com/anthropics/skills",
+      "source": "npm:@sentiolabs/pi-frontend-design",
       "skills": [
         "skills/frontend-design"
-      ]
+      ],
+      "prompts": []
     },
     {
       "source": "https://github.com/dmmulroy/skills",
