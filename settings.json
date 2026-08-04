@@ -66,8 +66,5 @@
       "skills": []
     }
   ],
-  "showCacheMissNotices": true,
-  "codePreview": {
-    "shikiTheme": "solarized-light"
-  }
+  "showCacheMissNotices": true
 }
