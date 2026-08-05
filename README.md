@@ -96,7 +96,7 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
 
 ## Pi Fabric
 
-The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. During reconciliation, bootstrap fetches the latest `fabric-exec` skill from Pi Fabric’s `main` branch and embeds it into the global system prompt so the complete API contract is available without a tool call. Subagents are disabled (`approvals.agent: "deny"`, `subagents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (8,192 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
+The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. Subagents are disabled (`approvals.agent: "deny"`, `subagents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (8,192 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
 
 ## What setup does
 
@@ -111,7 +111,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
    - `models.json`
    - `keybindings.json`
 
-3. **Fetches and validates** Pi Fabric’s current `fabric-exec` skill from GitHub, then writes `~/.pi/agent/APPEND_SYSTEM.md` by combining it with the repository-owned rules in `APPEND_SYSTEM.md`. Fetching happens before cleanup, so a network or validation failure leaves the existing managed configuration untouched.
+3. **Installs** the repository-owned `APPEND_SYSTEM.md` as `~/.pi/agent/APPEND_SYSTEM.md`.
 
 4. **Symlinks** extension and theme directories from the repo into `~/.pi/agent`:
    - `extensions/` → `~/.pi/agent/extensions/`
@@ -140,7 +140,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `skills/` — pi skills
 - `themes/` — pi themes
 - `reminders/` — global reminder definitions for `pi-system-reminders`
-- `APPEND_SYSTEM.md` — repository-owned base rules combined with the fetched `fabric-exec` skill during reconciliation
+- `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
 - `models.json` — custom provider/model definitions symlinked into pi (for example OpenRouter via `OPENROUTER_API_KEY`)
 - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
@@ -155,7 +155,7 @@ Reminder files tracked in `reminders/` become global reminders via `~/.pi/agent/
 
 ## Re-run / update
 
-Re-run `npm run setup` any time you change files in this repo or set up a new machine. Reconciliation requires network access to GitHub and refreshes the embedded `fabric-exec` skill on every run.
+Re-run `npm run setup` any time you change files in this repo or set up a new machine. Reconciliation is offline — no network access is required.
 
 `bootstrap.mjs` resolves the repo from the script location, so it works even if you invoke it outside the repo root.
 
