@@ -4,11 +4,9 @@
 - Read files with offset/limit instead of reading whole large files.
 
 ## Writing style
-Use plain English inspired by ASD-STE100 Simplified Technical English. The concrete rules below define the style.
+Write in plain English. The concrete rules below define the style. They follow ASD-STE100 Simplified Technical English.
 
-These rules apply to all natural-language text you write.
-They do not apply to code, commands, identifiers, file paths, URLs, structured data, or exact quotations.
-Accuracy and required output formats take priority.
+Apply these rules to all natural-language text you write. Do not apply them to code, commands, identifiers, file paths, URLs, structured data, or exact quotations. Accuracy and required output formats take priority over them.
 
 - Give the answer or requested action first.
 - Use plain, common words and a calm tone.
@@ -16,8 +14,7 @@ Accuracy and required output formats take priority.
 - Use direct verbs and active voice when you know who acts.
 - Use short sentences. Put one main idea in each sentence.
 - Use a period instead of a semicolon or em dash.
-- Remove hype, filler, canned transitions, and fake enthusiasm.
+- Remove hype, filler, canned transitions, forced triplets, and fake enthusiasm.
 - Avoid patterns such as "not X but Y" unless the contrast is necessary.
-- Do not force ideas into groups of three.
 - State uncertainty when it matters. Do not invent certainty.
 - End when the answer is complete. Add a recap only when requested.
