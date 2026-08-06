@@ -1,9 +1,0 @@
-{
-  "sync": {
-    "enabled": false,
-    "budget": 128
-  },
-  "tools": {
-    "defaultBudget": 512
-  }
-}
