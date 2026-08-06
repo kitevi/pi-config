@@ -24,8 +24,6 @@ const links = [
 
 const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
 const PI_SETTINGS = join(PI_DIR, "settings.json");
-const FOVEA_CONFIG_OVERLAY = join(REPO_DIR, "fovea.json");
-const PI_FOVEA_CONFIG = join(PI_DIR, "fovea.json");
 const SYNTHETIC_OVERLAY = join(REPO_DIR, "synthetic.json");
 const NEURALWATT_OVERLAY = join(REPO_DIR, "neuralwatt.json");
 const PI_SYNTHETIC = join(PI_EXTENSIONS_DIR, "synthetic.json");
@@ -200,7 +198,6 @@ async function main() {
   await installJsonConfig(SYNTHETIC_OVERLAY, PI_SYNTHETIC, "pi-synthetic settings");
   await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
-  await installJsonConfig(FOVEA_CONFIG_OVERLAY, PI_FOVEA_CONFIG, "pi-fovea settings");
   await installJsonConfig(FABRIC_CONFIG_OVERLAY, PI_FABRIC_CONFIG, "Pi Fabric config");
   await installJsonConfig(MCP_CONFIG_OVERLAY, PI_MCP_CONFIG, "MCP config");
   console.log("bootstrap complete");

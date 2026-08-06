@@ -98,26 +98,6 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
 
 The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. Subagents are disabled (`approvals.agent: "deny"`, `subagents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (8,192 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
 
-## Pi Fovea
-
-The `npm:pi-fovea` package loads its repo-map extension and `pi-fovea` skill. This config uses the npm release. Pi also accepts `git:github.com/monotykamary/pi-fovea` or an absolute local checkout, but only one source should be active.
-
-Fovea needs Node.js 20 or newer and `ast-grep` on `PATH`. Install ast-grep with `brew install ast-grep` or `npm install -g @ast-grep/cli`. Set `FOVEA_AST_GREP=/absolute/path/to/ast-grep` to use another binary.
-
-All persisted global options are explicit in `fovea.json`:
-
-| Key | Repo value | Accepted value | Effect |
-| --- | :---: | --- | --- |
-| `sync.enabled` | `false` | boolean | Check for semantic changes before a run and after each turn. |
-| `sync.budget` | `128` | integer from 128 to 8192 | Set the token cap for proactive steering. |
-| `sync.ackClean` | `false` | boolean | Show a small notice after a changed turn has no semantic action. |
-| `sync.warmFileThreshold` | `16` | integer from 1 to 16 | Set how many newly relevant files trigger steering. Route changes always trigger it. |
-| `tools.defaultBudget` | `512` | integer from 256 to 16000 | Set the fallback token cap when a `fovea_*` call omits `maxTokens`. |
-| `tools.replaceGrep` | `true` | boolean | Use graph navigation for bare symbol and route queries. Keep native grep for scoped, regex, and text searches. |
-
-`/fovea settings` offers budget presets `256`, `512`, `1024`, `2048`, `4096`, and `8192`. It offers threshold presets `1`, `2`, `3`, `5`, `8`, and `13`. Direct JSON values can use the full ranges in the table. `FOVEA_TURN_SYNC=off`, `0`, or `false` disables sync and overrides JSON.
-
-The global file is `~/.pi/agent/fovea.json`. A trusted project can override it with `<repo>/.pi/fovea.json`. Use `/fovea status`, `/fovea settings`, `/fovea reset`, and `/fovea reload` for runtime control. A later `npm run setup` restores this repo's global values.
 
 ## What setup does
 
@@ -140,7 +120,6 @@ The global file is `~/.pi/agent/fovea.json`. A trusted project can override it w
 
 5. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
    - `settings.json` → `~/.pi/agent/settings.json`
-   - `fovea.json` → `~/.pi/agent/fovea.json`
    - `synthetic.json` → `~/.pi/agent/extensions/synthetic.json`
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `fabric.json` → `~/.pi/agent/fabric.json`
@@ -164,7 +143,6 @@ The global file is `~/.pi/agent/fovea.json`. A trusted project can override it w
 - `reminders/` — global reminder definitions for `pi-system-reminders`
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
-- `fovea.json` — pi-fovea global settings with every supported option visible (see [Pi Fovea](#pi-fovea))
 - `models.json` — custom provider/model definitions symlinked into pi (for example OpenRouter via `OPENROUTER_API_KEY`)
 - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
 - `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
@@ -184,6 +162,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `fovea.json`, `synthetic.json`, `neuralwatt.json`, `fabric.json`, and `mcp.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `fabric.json`, and `mcp.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.

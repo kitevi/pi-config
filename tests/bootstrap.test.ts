@@ -27,10 +27,6 @@ function appendSystemPath(home: string): string {
 	return join(home, ".pi", "agent", "APPEND_SYSTEM.md");
 }
 
-function foveaConfigPath(home: string): string {
-	return join(home, ".pi", "agent", "fovea.json");
-}
-
 void describe("bootstrap reconciliation", () => {
 	void it("installs APPEND_SYSTEM.md as a regular file matching the repository copy", async () => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-bootstrap-"));
@@ -49,24 +45,6 @@ void describe("bootstrap reconciliation", () => {
 
 			await runBootstrap(home);
 			assert.equal(await readFile(generatedPath, "utf8"), firstOutput);
-		} finally {
-			await rm(home, { recursive: true, force: true });
-		}
-	});
-
-	void it("installs fovea.json as a regular file matching the repository copy", async () => {
-		const home = await mkdtemp(join(tmpdir(), "pi-config-bootstrap-"));
-
-		try {
-			await runBootstrap(home);
-
-			const repoConfig = await readFile(join(repoRoot, "fovea.json"), "utf8");
-			const generatedPath = foveaConfigPath(home);
-			const targetStat = await lstat(generatedPath);
-
-			assert.equal(await readFile(generatedPath, "utf8"), repoConfig);
-			assert.equal(targetStat.isFile(), true);
-			assert.equal(targetStat.isSymbolicLink(), false);
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}
