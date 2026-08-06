@@ -67,7 +67,7 @@
   },
   "showCacheMissNotices": true,
   "readseek": {
-    "replacedTools": [
+    "overrideTools": [
       "read",
       "edit",
       "write",
