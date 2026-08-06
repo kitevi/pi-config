@@ -1,0 +1,12 @@
+{
+  "sync": {
+    "enabled": false,
+    "budget": 128,
+    "ackClean": false,
+    "warmFileThreshold": 16
+  },
+  "tools": {
+    "defaultBudget": 512,
+    "replaceGrep": true
+  }
+}
