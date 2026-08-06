@@ -864,6 +864,12 @@ const sessionWrittenPaths = new Set<string>();
 // can say so explicitly. Reset per agent run.
 const ruleHits = new Map<string, number>();
 
+// Pi's extension selector host mounts exactly one dialog at a time. A second
+// concurrent ask unmounts the first without disposing it or settling its
+// promise: the orphaned ask then sits invisible until its countdown expires and
+// looks like a no-show. Serialize asks so parallel gated calls queue instead.
+let askSlot: Promise<void> = Promise.resolve();
+
 const rememberWrittenPath = (path: string) => {
 	if (!path) return;
 	sessionWrittenPaths.add(normalizedPath(path));
@@ -1392,25 +1398,35 @@ export default function (pi: ExtensionAPI) {
 		// backstop for a host that does not honour it. Either way "nobody answered"
 		// is told apart from "answered no" by how long the dialog stayed up.
 		const timeoutMs = askTimeoutMs();
+		const previous = askSlot;
+		let releaseSlot: () => void = () => {};
+		askSlot = new Promise((resolve) => {
+			releaseSlot = resolve;
+		});
+		await previous;
 		const controller = new AbortController();
 		const timer = setTimeout(() => controller.abort(), timeoutMs + ASK_TIMEOUT_BACKSTOP_MS);
-		const notifyAsk = { ids, target: assessment.target, timeoutMs };
-		try {
-			pi.events.emit("permission_gate:ask", notifyAsk);
-		} catch {
-			// Notification listeners are advisory; the ask must still run.
-		}
 		const startedAt = Date.now();
 		let choice: string | undefined;
 		try {
-			choice = await ctx.ui.select(`⚠️ Permission gate ask\n\n${reason}\n\nAllow?`, [ASK_DENY, ASK_ALLOW], {
-				signal: controller.signal,
-				timeout: timeoutMs,
-			});
-		} catch {
-			choice = undefined;
+			const notifyAsk = { ids, target: assessment.target, timeoutMs };
+			try {
+				pi.events.emit("permission_gate:ask", notifyAsk);
+			} catch {
+				// Notification listeners are advisory; the ask must still run.
+			}
+			try {
+				choice = await ctx.ui.select(`⚠️ Permission gate ask\n\n${reason}\n\nAllow?`, [ASK_DENY, ASK_ALLOW], {
+					signal: controller.signal,
+					timeout: timeoutMs,
+				});
+			} catch {
+				choice = undefined;
+			}
+		} finally {
+			clearTimeout(timer);
+			releaseSlot();
 		}
-		clearTimeout(timer);
 
 		if (choice === ASK_ALLOW) return undefined;
 
