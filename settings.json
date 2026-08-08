@@ -21,7 +21,7 @@
       "prompts": [],
       "themes": []
     },
-    "npm:pi-x-ide",
+    "npm:@xl0/pi-lovely-ide",
     "npm:@narumitw/pi-usage",
     {
       "source": "npm:pi-fabric",

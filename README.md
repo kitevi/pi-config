@@ -94,6 +94,10 @@ Setting that variable inside an agent’s child command does not bypass the gate
 
 Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact surface focus, and OSC 777 raises the native desktop notification. The extension also supports Kitty's OSC 99 protocol. When no native notification protocol is recognized, it falls back to `notify-send` on Linux or `osascript` on macOS. If no terminal focus report has arrived, focus detection falls back to X11's active window when `DISPLAY` and `WINDOWID` are available, or the frontmost terminal application on macOS. Terminal reports take precedence over these best-effort fallbacks.
 
+## VS Code selection context
+
+[`@xl0/pi-lovely-ide`](https://github.com/xl0/pi-lovely-ide) connects Pi to the matching VS Code workspace automatically while keeping prompt context opt-in. Install the companion VS Code extension `xl0.pi-lovely-ide`, select code in the editor, then press `Alt+Shift+L` (or run **Pi: Mention Selection** from the Command Palette) to paste an editable `@file#range` reference into Pi. Passive cursor and selection changes only update the footer because `xl0-lovely-ide.json` disables ambient selection context. Pi's `/ide` command manages the connection and settings; attachment is initiated from VS Code.
+
 ## Pi Fabric
 
 The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. Subagents are disabled (`approvals.agent: "deny"`, `subagents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (8,192 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
@@ -120,6 +124,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 
 5. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
    - `settings.json` → `~/.pi/agent/settings.json`
+   - `xl0-lovely-ide.json` → `~/.pi/agent/xl0-lovely-ide.json`
    - `synthetic.json` → `~/.pi/agent/extensions/synthetic.json`
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `fabric.json` → `~/.pi/agent/fabric.json`
@@ -143,6 +148,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `reminders/` — global reminder definitions for `pi-system-reminders`
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
+- `xl0-lovely-ide.json` — Pi Lovely IDE settings: automatic connection with ambient selection context disabled
 - `models.json` — custom provider/model definitions symlinked into pi (for example OpenRouter via `OPENROUTER_API_KEY`)
 - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
 - `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
@@ -162,6 +168,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `fabric.json`, and `mcp.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `xl0-lovely-ide.json`, `synthetic.json`, `neuralwatt.json`, `fabric.json`, and `mcp.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.

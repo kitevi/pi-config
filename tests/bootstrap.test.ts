@@ -27,6 +27,10 @@ function appendSystemPath(home: string): string {
 	return join(home, ".pi", "agent", "APPEND_SYSTEM.md");
 }
 
+function lovelyIdeConfigPath(home: string): string {
+	return join(home, ".pi", "agent", "xl0-lovely-ide.json");
+}
+
 void describe("bootstrap reconciliation", () => {
 	void it("installs APPEND_SYSTEM.md as a regular file matching the repository copy", async () => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-bootstrap-"));
@@ -45,6 +49,34 @@ void describe("bootstrap reconciliation", () => {
 
 			await runBootstrap(home);
 			assert.equal(await readFile(generatedPath, "utf8"), firstOutput);
+		} finally {
+			await rm(home, { recursive: true, force: true });
+		}
+	});
+
+	void it("installs manual-only Pi Lovely IDE configuration", async () => {
+		const home = await mkdtemp(join(tmpdir(), "pi-config-bootstrap-"));
+
+		try {
+			const repoConfig = await readFile(join(repoRoot, "xl0-lovely-ide.json"), "utf8");
+			const config = JSON.parse(repoConfig);
+			const settings = JSON.parse(await readFile(join(repoRoot, "settings.json"), "utf8"));
+
+			assert.deepEqual(config, {
+				autoConnectOnStartup: true,
+				autoReconnect: true,
+				selectionContext: false,
+			});
+			assert.equal(settings.packages.includes("npm:@xl0/pi-lovely-ide"), true);
+			assert.equal(settings.packages.includes("npm:pi-x-ide"), false);
+
+			await runBootstrap(home);
+
+			const generatedPath = lovelyIdeConfigPath(home);
+			const targetStat = await lstat(generatedPath);
+			assert.equal(await readFile(generatedPath, "utf8"), repoConfig);
+			assert.equal(targetStat.isFile(), true);
+			assert.equal(targetStat.isSymbolicLink(), false);
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}

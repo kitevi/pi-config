@@ -1,0 +1,5 @@
+{
+  "autoConnectOnStartup": true,
+  "autoReconnect": true,
+  "selectionContext": false
+}
