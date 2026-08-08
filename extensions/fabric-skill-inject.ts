@@ -1,15 +1,21 @@
 /**
- * Preload a compact fabric_exec call reference for selected models.
+ * Preload a compact fabric_exec reliability supplement for DeepSeek Flash models.
  *
  * Cache behavior: the injected text is static and model matching is
  * deterministic. For a fixed model and extension version, this extension adds
- * the same bytes on every turn; it introduces no turn-specific prompt data.
+ * the same bytes on every matching agent start; it introduces no request-specific
+ * prompt data.
  *
- * Reference provenance (verified 2026-08-08):
- * - pi-fabric 0.40.3, skills/fabric-exec/SKILL.md: pi.* forms, return shapes,
- *   bash settlement, aliases, edit behavior, and executor semantics.
+ * Duplication boundary (verified 2026-08-08): pi-fabric 0.40.3 automatically
+ * injects tool availability, representative forms and returns, bash settlement,
+ * provider namespaces, and named-string access. This supplement keeps canonical
+ * field variants plus executor, read, edit, and batching semantics that are
+ * absent from or only implicit in that ambient block.
+ *
+ * Reference provenance:
+ * - pi-fabric 0.40.3, skills/fabric-exec/SKILL.md.
  * - Pi 0.84.1 read behavior: unbounded reads stop at 2,000 lines or 50KB.
- * - Using canonical field names is an editorial recommendation, not a runtime
+ * - Canonical field names are an editorial recommendation, not a runtime
  *   requirement; pi-fabric accepts the documented aliases.
  */
 
@@ -21,49 +27,41 @@ export interface ModelIdentity {
 	name?: string;
 }
 
-// A model matches when its provider, id, and display name collectively contain
-// every word from at least one group. Matching is case-insensitive.
+// Match any DeepSeek Flash model when the words appear across its provider, id,
+// or display name. Matching is case-insensitive.
 const TARGET_MODEL_WORD_GROUPS: readonly (readonly string[])[] = [["deepseek", "flash"]];
 
 export const DISTILLED_BLOCK = `
 
-# fabric_exec routine-call reference (preloaded)
+# fabric_exec reliability supplement (preloaded)
 
-Use this reference for routine calls. Load the full fabric-exec skill only for
-advanced APIs or a contract error not covered here.
+Pi Fabric already supplies routine full-code guidance automatically. This
+supplement preloads canonical forms and edge semantics because these models may
+not reliably load the fabric-exec skill. Load the full skill only for advanced
+APIs or a contract error not covered here.
 
 Put one type-checked TypeScript program in \`fabric_exec.code\`. Top-level
 \`await\` and \`return\` work. Only the returned value enters model context;
 \`print()\` and \`console.log()\` go to the activity panel. For awkward payloads,
 pass top-level \`strings\` and read them in code as \`π.<key>\`.
 
-## Canonical pi.* calls and returns
-- Read: \`pi.read("file")\` or \`pi.read({ path: "file", offset: 1, limit: 120 })\`
-  returns a string.
-- Shell: \`pi.bash({ command: "git status", settle: true })\` returns
-  \`{ ok, output, details }\`; with \`settle: true\`, failure also includes
-  \`exitCode\` and \`error\` instead of rejecting.
-- Search: \`pi.grep({ pattern: "TODO", path: "src", limit: 20 })\` returns a string.
-- Find: \`pi.find({ pattern: "*.ts", path: "src", limit: 20 })\` returns a string.
-- List: \`pi.ls("src")\` returns a string.
-- Edit: \`pi.edit({ path, oldText, newText })\` or
-  \`pi.edit({ path, edits: [{ oldText, newText }] })\` returns
-  \`{ ok, output, details }\`.
-- Write: \`pi.write({ path, content })\` returns \`{ ok, output, details }\`.
+## Prefer canonical pi.* forms
+- String results: \`pi.read({ path, offset, limit })\`,
+  \`pi.grep({ pattern, path, limit })\`, \`pi.find({ pattern, path, limit })\`, and
+  \`pi.ls({ path, limit })\`.
+- Envelope results: \`pi.bash({ command, timeout, settle })\`,
+  \`pi.edit({ path, oldText, newText })\` or
+  \`pi.edit({ path, edits: [{ oldText, newText }] })\`, and
+  \`pi.write({ path, content })\`. Read their \`.output\` when only output text is
+  needed.
 
-## Important semantics
-- Without \`settle: true\`, \`pi.bash\` rejects on a nonzero exit. Do not use
-  \`settle\` for timeout, cancellation, approval, security, or spawn failures;
-  those still reject.
-- Read \`.output\` from successful bash/edit/write results when that is all the
-  final answer needs.
+## Additional semantics
 - Unbounded \`pi.read\` stops at 2,000 lines or 50KB. Use \`offset\` and \`limit\`.
-- Aliases such as \`cmd\`, \`query\`, and \`file_path\` are accepted. Prefer the
-  canonical fields above for consistency.
+- Aliases such as \`cmd\`, \`query\`, and \`file_path\` are accepted, but prefer
+  canonical fields for consistency.
 - For \`pi.edit\`, omit \`all\` for a unique anchor. Entry-level \`all: true\`
   intentionally replaces every non-overlapping occurrence.
 - Batch independent calls with \`Promise.all\`; keep dependent calls sequential.
-- Describe unknown provider actions before calling them; do not guess schemas.
 
 ## Canonical batch
 \`\`\`ts
@@ -71,12 +69,11 @@ const [pkg, hits] = await Promise.all([
   pi.read("package.json"),
   pi.grep({ pattern: "TODO", path: "src", limit: 20 }),
 ]);
-const status = await pi.bash({ command: "git status --short", settle: true });
-return { pkg, hits, status: status.output };
+return { pkg, hits };
 \`\`\`
 `;
 
-const BLOCK_MARKER = "# fabric_exec routine-call reference (preloaded)";
+const BLOCK_MARKER = "# fabric_exec reliability supplement (preloaded)";
 
 export function isTargetModel(model: ModelIdentity | undefined): boolean {
 	if (!model) return false;
@@ -93,6 +90,7 @@ export function isTargetModel(model: ModelIdentity | undefined): boolean {
 
 export default function fabricSkillInject(pi: ExtensionAPI): void {
 	pi.on("before_agent_start", async (event, ctx: ExtensionContext) => {
+		if (!pi.getActiveTools().includes("fabric_exec")) return;
 		if (!isTargetModel(ctx.model)) return;
 		if (event.systemPrompt.includes(BLOCK_MARKER)) return;
 		return { systemPrompt: `${event.systemPrompt}${DISTILLED_BLOCK}` };

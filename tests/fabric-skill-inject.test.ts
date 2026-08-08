@@ -6,12 +6,18 @@ import plugin, {
 } from "../extensions/fabric-skill-inject.ts";
 
 void describe("isTargetModel", () => {
-	void it("matches deepseek and flash across provider, id, and name, ignoring case", () => {
+	void it("matches DeepSeek Flash models across provider, id, and name", () => {
 		assert.strictEqual(
 			isTargetModel({
 				provider: "OpenRouter",
 				id: "deepseek/deepseek-v4-FLASH",
-				name: "DeepSeek V4 Flash",
+			}),
+			true,
+		);
+		assert.strictEqual(
+			isTargetModel({
+				provider: "openrouter",
+				id: "deepseek/deepseek-v4-flash-0731",
 			}),
 			true,
 		);
@@ -25,7 +31,7 @@ void describe("isTargetModel", () => {
 		);
 	});
 
-	void it("requires every word in the group", () => {
+	void it("requires both DeepSeek and Flash", () => {
 		assert.strictEqual(
 			isTargetModel({ provider: "openrouter", id: "deepseek/deepseek-v4-pro" }),
 			false,
@@ -45,9 +51,10 @@ void describe("fabric skill injection", () => {
 		ctx: { model?: ModelIdentity },
 	) => Promise<HookResult>;
 
-	function registeredHook(): Hook {
+	function registeredHook(activeTools: string[] = ["fabric_exec"]): Hook {
 		const handlers = new Map<string, Hook>();
 		const pi = {
+			getActiveTools: () => activeTools,
 			on(event: string, handler: Hook) {
 				handlers.set(event, handler);
 			},
@@ -69,7 +76,17 @@ void describe("fabric skill injection", () => {
 
 		assert.deepStrictEqual(first, second);
 		assert.strictEqual(first?.systemPrompt, `BASE${DISTILLED_BLOCK}`);
-		assert.notInclude(first?.systemPrompt ?? "", "| Tool | Forms | Returns |");
+		assert.isBelow(DISTILLED_BLOCK.length, 1_800, "keep the supplement compact");
+	});
+
+	void it("does nothing when fabric_exec is inactive", async () => {
+		const hook = registeredHook([]);
+		assert.isUndefined(
+			await hook(
+				{ systemPrompt: "BASE" },
+				{ model: { provider: "openrouter", id: "deepseek/deepseek-v4-flash" } },
+			),
+		);
 	});
 
 	void it("does nothing for other models or an already injected prompt", async () => {
