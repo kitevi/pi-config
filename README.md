@@ -137,7 +137,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
   - `extensions/permission-gate.ts` — rule-based permission gate for `bash`/`nu` tool calls (see [Permission gate](#permission-gate))
   - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus GPT verbosity and context "dumb zone" hints
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
-  - `extensions/max-reasoning.ts` — raises the thinking level to a GLM/DeepSeek/Kimi model’s highest supported level on model select/start
+  - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
 - `skills/` — pi skills
 - `themes/` — pi themes
 - `reminders/` — global reminder definitions for `pi-system-reminders`
