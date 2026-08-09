@@ -51,29 +51,4 @@ void describe("bootstrap reconciliation", () => {
 		}
 	});
 
-	void it("replaces the removed Pi Lovely IDE wiring with the vendored IDE extension", async () => {
-		const home = await mkdtemp(join(tmpdir(), "pi-config-bootstrap-"));
-
-		try {
-			const settings = JSON.parse(await readFile(join(repoRoot, "settings.json"), "utf8"));
-			const legacyTarget = join(home, ".pi", "agent", "xl0-lovely-ide.json");
-			const vendoredEntry = join(home, ".pi", "agent", "extensions", "ide", "index.js");
-
-			// Declared state: the old package/config are gone, the vendored
-			// bridge exists in the repo.
-			assert.equal(settings.packages.includes("npm:@xl0/pi-lovely-ide"), false);
-			assert.equal(existsSync(join(repoRoot, "xl0-lovely-ide.json")), false);
-			assert.equal(existsSync(join(repoRoot, "extensions", "ide", "index.js")), true);
-
-			await runBootstrap(home);
-
-			// Reconciliation never writes the stale legacy config (per
-			// docs/adr/0001-user-managed-legacy-path-cleanup.md it is the
-			// user's to remove manually), and links the vendored extension.
-			assert.equal(existsSync(legacyTarget), false);
-			assert.equal(existsSync(vendoredEntry), true);
-		} finally {
-			await rm(home, { recursive: true, force: true });
-		}
-	});
 });

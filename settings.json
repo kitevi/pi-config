@@ -28,6 +28,7 @@
         "skills/fabric-exec"
       ]
     },
+	"npm:@pborck/pi-de",
     "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",
     "npm:pi-lilac-provider",
