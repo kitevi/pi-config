@@ -1,0 +1,19 @@
+{
+	"name": "pi-ide-selection",
+	"displayName": "Pi IDE Selection",
+	"description": "On-demand bridge that reports the active file path and primary selection range to Pi's /ide command.",
+	"version": "0.1.0",
+	"publisher": "ppowo",
+	"type": "commonjs",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"main": "./extension.js",
+	"activationEvents": [
+		"onUri"
+	]
+}
