@@ -118,6 +118,7 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
    - `web-tools.json` → `~/.pi/web-tools.json`
+   - `hashline-readmap-settings.json` → `~/.pi/agent/hashline-readmap/settings.json`
 
 5. **Switches the active theme** — symlinks the `github-colorblind.json` theme to the light or dark variant (defaults to light unless `--dark` or `--light` is passed to the script).
 
@@ -131,7 +132,6 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
   - `extensions/permission-gate.ts` — rule-based permission gate for `bash`/`nu` tool calls (see [Permission gate](#permission-gate))
   - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus GPT verbosity and context "dumb zone" hints
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
-  - `extensions/bash-context-guard.ts` — replaces oversized `bash` results with a small head/tail preview linked to the complete output
   - `extensions/max-reasoning.ts` — raises the thinking level to a GLM/DeepSeek/Kimi model’s highest supported level on model select/start
 - `skills/` — pi skills
 - `themes/` — pi themes
@@ -144,6 +144,7 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
 - `pi-vcc-config.json` — pi-vcc extension configuration installed into `~/.pi/agent/pi-vcc-config.json`
 - `web-tools.json` — pi-web-tools configuration installed into `~/.pi/web-tools.json`
+- `hashline-readmap-settings.json` — hashline-readmap configuration installed into `~/.pi/agent/hashline-readmap/settings.json`
 - `tests/` — `node:test` suites for the extensions, run with `npm test`
 
 The bootstrap script is plain Node.js, but pi extensions in `extensions/` can still stay TypeScript.
@@ -157,6 +158,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, and `web-tools.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `web-tools.json`, and `hashline-readmap-settings.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.

@@ -1,0 +1,13 @@
+{
+  "grep": {
+    "maxLines": 50,
+    "maxBytes": 4096
+  },
+  "bashContextGuard": {
+    "enabled": true,
+    "maxLines": 80,
+    "maxBytes": 6144,
+    "headLines": 12,
+    "tailLines": 35
+  }
+}
