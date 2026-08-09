@@ -93,23 +93,6 @@ Setting that variable inside an agent’s child command does not bypass the gate
 `extensions/desktop-notifications.ts` requests terminal focus reporting and sends an attention notification only when Pi's terminal surface is known to be unfocused. It handles permission-gate asks (`Pi needs permission`) and the final `agent_settled` lifecycle event (`Pi is waiting for you`). Unknown focus is treated conservatively as focused, so unsupported or headless sessions stay silent.
 
 Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact surface focus, and OSC 777 raises the native desktop notification. The extension also supports Kitty's OSC 99 protocol. When no native notification protocol is recognized, it falls back to `notify-send` on Linux or `osascript` on macOS. If no terminal focus report has arrived, focus detection falls back to X11's active window when `DISPLAY` and `WINDOWID` are available, or the frontmost terminal application on macOS. Terminal reports take precedence over these best-effort fallbacks.
-
-## VS Code selection bridge
-
-`extensions/ide/index.js` provides two commands for pulling a file/range reference out of native desktop VS Code (macOS, Linux, Windows):
-
-- **`/ide`** — captures the active file path and primary selection range from VS Code, then pastes a reference like ``Read `src/auth/session.ts`, lines 10–15 (selection 10:1–16:1). `` into Pi's input editor without triggering an agent turn. The selected source text never crosses the bridge: the response file carries only the path, dirty flag, and zero-based selection coordinates, and the model reads the saved file itself.
-- **`/ide-install`** — packages the vendored VS Code companion (`extensions/ide/vscode/`) into a temporary VSIX on demand with `npx @vscode/vsce`, installs it via `code --install-extension`, and deletes the VSIX. No prebuilt or committed VSIX exists; npm/network access on first install is expected.
-
-Details worth knowing:
-
-- VS Code's URI handler (`vscode://ppowo.pi-ide-selection/capture?id=<uuid>`) routes to the topmost window; responses land in `~/.pi/ide-capture/` with a short bounded poll. There is no background server, socket, listener, or reconnect loop.
-- Positions are rendered one-based with consistent separators (including on Windows); a multi-line selection ending at column zero excludes the unselected final line from the readable range.
-- If the document is dirty, `/ide` still inserts the reference and warns: **VS Code has unsaved changes; the model will read the saved file.** An empty selection or other capture failure produces an error notification and inserts nothing.
-- Untitled/virtual documents, notebook cells, multiple selections, and remote (WSL/SSH/Dev Container) topologies are out of scope.
-
-Per [`docs/adr/0001-user-managed-legacy-path-cleanup.md`](docs/adr/0001-user-managed-legacy-path-cleanup.md), legacy paths are cleaned up manually, not by bootstrap: a stale `~/.pi/agent/xl0-lovely-ide.json` and the old `xl0.pi-lovely-ide` VS Code extension may be removed by hand. The old VS Code extension may also be left in place — it is never uninstalled automatically.
-
 ## What setup does
 
 `npm run setup` runs `bootstrap.mjs`, which:
@@ -143,8 +126,6 @@ Per [`docs/adr/0001-user-managed-legacy-path-cleanup.md`](docs/adr/0001-user-man
 - `bootstrap.mjs` — setup/link/merge script
 - `prompts/` — prompt files
 - `extensions/` — pi extensions
-  - `extensions/ide/index.js` — VS Code selection bridge: `/ide` and `/ide-install` commands (see [VS Code selection bridge](#vs-code-selection-bridge))
-  - `extensions/ide/vscode/` — vendored plain-JavaScript VS Code companion (`pi-ide-selection`), packaged on demand by `/ide-install`
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide`
   - `extensions/skill-guide.json` — startup skill-index display settings and summary overrides
   - `extensions/permission-gate.ts` — rule-based permission gate for `bash`/`nu` tool calls (see [Permission gate](#permission-gate))
