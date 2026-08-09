@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, lstat, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -27,10 +28,6 @@ function appendSystemPath(home: string): string {
 	return join(home, ".pi", "agent", "APPEND_SYSTEM.md");
 }
 
-function lovelyIdeConfigPath(home: string): string {
-	return join(home, ".pi", "agent", "xl0-lovely-ide.json");
-}
-
 void describe("bootstrap reconciliation", () => {
 	void it("installs APPEND_SYSTEM.md as a regular file matching the repository copy", async () => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-bootstrap-"));
@@ -54,29 +51,27 @@ void describe("bootstrap reconciliation", () => {
 		}
 	});
 
-	void it("installs manual-only Pi Lovely IDE configuration", async () => {
+	void it("replaces the removed Pi Lovely IDE wiring with the vendored IDE extension", async () => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-bootstrap-"));
 
 		try {
-			const repoConfig = await readFile(join(repoRoot, "xl0-lovely-ide.json"), "utf8");
-			const config = JSON.parse(repoConfig);
 			const settings = JSON.parse(await readFile(join(repoRoot, "settings.json"), "utf8"));
+			const legacyTarget = join(home, ".pi", "agent", "xl0-lovely-ide.json");
+			const vendoredEntry = join(home, ".pi", "agent", "extensions", "ide", "index.js");
 
-			assert.deepEqual(config, {
-				autoConnectOnStartup: true,
-				autoReconnect: true,
-				selectionContext: false,
-			});
-			assert.equal(settings.packages.includes("npm:@xl0/pi-lovely-ide"), true);
-			assert.equal(settings.packages.includes("npm:pi-x-ide"), false);
+			// Declared state: the old package/config are gone, the vendored
+			// bridge exists in the repo.
+			assert.equal(settings.packages.includes("npm:@xl0/pi-lovely-ide"), false);
+			assert.equal(existsSync(join(repoRoot, "xl0-lovely-ide.json")), false);
+			assert.equal(existsSync(join(repoRoot, "extensions", "ide", "index.js")), true);
 
 			await runBootstrap(home);
 
-			const generatedPath = lovelyIdeConfigPath(home);
-			const targetStat = await lstat(generatedPath);
-			assert.equal(await readFile(generatedPath, "utf8"), repoConfig);
-			assert.equal(targetStat.isFile(), true);
-			assert.equal(targetStat.isSymbolicLink(), false);
+			// Reconciliation never writes the stale legacy config (per
+			// docs/adr/0001-user-managed-legacy-path-cleanup.md it is the
+			// user's to remove manually), and links the vendored extension.
+			assert.equal(existsSync(legacyTarget), false);
+			assert.equal(existsSync(vendoredEntry), true);
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}
