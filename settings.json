@@ -62,8 +62,5 @@
       "skills": []
     }
   ],
-  "compaction": {
-    "enabled": false
-  },
   "showCacheMissNotices": true
 }
