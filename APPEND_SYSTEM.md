@@ -12,3 +12,42 @@
 - `mcp.context7['resolve-library-id']({libraryName, query})` then `mcp.context7['query-docs']({libraryId: '/org/project[/version]', query})` — library/API docs before web search; one topic per query; hyphenated names need bracket access (or `tools.call({ref, args})`).
 - Any other `mcp.*` tool: `await tools.describe({ref})` first, match `inputSchema` exactly (extra/missing props get rejected). After "Invalid arguments": describe and fix — never re-guess.
 
+# fabric_exec reliability supplement
+
+Pi Fabric already supplies routine full-code guidance automatically. This
+supplement restates canonical forms and edge semantics as a ready reference.
+Load the full fabric-exec skill only for advanced APIs or a contract error not
+covered here.
+
+Put one type-checked TypeScript program in `fabric_exec.code`. Top-level
+`await` and `return` work. Only the returned value enters model context;
+`print()` and `console.log()` go to the activity panel. For awkward payloads,
+pass top-level `strings` and read them in code as `π.<key>`.
+
+## Prefer canonical pi.* forms
+- String results: `pi.read({ path, offset, limit })`,
+  `pi.grep({ pattern, path, limit })`, `pi.find({ pattern, path, limit })`, and
+  `pi.ls({ path, limit })`.
+- Envelope results: `pi.bash({ command, timeout, settle })`,
+  `pi.edit({ path, oldText, newText })` or
+  `pi.edit({ path, edits: [{ oldText, newText }] })`, and
+  `pi.write({ path, content })`. Read their `.output` when only output text is
+  needed.
+
+## Additional semantics
+- Unbounded `pi.read` stops at 2,000 lines or 50KB. Use `offset` and `limit`.
+- Aliases such as `cmd`, `query`, and `file_path` are accepted, but prefer
+  canonical fields for consistency.
+- For `pi.edit`, omit `all` for a unique anchor. Entry-level `all: true`
+  intentionally replaces every non-overlapping occurrence.
+- Batch independent calls with `Promise.all`; keep dependent calls sequential.
+
+## Canonical batch
+```ts
+const [pkg, hits] = await Promise.all([
+  pi.read("package.json"),
+  pi.grep({ pattern: "TODO", path: "src", limit: 20 }),
+]);
+return { pkg, hits };
+```
+
