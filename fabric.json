@@ -1,4 +1,5 @@
 {
+  "configVersion": 3,
   "fullCodeMode": true,
   "executor": {
     "maxOutputChars": 8192,
@@ -25,7 +26,7 @@
     "disableOAuth": true,
     "allowDynamicServers": false
   },
-  "subagents": {
+  "agents": {
     "enabled": false,
     "maxDepth": 0,
     "retainRuns": false,
@@ -34,10 +35,15 @@
   "ui": {
     "enabled": false,
     "widget": "hidden",
-    "showNestedToolCalls": false
+    "showAgentToolPreview": false
   },
   "compaction": {
     "engine": "fabric"
+  },
+  "prewalk": {
+    "mode": "in-place",
+    "model": "opencode-go/deepseek-v4-flash",
+    "thinking": "max"
   },
   "mesh": {
     "enabled": false
