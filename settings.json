@@ -65,6 +65,14 @@
     {
       "source": "https://github.com/dmmulroy/skills",
       "skills": []
+    },
+    {
+      "source": "https://github.com/emilkowalski/skills",
+      "skills": [
+        "skills/emil-design-eng",
+        "skills/review-animations",
+        "skills/animation-vocabulary"
+      ]
     }
   ],
   "showCacheMissNotices": true
