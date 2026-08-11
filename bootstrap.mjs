@@ -26,8 +26,6 @@ const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
 const PI_SETTINGS = join(PI_DIR, "settings.json");
 const WEB_TOOLS_OVERLAY = join(REPO_DIR, "web-tools.json");
 const PI_WEB_TOOLS = join(HOME, ".pi", "web-tools.json");
-const HASHLINE_READMAP_OVERLAY = join(REPO_DIR, "hashline-readmap-settings.json");
-const PI_HASHLINE_READMAP_SETTINGS = join(PI_DIR, "hashline-readmap", "settings.json");
 const SYNTHETIC_OVERLAY = join(REPO_DIR, "synthetic.json");
 const NEURALWATT_OVERLAY = join(REPO_DIR, "neuralwatt.json");
 const PI_SYNTHETIC = join(PI_EXTENSIONS_DIR, "synthetic.json");
@@ -193,7 +191,6 @@ async function main() {
   await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
   await installJsonConfig(WEB_TOOLS_OVERLAY, PI_WEB_TOOLS, "pi web-tools");
-  await installJsonConfig(HASHLINE_READMAP_OVERLAY, PI_HASHLINE_READMAP_SETTINGS, "hashline-readmap settings");
   console.log("bootstrap complete");
   await switchTheme(themeVariant);
 }

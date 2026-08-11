@@ -23,7 +23,7 @@
     },
     "npm:@pborck/pi-de",
     "npm:@narumitw/pi-usage",
-    "https://github.com/coctostan/pi-hashline-readmap",
+    "npm:pi-readseek",
     "npm:pi-web-tools",
     "npm:@monotykamary/pi-vcc",
     {
@@ -67,5 +67,25 @@
       "skills": []
     }
   ],
-  "showCacheMissNotices": true
+  "showCacheMissNotices": true,
+  "readseek": {
+    "overrideTools": [
+      "read",
+      "edit",
+      "write",
+      "grep"
+    ],
+    "imageMode": "auto",
+    "syntaxValidation": "warn",
+    "timeoutMs": 120000,
+    "grep": {
+      "maxLines": 50,
+      "maxBytes": 4096
+    },
+    "display": {
+      "grep": "compact",
+      "edit": "compact",
+      "write": "compact"
+    }
+  }
 }
