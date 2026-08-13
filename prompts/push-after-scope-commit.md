@@ -24,7 +24,8 @@ Commit message requirements:
 - Do not use Conventional Commit types such as `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `build`, or `ci` unless that word is genuinely the code area being changed.
 - Choose the most specific useful scope that helps someone scanning the log find changes relevant to an area of the codebase.
 - Use a concise, imperative description after the colon.
-- Add a body only if it materially improves clarity.
+- Keep the message short: a single summary line only. Do not add a body, bullet lists, or extra paragraphs unless I explicitly ask for one.
+- Keep the summary line under ~72 characters.
 
 Scope selection guidance:
 - Prefer real project language from paths, modules, packages, features, commands, config names, docs sections, or domain terms.
