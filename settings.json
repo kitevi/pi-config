@@ -29,12 +29,7 @@
       ]
     },
 	"npm:@pborck/pi-de",
-    {
-      "source": "npm:pi-neuralwatt-provider",
-      "extensions": [
-        "index.ts"
-      ]
-    },
+    "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",
     "npm:pi-lilac-provider",
     "npm:pi-model-sort",
