@@ -8,7 +8,8 @@
   ],
   "skills": [
     "git/github.com/dmmulroy/skills/tech-spec",
-    "git/github.com/dmmulroy/skills/bro"
+    "git/github.com/dmmulroy/skills/bro",
+    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me"
   ],
   "packages": [
     {
@@ -63,6 +64,10 @@
     },
     {
       "source": "https://github.com/dmmulroy/skills",
+      "skills": []
+    },
+    {
+      "source": "https://github.com/humanlayer/skills",
       "skills": []
     },
     {
