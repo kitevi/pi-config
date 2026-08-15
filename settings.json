@@ -29,7 +29,7 @@
         "skills/fabric-exec"
       ]
     },
-	"npm:@pborck/pi-de",
+    "npm:@pborck/pi-de",
     "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",
     "npm:pi-lilac-provider",
@@ -37,7 +37,6 @@
     "npm:pi-invisible-continue",
     "npm:@dustydonkey/pi-spinner",
     "npm:pi-system-reminders",
-    "npm:pi-streaming-guard",
     {
       "source": "https://github.com/mattpocock/skills",
       "skills": [
