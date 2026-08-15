@@ -44,12 +44,8 @@ npm install
 npm run setup
 ```
 
-Theme defaults to light. You can also choose explicitly:
-
-```bash
-npm run setup-light
-npm run setup-dark
-```
+The theme follows your terminal appearance: pi switches between the
+`github-colorblind-light` and `github-colorblind-dark` variants automatically.
 
 `npm install` provides the pinned dependencies used by the extensions and their tests. The reconciliation script itself still uses only Node.js built-ins.
 
@@ -126,7 +122,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
    - `fabric.json` → `~/.pi/agent/fabric.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
 
-6. **Switches the active theme** — symlinks the `github-colorblind.json` theme to the light or dark variant (defaults to light unless `--dark` or `--light` is passed to the script).
+6. **Links both theme variants** — `github-colorblind-light.json` and `github-colorblind-dark.json` are linked into `~/.pi/agent/themes/`; pi follows the terminal's light/dark appearance automatically.
 
 ## Repo layout
 
@@ -140,7 +136,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
 - `skills/` — pi skills
-- `themes/` — pi themes
+- `themes/` — pi themes (`github-colorblind` light/dark variants)
 - `reminders/` — global reminder definitions for `pi-system-reminders`
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions

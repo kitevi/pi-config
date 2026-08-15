@@ -152,31 +152,7 @@ async function syncDirectoryLinks(sourceDir, targetDir) {
     await relink(join(targetDir, entry.name), join(sourceDir, entry.name));
   }
 }
-function getThemeVariantFromArgs(args = process.argv.slice(2)) {
-  if (args.includes("--dark")) {
-    return "dark";
-  }
-
-  if (args.includes("--light")) {
-    return "light";
-  }
-
-  return "light";
-}
-
-async function switchTheme(variant = getThemeVariantFromArgs()) {
-  const themeDir = PI_THEMES_DIR;
-  const linkPath = join(themeDir, "github-colorblind.json");
-  const targetPath = join(themeDir, "github-colorblind", `${variant}.json`);
-  const symlinkTarget = relative(dirname(linkPath), targetPath);
-
-  try { await rm(linkPath, { force: true }); } catch {}
-  await symlink(symlinkTarget, linkPath);
-  console.log(`linked theme (${variant}): github-colorblind.json → ${symlinkTarget}`);
-}
-
 async function main() {
-  const themeVariant = getThemeVariantFromArgs();
   const appendSystem = await readFile(APPEND_SYSTEM_SOURCE, "utf-8");
 
   if (!existsSync(PI_DIR)) {
@@ -201,7 +177,6 @@ async function main() {
   await installJsonConfig(FABRIC_CONFIG_OVERLAY, PI_FABRIC_CONFIG, "Pi Fabric config");
   await installJsonConfig(MCP_CONFIG_OVERLAY, PI_MCP_CONFIG, "MCP config");
   console.log("bootstrap complete");
-  await switchTheme(themeVariant);
 }
 
 main().catch((err) => {

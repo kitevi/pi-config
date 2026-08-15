@@ -56,8 +56,8 @@ _Avoid_: Master copy, canonical copy.
 
 ## Relationships
 
-- A **Theme** has a `light` and `dark` variant. The bootstrap script auto-links
-the appropriate variant based on OS appearance mode.
+- A **Theme** has a `light` and `dark` variant. Pi follows the terminal's
+appearance automatically through the `light/dark` pair in the `theme` setting.
 - An **Extension** can be either a **Local Extension** (in `extensions/`) or a
 **Package Extension** (installed via npm/GitHub and tracked in `settings.json`).
 - A **Package** can bring any combination of **Extensions**, **Skills**, and

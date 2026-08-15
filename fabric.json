@@ -53,8 +53,5 @@
   },
   "schema": {
     "mode": "off"
-  },
-  "codePreview": {
-    "shikiTheme": "solarized-light/solarized-dark"
   }
 }

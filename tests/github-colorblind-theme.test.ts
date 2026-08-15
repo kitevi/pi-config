@@ -129,7 +129,7 @@ const expectedColors = {
 
 function loadTheme(variant: keyof typeof expectedColors): ThemeJson {
 	return JSON.parse(
-		readFileSync(join(repoRoot, "themes", "github-colorblind", `${variant}.json`), "utf8"),
+		readFileSync(join(repoRoot, "themes", `github-colorblind-${variant}.json`), "utf8"),
 	) as ThemeJson;
 }
 
