@@ -12,6 +12,15 @@
         "web_fetch_exa"
       ]
     },
+    "synthetic-web-search": {
+      "description": "Search the live web with Synthetic's zero-data-retention search API.",
+      "command": "npx",
+      "args": ["-y", "synthetic-web-search-mcp@latest"],
+      "env": {
+        "SYNTHETIC_API_KEY": "$env:SYNTHETIC_API_KEY"
+      },
+      "allowedTools": ["search_web"]
+    },
     "context7": {
       "description": "Look up current library and framework documentation with Context7.",
       "baseUrl": "https://mcp.context7.com/mcp",
