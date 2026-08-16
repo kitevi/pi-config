@@ -33,6 +33,7 @@
         "index.ts"
       ]
     },
+    "npm:pi-deepseek-provider",
     "npm:@monotykamary/pi-tps",
     "npm:pi-lilac-provider",
     "npm:pi-model-sort",
