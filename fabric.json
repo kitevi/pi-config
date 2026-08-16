@@ -1,5 +1,11 @@
 {
   "configVersion": 3,
+  "components": [
+    {
+      "id": "deepseek-flash-guidance",
+      "component": "deepseek-flash-guidance"
+    }
+  ],
   "executor": {
     "maxOutputChars": 8192
   },

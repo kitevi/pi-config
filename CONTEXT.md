@@ -69,6 +69,11 @@ owns leaf paths; local additions survive reconciliation.
 `skills/`, `themes/`, `extensions/`, `models.json`).
 - **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
 repository-owned file as-is (no network fetch).
+- **Pi-fabric model guidance**: `extensions/deepseek-flash-guidance.ts`
+registers the `deepseek-flash-guidance` component declared in `fabric.json`.
+Its prompt guidance applies only to DeepSeek V4 Flash turns; other models,
+including V4 Pro, do not receive it. See the file header for API references,
+lifecycle constraints, matching behavior, supported changes, and verification.
 - **Reconciliation** is idempotent — re-running it is safe and intended to be
 done after any change to this repo or on a fresh machine.
 - **Reminders** are static assets managed via symlink, but their *semantics*
