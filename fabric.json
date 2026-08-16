@@ -4,6 +4,10 @@
     {
       "id": "deepseek-flash-guidance",
       "component": "deepseek-flash-guidance"
+    },
+    {
+      "id": "deepseek-pro-guidance",
+      "component": "deepseek-pro-guidance"
     }
   ],
   "executor": {
