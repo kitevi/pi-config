@@ -63,7 +63,7 @@ export const GENERIC_MCP_GUIDANCE = `# MCP tool discovery
 const component: FabricComponentDefinition = {
   name: "generic-mcp-guidance",
   description: "Concise MCP discovery guidance for Kimi, GPT, GLM, and MiniMax models",
-  guarantee: "managed",
+  guarantee: "revertible",
   activate(context) {
     context.guide({
       label: "generic-mcp-discovery",

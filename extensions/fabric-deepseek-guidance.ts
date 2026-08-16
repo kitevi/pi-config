@@ -85,10 +85,7 @@ const DEEPSEEK_V4_MODELS = [
 const component: FabricComponentDefinition = {
   name: "deepseek-guidance",
   description: "Model-facing execution guidance for DeepSeek V4",
-  // The current provider graph fails the stronger `revertible` independence
-  // check against MCP's wildcard effect. `managed` still gives the supervisor
-  // ownership of unloading and cleanup.
-  guarantee: "managed",
+  guarantee: "revertible",
   activate(context) {
     context.guide({
       label: "deepseek-mcp-web-docs",
