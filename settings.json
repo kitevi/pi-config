@@ -27,12 +27,7 @@
     "npm:pi-readseek",
     "npm:pi-web-tools",
     "npm:@monotykamary/pi-vcc",
-    {
-      "source": "npm:pi-neuralwatt-provider",
-      "extensions": [
-        "index.ts"
-      ]
-    },
+    "npm:pi-neuralwatt-provider",
     "npm:pi-deepseek-provider",
     "npm:@monotykamary/pi-tps",
     "npm:pi-lilac-provider",
