@@ -2,12 +2,12 @@
   "configVersion": 3,
   "components": [
     {
-      "id": "deepseek-flash-guidance",
-      "component": "deepseek-flash-guidance"
+      "id": "deepseek-guidance",
+      "component": "deepseek-guidance"
     },
     {
-      "id": "deepseek-pro-guidance",
-      "component": "deepseek-pro-guidance"
+      "id": "generic-mcp-guidance",
+      "component": "generic-mcp-guidance"
     }
   ],
   "executor": {

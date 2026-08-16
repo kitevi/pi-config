@@ -1,12 +1,12 @@
 /**
- * Model-facing guidance for DeepSeek V4 Flash in Pi Fabric.
+ * Model-facing guidance for DeepSeek V4 Flash and Pro in Pi Fabric.
  *
  * Runtime contract
- * - Registers `deepseek-flash-guidance`; its configured instance lives in
+ * - Registers `deepseek-guidance`; its configured instance lives in
  *   `../fabric.json`.
  * - Pi Fabric evaluates `models` on every turn against the canonical
- *   `${provider}/${modelId}` key. Current selectors cover Flash variants
- *   across providers and deliberately exclude V4 Pro.
+ *   `${provider}/${modelId}` key. Current selectors cover Flash and Pro
+ *   variants across providers and exclude other DeepSeek families.
  * - Both entries target `main` and `participant`. Guidance changes prompt
  *   text only; it cannot grant tools, providers, or capabilities.
  * - Keep content deterministic. Timestamps, run IDs, or turn-derived data
@@ -72,25 +72,27 @@ const PROTOCOL_MODULE = (() => {
   );
 })();
 
-// Full-string globs are case-sensitive. The lowercase form covers most
-// providers; the capitalized form covers NeuralWatt. Requiring Flash excludes
-// every current V4 Pro key.
-const DEEPSEEK_V4_FLASH_MODELS = [
+// Full-string globs are case-sensitive. Lowercase forms cover most providers;
+// capitalized forms cover NeuralWatt. Restricting matches to Flash or Pro
+// excludes other DeepSeek families.
+const DEEPSEEK_V4_MODELS = [
   "*/*deepseek*v4*flash*",
   "*/*DeepSeek*V4*Flash*",
+  "*/*deepseek*v4*pro*",
+  "*/*DeepSeek*V4*Pro*",
 ] as const;
 
 const component: FabricComponentDefinition = {
-  name: "deepseek-flash-guidance",
-  description: "Model-facing execution guidance for DeepSeek V4 Flash",
+  name: "deepseek-guidance",
+  description: "Model-facing execution guidance for DeepSeek V4",
   // The current provider graph fails the stronger `revertible` independence
   // check against MCP's wildcard effect. `managed` still gives the supervisor
   // ownership of unloading and cleanup.
   guarantee: "managed",
   activate(context) {
     context.guide({
-      label: "deepseek-flash-mcp-web-docs",
-      models: DEEPSEEK_V4_FLASH_MODELS,
+      label: "deepseek-mcp-web-docs",
+      models: DEEPSEEK_V4_MODELS,
       targets: ["main", "participant"],
       placement: "append",
       content: `# Web and documentation tools (MCP, inside fabric_exec)
@@ -104,8 +106,8 @@ const component: FabricComponentDefinition = {
     });
 
     context.guide({
-      label: "deepseek-flash-fabric-exec-edges",
-      models: DEEPSEEK_V4_FLASH_MODELS,
+      label: "deepseek-fabric-exec-edges",
+      models: DEEPSEEK_V4_MODELS,
       targets: ["main", "participant"],
       placement: "append",
       content: `# fabric_exec edge semantics
