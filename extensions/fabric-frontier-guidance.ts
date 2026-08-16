@@ -2,7 +2,7 @@
  * Concise MCP discovery guidance for Kimi, GPT, GLM, and MiniMax models.
  *
  * Runtime contract
- * - Registers `generic-mcp-guidance`; its configured instance lives in
+ * - Registers `frontier-guidance`; its configured instance lives in
  *   `../fabric.json`.
  * - Pi Fabric evaluates `models` on every turn against the canonical
  *   `${provider}/${modelId}` key. Selectors are case-sensitive and cover the
@@ -44,7 +44,7 @@ const PROTOCOL_MODULE = (() => {
 // Full-string globs are case-sensitive. Include casing used by current direct,
 // aggregator, and Synthetic model IDs. MiniMax IDs use the canonical `minimax`
 // spelling.
-export const GENERIC_MCP_MODELS = [
+export const FRONTIER_MODELS = [
   "*/*kimi*",
   "*/*Kimi*",
   "*/*gpt*",
@@ -55,22 +55,22 @@ export const GENERIC_MCP_MODELS = [
   "*/*MiniMax*",
 ] as const;
 
-export const GENERIC_MCP_GUIDANCE = `# MCP tool discovery
+export const FRONTIER_GUIDANCE = `# MCP tool discovery
 - Prefer an available \`mcp.*\` tool over recreating the same capability with shell commands or direct HTTP.
 - When the right tool is unclear, search with \`await tools.list({ provider: "mcp", query: "<capability>", limit: 20 })\`; inspect uncertain contracts with \`await tools.describe({ ref })\` and follow \`inputSchema\`.
 - Fall back only when no suitable MCP tool is available or it fails, and briefly state why.`;
 
 const component: FabricComponentDefinition = {
-  name: "generic-mcp-guidance",
+  name: "frontier-guidance",
   description: "Concise MCP discovery guidance for Kimi, GPT, GLM, and MiniMax models",
   guarantee: "revertible",
   activate(context) {
     context.guide({
-      label: "generic-mcp-discovery",
-      models: GENERIC_MCP_MODELS,
+      label: "frontier-mcp-discovery",
+      models: FRONTIER_MODELS,
       targets: ["main", "participant"],
       placement: "append",
-      content: GENERIC_MCP_GUIDANCE,
+      content: FRONTIER_GUIDANCE,
     });
   },
 };

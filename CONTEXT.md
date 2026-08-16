@@ -69,13 +69,13 @@ owns leaf paths; local additions survive reconciliation.
 `skills/`, `themes/`, `extensions/`, `models.json`).
 - **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
 repository-owned file as-is (no network fetch).
-- **Pi-fabric model guidance**: `extensions/fabric-deepseek-guidance.ts`
-registers the `deepseek-guidance` component declared in `fabric.json`.
-Its prompt guidance applies only to DeepSeek V4 Flash and Pro turns; other
-DeepSeek families and non-DeepSeek models do not receive it. See the file header
+- **Pi-fabric model guidance**: `extensions/fabric-non-frontier-guidance.ts`
+registers the `non-frontier-guidance` component declared in `fabric.json`.
+Its prompt guidance applies only to DeepSeek V4 Flash and Pro and Qwen 27B
+turns; other models do not receive it. See the file header
 for API references, lifecycle constraints, matching behavior, supported changes,
-and verification. `extensions/fabric-generic-mcp-guidance.ts` registers the
-`generic-mcp-guidance` component for concise MCP discovery guidance on Kimi,
+and verification. `extensions/fabric-frontier-guidance.ts` registers the
+`frontier-guidance` component for concise MCP discovery guidance on Kimi,
 GPT, GLM, and MiniMax turns.
 - **Reconciliation** is idempotent — re-running it is safe and intended to be
 done after any change to this repo or on a fresh machine.

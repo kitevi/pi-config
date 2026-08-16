@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { assert, describe, it } from "vitest";
-import deepseekPlugin from "../extensions/fabric-deepseek-guidance.ts";
-import genericPlugin, {
-	GENERIC_MCP_GUIDANCE,
-	GENERIC_MCP_MODELS,
-} from "../extensions/fabric-generic-mcp-guidance.ts";
+import nonFrontierPlugin from "../extensions/fabric-non-frontier-guidance.ts";
+import frontierPlugin, {
+	FRONTIER_GUIDANCE,
+	FRONTIER_MODELS,
+} from "../extensions/fabric-frontier-guidance.ts";
 
 const REGISTER_EVENT = "pi-fabric:component:register:v1";
 const DISCOVER_EVENT = "pi-fabric:component:discover:v1";
@@ -77,44 +77,49 @@ function matches(patterns: readonly string[], model: string): boolean {
 
 describe("Fabric model guidance", () => {
 	it("registers both configured components through eager and discovery paths", async () => {
-		const [deepseek, generic] = await Promise.all([
-			inspect(deepseekPlugin),
-			inspect(genericPlugin),
+		const [nonFrontier, frontier] = await Promise.all([
+			inspect(nonFrontierPlugin),
+			inspect(frontierPlugin),
 		]);
 		assert.deepEqual(fabricConfig.components, [
-			{ id: "deepseek-guidance", component: deepseek.component.name },
-			{ id: "generic-mcp-guidance", component: generic.component.name },
+			{ id: "non-frontier-guidance", component: nonFrontier.component.name },
+			{ id: "frontier-guidance", component: frontier.component.name },
 		]);
 	});
 
-	it("routes only DeepSeek V4 Flash and Pro to the detailed guidance", async () => {
-		const { guides } = await inspect(deepseekPlugin);
+	it("routes only non-frontier models (DeepSeek V4, Qwen 27B) to the detailed guidance", async () => {
+		const { guides } = await inspect(nonFrontierPlugin);
 		assert.equal(guides.length, 2);
 		for (const guide of guides) {
 			assert.deepEqual(guide.targets, ["main", "participant"]);
 			assert.equal(guide.placement, "append");
 			assert.equal(matches(guide.models, "openrouter/deepseek/deepseek-v4-pro"), true);
 			assert.equal(matches(guide.models, "neuralwatt/deepseek-ai/DeepSeek-V4-Flash"), true);
+			assert.equal(matches(guide.models, "openrouter/qwen/qwen3.6-27b"), true);
+			assert.equal(matches(guide.models, "neuralwatt/Qwen/Qwen3.8-27B-FP8"), true);
+			assert.equal(matches(guide.models, "synthetic/hf:Qwen/Qwen3.6-27B"), true);
 			assert.equal(matches(guide.models, "openrouter/deepseek/deepseek-r1"), false);
+			assert.equal(matches(guide.models, "openrouter/google/gemma-3-27b-it"), false);
+			assert.equal(matches(guide.models, "openrouter/qwen/qwen-2.5-72b-instruct"), false);
 		}
 	});
 
 	it("routes concise MCP guidance to Kimi, GPT, GLM, and MiniMax only", async () => {
-		const { guides } = await inspect(genericPlugin);
+		const { guides } = await inspect(frontierPlugin);
 		assert.equal(guides.length, 1);
-		assert.deepEqual(guides[0]?.models, GENERIC_MCP_MODELS);
+		assert.deepEqual(guides[0]?.models, FRONTIER_MODELS);
 		assert.deepEqual(guides[0]?.targets, ["main", "participant"]);
-		assert.equal(guides[0]?.content, GENERIC_MCP_GUIDANCE);
+		assert.equal(guides[0]?.content, FRONTIER_GUIDANCE);
 		for (const model of [
 			"openrouter/moonshotai/kimi-k2.5",
 			"openai-codex/gpt-5.4",
 			"synthetic/hf:zai-org/GLM-5.2",
 			"openrouter/minimax/minimax-m2.7",
-		]) assert.equal(matches(GENERIC_MCP_MODELS, model), true, model);
+		]) assert.equal(matches(FRONTIER_MODELS, model), true, model);
 		for (const model of [
 			"openrouter/deepseek/deepseek-v4-pro",
 			"anthropic/claude-sonnet-4-6",
-		]) assert.equal(matches(GENERIC_MCP_MODELS, model), false, model);
-		assert.notMatch(GENERIC_MCP_GUIDANCE, /exa|context7|web_search_exa/i);
+		]) assert.equal(matches(FRONTIER_MODELS, model), false, model);
+		assert.notMatch(FRONTIER_GUIDANCE, /exa|context7|web_search_exa/i);
 	});
 });

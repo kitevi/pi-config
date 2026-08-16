@@ -2,12 +2,12 @@
   "configVersion": 3,
   "components": [
     {
-      "id": "deepseek-guidance",
-      "component": "deepseek-guidance"
+      "id": "non-frontier-guidance",
+      "component": "non-frontier-guidance"
     },
     {
-      "id": "generic-mcp-guidance",
-      "component": "generic-mcp-guidance"
+      "id": "frontier-guidance",
+      "component": "frontier-guidance"
     }
   ],
   "executor": {

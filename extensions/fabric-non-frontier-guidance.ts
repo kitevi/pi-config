@@ -1,12 +1,12 @@
 /**
- * Model-facing guidance for DeepSeek V4 Flash and Pro in Pi Fabric.
+ * Model-facing guidance for DeepSeek V4 and Qwen 27B in Pi Fabric.
  *
  * Runtime contract
- * - Registers `deepseek-guidance`; its configured instance lives in
+ * - Registers `non-frontier-guidance`; its configured instance lives in
  *   `../fabric.json`.
  * - Pi Fabric evaluates `models` on every turn against the canonical
- *   `${provider}/${modelId}` key. Current selectors cover Flash and Pro
- *   variants across providers and exclude other DeepSeek families.
+ *   `${provider}/${modelId}` key. Current selectors cover DeepSeek V4
+ *   Flash and Pro variants plus Qwen 27B models across providers.
  * - Both entries target `main` and `participant`. Guidance changes prompt
  *   text only; it cannot grant tools, providers, or capabilities.
  * - Keep content deterministic. Timestamps, run IDs, or turn-derived data
@@ -74,22 +74,24 @@ const PROTOCOL_MODULE = (() => {
 
 // Full-string globs are case-sensitive. Lowercase forms cover most providers;
 // capitalized forms cover NeuralWatt. Restricting matches to Flash or Pro
-// excludes other DeepSeek families.
-const DEEPSEEK_V4_MODELS = [
+// excludes other DeepSeek families; `27b` restricts Qwen to the 27B class.
+const NON_FRONTIER_MODELS = [
   "*/*deepseek*v4*flash*",
   "*/*DeepSeek*V4*Flash*",
   "*/*deepseek*v4*pro*",
   "*/*DeepSeek*V4*Pro*",
+  "*/*qwen*27b*",
+  "*/*Qwen*27B*",
 ] as const;
 
 const component: FabricComponentDefinition = {
-  name: "deepseek-guidance",
-  description: "Model-facing execution guidance for DeepSeek V4",
+  name: "non-frontier-guidance",
+  description: "Model-facing execution guidance for DeepSeek V4 and Qwen 27B",
   guarantee: "revertible",
   activate(context) {
     context.guide({
-      label: "deepseek-mcp-web-docs",
-      models: DEEPSEEK_V4_MODELS,
+      label: "non-frontier-mcp-web-docs",
+      models: NON_FRONTIER_MODELS,
       targets: ["main", "participant"],
       placement: "append",
       content: `# Web and documentation tools (MCP, inside fabric_exec)
@@ -103,8 +105,8 @@ const component: FabricComponentDefinition = {
     });
 
     context.guide({
-      label: "deepseek-fabric-exec-edges",
-      models: DEEPSEEK_V4_MODELS,
+      label: "non-frontier-fabric-exec-edges",
+      models: NON_FRONTIER_MODELS,
       targets: ["main", "participant"],
       placement: "append",
       content: `# fabric_exec edge semantics
