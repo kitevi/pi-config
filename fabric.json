@@ -1,15 +1,6 @@
 {
   "configVersion": 3,
-  "components": [
-    {
-      "id": "non-frontier-guidance",
-      "component": "non-frontier-guidance"
-    },
-    {
-      "id": "frontier-guidance",
-      "component": "frontier-guidance"
-    }
-  ],
+  "components": [],
   "executor": {
     "maxOutputChars": 8192
   },

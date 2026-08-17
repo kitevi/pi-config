@@ -68,15 +68,7 @@ owns leaf paths; local additions survive reconciliation.
 - **Symlink** is used for static assets that pi only reads (`prompts/`,
 `skills/`, `themes/`, `extensions/`, `models.json`).
 - **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
-repository-owned file as-is (no network fetch).
-- **Pi-fabric model guidance**: `extensions/fabric-non-frontier-guidance.ts`
-registers the `non-frontier-guidance` component declared in `fabric.json`.
-Its prompt guidance applies only to DeepSeek V4 Flash and Pro and Qwen 27B
-turns; other models do not receive it. See the file header
-for API references, lifecycle constraints, matching behavior, supported changes,
-and verification. `extensions/fabric-frontier-guidance.ts` registers the
-`frontier-guidance` component for concise MCP discovery guidance on Kimi,
-GPT, GLM, and MiniMax turns.
+repository-owned file as-is (no network fetch). Its MCP web/docs and `fabric_exec` guidance applies to every model.
 - **Reconciliation** is idempotent — re-running it is safe and intended to be
 done after any change to this repo or on a fresh machine.
 - **Reminders** are static assets managed via symlink, but their *semantics*
