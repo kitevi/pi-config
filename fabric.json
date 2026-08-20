@@ -2,7 +2,7 @@
   "configVersion": 3,
   "components": [],
   "executor": {
-    "maxOutputChars": 8192
+    "maxOutputChars": 12288
   },
   "approvals": {
     "agent": "deny"
