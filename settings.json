@@ -48,10 +48,8 @@
         "skills/engineering/resolving-merge-conflicts",
         "skills/engineering/domain-modeling",
         "skills/engineering/tdd",
-        "skills/engineering/prototype",
         "skills/engineering/diagnosing-bugs",
         "skills/productivity/writing-for-agents",
-        "skills/productivity/teach",
         "skills/productivity/handoff"
       ]
     },
@@ -74,8 +72,19 @@
       "source": "https://github.com/emilkowalski/skills",
       "skills": [
         "skills/emil-design-eng",
-        "skills/review-animations",
-        "skills/animation-vocabulary"
+        "skills/review-animations"
+      ]
+    },
+    {
+      "source": "https://github.com/cursor/plugins",
+      "skills": [
+        "cursor-team-kit/skills/thermo-nuclear-code-quality-review"
+      ]
+    },
+    {
+      "source": "https://github.com/anthropics/knowledge-work-plugins",
+      "skills": [
+        "engineering/skills/code-review"
       ]
     }
   ],
