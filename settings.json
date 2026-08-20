@@ -9,7 +9,9 @@
   "skills": [
     "git/github.com/dmmulroy/skills/tech-spec",
     "git/github.com/dmmulroy/skills/bro",
-    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me"
+    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me",
+    "git/github.com/cursor/plugins/cursor-team-kit/skills/thermo-nuclear-code-quality-review",
+    "git/github.com/anthropics/knowledge-work-plugins/engineering/skills/code-review"
   ],
   "packages": [
     {
@@ -51,41 +53,57 @@
         "skills/engineering/diagnosing-bugs",
         "skills/productivity/writing-for-agents",
         "skills/productivity/handoff"
-      ]
+      ],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     },
     {
       "source": "npm:@sentiolabs/pi-frontend-design",
       "skills": [
         "skills/frontend-design"
       ],
-      "prompts": []
+      "prompts": [],
+      "extensions": [],
+      "themes": []
     },
     {
       "source": "https://github.com/dmmulroy/skills",
-      "skills": []
+      "skills": [],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     },
     {
       "source": "https://github.com/humanlayer/skills",
-      "skills": []
+      "skills": [],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     },
     {
       "source": "https://github.com/emilkowalski/skills",
       "skills": [
         "skills/emil-design-eng",
         "skills/review-animations"
-      ]
+      ],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     },
     {
       "source": "https://github.com/cursor/plugins",
-      "skills": [
-        "cursor-team-kit/skills/thermo-nuclear-code-quality-review"
-      ]
+      "skills": [],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     },
     {
       "source": "https://github.com/anthropics/knowledge-work-plugins",
-      "skills": [
-        "engineering/skills/code-review"
-      ]
+      "skills": [],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     }
   ],
   "showCacheMissNotices": true
