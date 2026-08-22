@@ -40,7 +40,6 @@
     "npm:pi-invisible-continue",
     "npm:@dustydonkey/pi-spinner",
     "npm:pi-system-reminders",
-    "npm:pi-opencode-go-provider",
     {
       "source": "https://github.com/mattpocock/skills",
       "skills": [
