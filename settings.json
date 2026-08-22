@@ -35,6 +35,7 @@
     "npm:pi-neuralwatt-provider",
     "npm:pi-deepseek-provider",
     "npm:@monotykamary/pi-tps",
+    "npm:@monotykamary/pi-retry",
     "npm:pi-lilac-provider",
     "npm:pi-model-sort",
     "npm:pi-invisible-continue",
