@@ -1,4 +1,5 @@
 {
+  "tuiMode": "fullscreen",
   "theme": "github-colorblind-light/github-colorblind-dark",
   "npmCommand": [
     "npm",
