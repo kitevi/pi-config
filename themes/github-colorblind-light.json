@@ -39,6 +39,7 @@
     "text": "fgDefault",
     "thinkingText": "fgMuted",
     "selectedBg": "bgAccentMuted",
+    "scrollbarThumb": "fgDim",
     "userMessageBg": "bgMuted",
     "userMessageText": "fgDefault",
     "customMessageBg": "bgMuted",
