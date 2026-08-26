@@ -3,21 +3,6 @@
     "openrouter": {
       "baseUrl": "https://openrouter.ai/api/v1",
       "apiKey": "$OPENROUTER_API_KEY",
-      "models": [
-        {
-          "id": "stealth/ox-alpha",
-          "name": "Ox Alpha (OpenRouter)",
-          "reasoning": true,
-          "input": ["text", "image"],
-          "contextWindow": 1048576,
-          "maxTokens": 131072,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-          "compat": {
-            "supportsDeveloperRole": false,
-            "thinkingFormat": "openrouter"
-          }
-        }
-      ],
       "modelOverrides": {
         "deepseek/deepseek-v4-flash": {
           "compat": {
@@ -26,47 +11,6 @@
           }
         }
       }
-    },
-    "opencode-go": {
-      "models": [
-        {
-          "id": "ox-alpha-free",
-          "name": "Ox Alpha Free (Unlimited)",
-          "api": "openai-completions",
-          "baseUrl": "https://opencode.ai/zen/go/v1",
-          "reasoning": true,
-          "thinkingLevelMap": {
-            "off": null,
-            "minimal": null,
-            "low": "low",
-            "medium": null,
-            "high": "high",
-            "xhigh": null,
-            "max": "max"
-          },
-          "input": [
-            "text",
-            "image"
-          ],
-          "cost": {
-            "input": 0,
-            "output": 0,
-            "cacheRead": 0,
-            "cacheWrite": 0
-          },
-          "contextWindow": 1000000,
-          "maxTokens": 131072,
-          "compat": {
-            "supportsStore": false,
-            "supportsDeveloperRole": false,
-            "maxTokensField": "max_tokens",
-            "requiresReasoningContentOnAssistantMessages": true,
-            "thinkingFormat": "deepseek",
-            "supportsReasoningEffort": true,
-            "supportsFinishReason": false
-          }
-        }
-      ]
     }
   }
 }
