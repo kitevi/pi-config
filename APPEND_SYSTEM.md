@@ -16,3 +16,12 @@
 # fabric_exec edge semantics
 - `print()` and `console.log()` write to the activity panel rather than the model-visible tool result.
 - Prefer canonical argument fields (`command`, `pattern`, `path`, `oldText`, `newText`, `content`) even though aliases are accepted.
+- Every `pi.*` call is asynchronous. Await its result before reading properties or calling methods; batch independent calls with the complete pattern below:
+  ```ts
+  const [pkg, hits] = await Promise.all([
+    pi.read("package.json"),
+    pi.grep({ pattern: "TODO", path: "src" }),
+  ]);
+  return { pkg, hits };
+  ```
+- `pi` is a lazy proxy. `Object.keys(pi)` is empty by design; do not use it for capability discovery.
