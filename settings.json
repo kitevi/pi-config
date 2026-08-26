@@ -33,7 +33,6 @@
     },
     "npm:@pborck/pi-de",
     "npm:pi-neuralwatt-provider",
-    "npm:pi-deepseek-provider",
     "npm:@monotykamary/pi-tps",
     "npm:@monotykamary/pi-retry",
     "npm:pi-lilac-provider",

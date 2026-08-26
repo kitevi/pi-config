@@ -16,6 +16,7 @@
 # fabric_exec edge semantics
 - `print()` and `console.log()` write to the activity panel rather than the model-visible tool result.
 - Prefer canonical argument fields (`command`, `pattern`, `path`, `oldText`, `newText`, `content`) even though aliases are accepted.
+- Before executing, check bracket balance and that every referenced variable is declared or destructured. Put multiline edit/write payloads in top-level `strings` and reference them as `π.key`; on a type/parse error, fix the reported line rather than retrying unchanged.
 - Every `pi.*` call is asynchronous. Await its result before reading properties or calling methods; batch independent calls with the complete pattern below:
   ```ts
   const [pkg, hits] = await Promise.all([
