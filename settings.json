@@ -36,6 +36,7 @@
     "npm:@monotykamary/pi-tps",
     "npm:@monotykamary/pi-retry",
     "npm:pi-lilac-provider",
+    "npm:pi-zro-provider",
     "npm:pi-model-sort",
     "npm:pi-invisible-continue",
     "npm:@dustydonkey/pi-spinner",
