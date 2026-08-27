@@ -26,3 +26,9 @@
   return { pkg, hits };
   ```
 - `pi` is a lazy proxy. `Object.keys(pi)` is empty by design; do not use it for capability discovery.
+
+# fabric_exec failure recovery
+- After a `pi.grep` regex parse error, use `literal:true` for exact punctuated text; for an intentional regex, double-escape backslashes through the TypeScript string layer or pass the pattern through top-level `strings`.
+- After a `pi.edit` match error, re-read the current file and use exact, unique `oldText`; never use stale or line-number-prefixed search output as an anchor, and use `all:true` only when every occurrence should change.
+- After `pi.find`/`pi.grep` reports an invalid search path, verify the directory from an existing parent with `pi.ls` or `pi.find` before retrying; do not batch an unverified path with unrelated calls.
+- After a shell syntax error, inspect the command after TypeScript escaping; quote shell metacharacters or put an escape-heavy command in top-level `strings` and pass `π.key` to `pi.bash`.
