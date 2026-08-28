@@ -24,7 +24,6 @@
       "prompts": [],
       "themes": []
     },
-    "npm:@narumitw/pi-usage",
     {
       "source": "npm:pi-fabric",
       "skills": [
