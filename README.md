@@ -136,6 +136,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
   - `extensions/codex-usage.ts` — shows Codex 5h/7d rolling usage and reset times in the footer while a Codex model is active
+  - `extensions/opencode-go-usage.ts` — shows OpenCode Go 5h/weekly/monthly used quotas and reset times in the footer while an OpenCode Go model is active
 - `skills/` — pi skills
 - `themes/` — pi themes (`github-colorblind` light/dark variants)
 - `reminders/` — global reminder definitions for `pi-system-reminders`
