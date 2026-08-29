@@ -94,6 +94,7 @@
  *   turn would otherwise show the model a bare "Operation aborted".
  */
 
+import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { resolve } from "node:path";
 
@@ -1467,9 +1468,13 @@ const escalationNote = (hits: number) =>
 const unique = <T>(values: T[]) => [...new Set(values)];
 const formatList = (values: string[]) => values.map((value) => `- ${value}`).join("\n");
 
+const assessmentSections = (assessment: Assessment) => ({
+	descriptions: unique(assessment.matches.map((match) => `${match.id}: ${match.description}`)),
+	guidance: unique(assessment.matches.map((match) => match.guidance)),
+});
+
 const formatReason = (assessment: Assessment, hits = 0) => {
-	const descriptions = unique(assessment.matches.map((match) => `${match.id}: ${match.description}`));
-	const guidance = unique(assessment.matches.map((match) => match.guidance));
+	const { descriptions, guidance } = assessmentSections(assessment);
 	return [
 		`Permission gate ${assessment.decision}:`,
 		formatList(descriptions),
@@ -1480,6 +1485,27 @@ const formatReason = (assessment: Assessment, hits = 0) => {
 		"Target:",
 		assessment.target,
 		escalationNote(hits),
+	]
+		.join("\n")
+		.trimEnd();
+};
+
+const formatAskPrompt = (assessment: Assessment, hits: number, language?: string) => {
+	const theme = getMarkdownTheme();
+	const { descriptions, guidance } = assessmentSections(assessment);
+	const target = theme.highlightCode?.(assessment.target, language) ?? assessment.target.split("\n").map(theme.codeBlock);
+	const escalation = escalationNote(hits).trim();
+
+	return [
+		theme.heading("REVIEW THIS"),
+		...descriptions.map((description) => `${theme.listBullet("•")} ${theme.bold(description)}`),
+		"",
+		theme.heading("GUIDANCE"),
+		...guidance.map((instruction) => `${theme.listBullet("•")} ${theme.quote(instruction)}`),
+		"",
+		theme.heading("FULL COMMAND"),
+		...target,
+		...(escalation ? ["", theme.quote(escalation)] : []),
 	]
 		.join("\n")
 		.trimEnd();
@@ -1534,6 +1560,8 @@ export default function (pi: ExtensionAPI) {
 
 		if (!ctx.hasUI) return { block: true, reason: `${reason}\n\nConfirmation requires UI.` };
 
+		const askPrompt = formatAskPrompt(assessment, hits, event.toolName === "bash" ? "bash" : undefined);
+
 		// The dialog renders its own countdown from `timeout`; the controller is a
 		// backstop for a host that does not honour it. Either way "nobody answered"
 		// is told apart from "answered no" by how long the dialog stayed up.
@@ -1556,7 +1584,7 @@ export default function (pi: ExtensionAPI) {
 				// Notification listeners are advisory; the ask must still run.
 			}
 			try {
-				choice = await ctx.ui.select(`⚠️ Permission gate ask\n\n${reason}\n\nAllow?`, [ASK_DENY, ASK_ALLOW], {
+				choice = await ctx.ui.select(`⚠️ Permission gate ask\n\n${askPrompt}\n\nAllow?`, [ASK_DENY, ASK_ALLOW], {
 					signal: controller.signal,
 					timeout: timeoutMs,
 				});

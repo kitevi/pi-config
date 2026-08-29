@@ -1,3 +1,4 @@
+import { initTheme } from "@earendil-works/pi-coding-agent";
 import gate, {
 	ASK_DENY,
 	assessToolCall,
@@ -8,7 +9,7 @@ import gate, {
 	rememberWrittenPath,
 	resetGateState,
 } from "../extensions/permission-gate.ts";
-import { beforeEach, describe, it } from "vitest";
+import { beforeAll, beforeEach, describe, it } from "vitest";
 import { assert } from "vitest";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -28,6 +29,10 @@ const check = (cases: Case[]) => {
 		});
 	}
 };
+
+beforeAll(() => {
+	initTheme("dark");
+});
 
 beforeEach(() => {
 	resetGateState();
@@ -438,6 +443,7 @@ void describe("tool_call handling", () => {
 	const install = (choice: string | undefined, honorTimeout = false) => {
 		const sent: Array<{ content: unknown; deliverAs: unknown }> = [];
 		const emitted: Array<{ channel: string; data: unknown }> = [];
+		const prompts: string[] = [];
 		const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
 		const pi = {
 			on: (event: string, handler: (event: unknown, ctx: unknown) => unknown) => handlers.set(event, handler),
@@ -450,14 +456,18 @@ void describe("tool_call handling", () => {
 		gate(pi as never);
 
 		let aborted = false;
+		const select = (title: unknown, _choices: unknown, options: { timeout?: number }) => {
+			prompts.push(String(title));
+			if (honorTimeout) {
+				// Mimic the host's own countdown: resolve unanswered after `timeout`.
+				return new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), options?.timeout ?? 0));
+			}
+			return Promise.resolve(choice);
+		};
 		const ctx = {
 			hasUI: true,
 			ui: {
-				select: honorTimeout
-					? // Mimic the host's own countdown: resolve unanswered after `timeout`.
-						(_title: unknown, _choices: unknown, options: { timeout?: number }) =>
-							new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), options?.timeout ?? 0))
-					: async () => choice,
+				select,
 				notify: () => {},
 			},
 			abort: () => {
@@ -468,7 +478,7 @@ void describe("tool_call handling", () => {
 		const call = (toolName: string, input: Record<string, unknown>) =>
 			handlers.get("tool_call")?.({ toolName, input }, ctx) as Promise<{ block?: boolean; reason?: string } | undefined>;
 
-		return { call, emitted, sent, wasAborted: () => aborted };
+		return { call, emitted, prompts, sent, wasAborted: () => aborted };
 	};
 
 	void it("lets an allowed call through untouched", async () => {
@@ -493,6 +503,23 @@ void describe("tool_call handling", () => {
 		assert.strictEqual(emitted.length, 1);
 		assert.strictEqual(emitted[0].channel, "permission_gate:ask");
 		assert.deepStrictEqual(emitted[0].data, { ids: ["ask.rm"], target: "rm foo.txt", timeoutMs: 60_000 });
+	});
+
+	void it("highlights what to review and syntax-colors the full command", async () => {
+		const { call, prompts } = install("Yes, allow once");
+		const command = `python3 -c "open('/tmp/out', 'w').write('x')"`;
+
+		assert.strictEqual(await call("bash", shell(command)), undefined);
+		assert.strictEqual(prompts.length, 1);
+		const lines = prompts[0].split("\n");
+		const reviewHeading = lines.find((line) => line.includes("REVIEW THIS"));
+		assert.ok(reviewHeading);
+		assert.match(reviewHeading, /\x1b\[/);
+		assert.match(prompts[0], /ask\.inline-script: inline interpreter code writes files, spawns processes, or sends data/);
+		assert.match(prompts[0], /FULL COMMAND/);
+		const commandLine = lines.find((line) => line.includes("python3"));
+		assert.ok(commandLine);
+		assert.match(commandLine, /\x1b\[/);
 	});
 
 	// The reason has to reach the model twice: pi's loop reads the abort signal
