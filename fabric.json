@@ -22,7 +22,7 @@
     "showAgentToolPreview": false
   },
   "prewalk": {
-    "model": "opencode-go/glm-5.3-flash",
+    "model": "synthetic/hf:zai-org/GLM-5.3-Flash",
     "thinking": "max"
   },
   "mesh": {
