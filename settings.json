@@ -38,7 +38,7 @@
     "npm:pi-zro-provider",
     "npm:pi-model-sort",
     "npm:pi-invisible-continue",
-    "npm:@dustydonkey/pi-spinner",
+    "npm:@ladbabynpm/picc-working-spinner",
     "npm:pi-system-reminders",
     {
       "source": "https://github.com/mattpocock/skills",

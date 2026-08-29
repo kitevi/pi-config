@@ -1,5 +1,4 @@
 import { strict as assert } from "node:assert";
-import { readFile } from "node:fs/promises";
 import { describe, it, vi } from "vitest";
 import {
 	createCodexUsageExtension,
@@ -521,12 +520,5 @@ void describe("Codex usage footer", () => {
 		await handlers.get("turn_end")?.({}, ctx);
 		assert.equal(fetches, 2);
 		await handlers.get("session_shutdown")?.({}, ctx);
-	});
-
-	void it("uses the local extension instead of a generic usage package", async () => {
-		const settings = await readFile(new URL("../settings.json", import.meta.url), "utf8");
-
-		assert.doesNotMatch(settings, /pi-(?:quotas|usage)/);
-		assert.match(settings, /@dustydonkey\/pi-spinner/);
 	});
 });

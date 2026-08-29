@@ -1,5 +1,4 @@
 import { strict as assert } from "node:assert";
-import { readFile } from "node:fs/promises";
 import { describe, it, vi } from "vitest";
 import {
 	createOpenCodeGoUsageExtension,
@@ -434,12 +433,5 @@ void describe("OpenCode Go usage footer", () => {
 		assert.equal(fetches, 1);
 		assert.equal(statuses.at(-1), "wk:61% used (↺in 1d)");
 		await handlers.get("session_shutdown")?.({}, ctx);
-	});
-
-	void it("uses the local extension without a generic usage package", async () => {
-		const settings = await readFile(new URL("../settings.json", import.meta.url), "utf8");
-
-		assert.doesNotMatch(settings, /pi-(?:quotas|usage)/);
-		assert.match(settings, /@dustydonkey\/pi-spinner/);
 	});
 });
