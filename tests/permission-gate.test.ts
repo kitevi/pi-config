@@ -6,15 +6,14 @@ import gate, {
 	NESTED_PI_OVERRIDE_ENV,
 	noteRuleHits,
 	rememberWrittenPath,
-	deletionTargets,
 	resetGateState,
 } from "../extensions/permission-gate.ts";
-import { afterEach, beforeEach, describe, it } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import { assert } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 type Decision = "allow" | "ask" | "block";
 type Case = [name: string, toolName: string, input: Record<string, unknown>, decision: Decision];
@@ -86,7 +85,7 @@ void describe("benign shell operations", () => {
 
 void describe("deletion, mutation, privilege", () => {
 	check([
-		["rm", "bash", shell("rm foo.txt"), "ask"],
+		["rm always asks", "bash", shell("rm foo.txt"), "ask"],
 		["rm hidden in sh -c", "bash", shell("sh -c 'rm -rf /tmp/foo'"), "ask"],
 		["rm hidden in bash -c", "bash", shell('bash -c "rm -rf build"'), "ask"],
 		["rm through xargs", "bash", shell("find . -name '*.log' | xargs rm"), "ask"],
@@ -100,6 +99,22 @@ void describe("deletion, mutation, privilege", () => {
 		["sudo", "bash", shell("sudo systemctl restart nginx"), "ask"],
 		["rm inside a quoted commit message is not a deletion", "bash", shell('git commit -m "rm dead code"'), "ask"],
 	]);
+	void it("Git tracking never suppresses an rm ask", () => {
+		const repo = mkdtempSync(join(tmpdir(), "pi-gate-rm-"));
+		const savedCwd = process.cwd();
+		try {
+			mkdirSync(join(repo, "src"));
+			writeFileSync(join(repo, "src", "tracked.ts"), "tracked\n");
+			writeFileSync(join(repo, "src", "untracked.ts"), "untracked\n");
+			assert.strictEqual(spawnSync("git", ["init", "-q"], { cwd: repo }).status, 0);
+			assert.strictEqual(spawnSync("git", ["add", "src/tracked.ts"], { cwd: repo }).status, 0);
+			process.chdir(repo);
+			assert.strictEqual(assessToolCall("bash", shell("rm -rf src")).decision, "ask");
+		} finally {
+			process.chdir(savedCwd);
+			rmSync(repo, { recursive: true, force: true });
+		}
+	});
 });
 
 void describe("inline interpreter code", () => {
@@ -533,170 +548,5 @@ void describe("repeat escalation", () => {
 	void it("counts each rule separately", () => {
 		noteRuleHits(["ask.rm"]);
 		assert.strictEqual(escalationNote(noteRuleHits(["ask.sudo"])), "");
-	});
-});
-
-// A real throwaway repository is the only honest fixture for the tracked-deletion
-// exemption: the behavior IS "recoverable through git", so the tests build an
-// index, chdir into it, and let the real git answer.
-const makeTrackedRepo = () => {
-	const root = mkdtempSync(join(tmpdir(), "pi-gate-repo-"));
-	mkdirSync(join(root, "src"), { recursive: true });
-	mkdirSync(join(root, "node_modules"), { recursive: true });
-	writeFileSync(join(root, "tracked.txt"), "keep\n");
-	writeFileSync(join(root, ".gitignore"), "ignored.log\n");
-	writeFileSync(join(root, "src", "mod.ts"), "export {}\n");
-	writeFileSync(join(root, "new.ts"), "untracked\n");
-	writeFileSync(join(root, "ignored.log"), "noise\n");
-	spawnSync("git", ["init", "-q"], { cwd: root });
-	spawnSync("git", ["add", ".gitignore", "tracked.txt", "src/mod.ts"], { cwd: root });
-	return root;
-};
-
-// The gate captures HOME once at import, so `~` always expands to the real
-// home directory; the tilde-case fixture therefore anchors a throwaway repo
-// under the real home rather than pretending HOME points elsewhere.
-const trackedRepo = () => {
-	let repo = "";
-	let savedCwd = "";
-
-	beforeEach(() => {
-		repo = makeTrackedRepo();
-		savedCwd = process.cwd();
-		process.chdir(repo);
-	});
-
-	afterEach(() => {
-		process.chdir(savedCwd);
-		rmSync(repo, { recursive: true, force: true });
-	});
-
-	return () => repo;
-};
-
-void describe("git-tracked deletion exemption", () => {
-	const repo = trackedRepo();
-
-	check([
-		["rm of a tracked file is allowed", "bash", shell("rm tracked.txt"), "allow"],
-		["unlink of a tracked file is allowed", "bash", shell("unlink tracked.txt"), "allow"],
-		["shred of a tracked file is allowed", "bash", shell("shred -u tracked.txt"), "allow"],
-		["rm -rf of a tracked directory is allowed", "bash", shell("rm -rf src"), "allow"],
-
-		// The accepted trade: untracked-and-ignored paths are NOT recoverable
-		// through git, so they keep asking even inside the repo.
-		["rm of an untracked file asks", "bash", shell("rm new.ts"), "ask"],
-		["rm of an ignored file asks", "bash", shell("rm ignored.log"), "ask"],
-		["rm -rf of an untracked directory asks", "bash", shell("rm -rf node_modules"), "ask"],
-		["mixed tracked and untracked targets ask", "bash", shell("rm tracked.txt new.ts"), "ask"],
-
-		// Globs never reach the index query: expansion may select untracked paths.
-		["glob target asks", "bash", shell("rm *.txt"), "ask"],
-		["prefixed glob asks", "bash", shell("rm src/*.ts"), "ask"],
-
-		// A directory change invalidates every relative-target check.
-		["cd before rm asks even for tracked paths", "bash", shell("cd src && rm mod.ts"), "ask"],
-
-		// git rm stages what it deletes, so it never gets the exemption.
-		["git rm of a tracked file still asks", "bash", shell("git rm tracked.txt"), "ask"],
-		["git rm behind global options still asks", "bash", shell("git -C . rm -f src/mod.ts"), "ask"],
-	]);
-
-	// Path forms resolve per invocation, so these run standalone with commands
-	// built while the fixture exists.
-	void it("absolute-path rm inside the repo is allowed", () => {
-		assert.strictEqual(assessToolCall("bash", shell(`rm -rf ${repo()}/tracked.txt`)).decision, "allow");
-	});
-
-	void it("tilde-form rm inside a home-anchored repo is allowed", () => {
-		const root = mkdtempSync(join(homedir(), ".pi-gate-repo-"));
-		try {
-			writeFileSync(join(root, "tracked.txt"), "keep\n");
-			spawnSync("git", ["init", "-q"], { cwd: root });
-			spawnSync("git", ["add", "tracked.txt"], { cwd: root });
-			process.chdir(root);
-			assert.strictEqual(assessToolCall("bash", shell(`rm ~/${basename(root)}/tracked.txt`)).decision, "allow");
-		} finally {
-			process.chdir(repo());
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
-
-	void it("symlinked escape hatch asks", () => {
-		symlinkSync("/etc", join(repo(), "out-link"));
-		assert.strictEqual(assessToolCall("bash", shell("rm -rf out-link/")).decision, "ask");
-	});
-
-	void it("removing an outside-pointing symlink itself asks too", () => {
-		symlinkSync("/etc", join(repo(), "out-link"));
-		assert.strictEqual(assessToolCall("bash", shell("rm out-link")).decision, "ask");
-	});
-
-	void it("deletion in a directory that is not a repository asks", () => {
-		const plain = mkdtempSync(join(tmpdir(), "pi-gate-plain-"));
-		try {
-			writeFileSync(join(plain, "whatever.txt"), "x\n");
-			process.chdir(plain);
-			assert.strictEqual(assessToolCall("bash", shell("rm whatever.txt")).decision, "ask");
-		} finally {
-			process.chdir(repo());
-			rmSync(plain, { recursive: true, force: true });
-		}
-	});
-
-	void it("asks when git cannot run at all", () => {
-		const savedPath = process.env.PATH;
-		process.env.PATH = "";
-		try {
-			assert.strictEqual(assessToolCall("bash", shell("rm tracked.txt")).decision, "ask");
-		} finally {
-			if (savedPath === undefined) delete process.env.PATH;
-			else process.env.PATH = savedPath;
-		}
-	});
-
-	// Blocks outrank the exemption even inside a fully tracked context.
-	check([
-		["sudo rm is blocked in-repo", "bash", shell("sudo rm tracked.txt"), "block"],
-		["credential rm is blocked in-repo", "bash", shell("rm ~/.ssh/id_ed25519"), "block"],
-
-		// The exemption is scoped to ask.rm alone; other mutation rules are untouched.
-		["truncate still asks", "bash", shell("truncate -s 0 tracked.txt"), "ask"],
-		["sed -i still asks", "bash", shell("sed -i 's/a/b/' tracked.txt"), "ask"],
-		["git clean still asks", "bash", shell("git clean -fd"), "ask"],
-		["git reset --hard still asks", "bash", shell("git reset --hard"), "ask"],
-	]);
-});
-
-void describe("deletionTargets projections", () => {
-	const invocation = (executable: string, args: string[]) => ({
-		executable,
-		raw: executable,
-		args,
-		words: [executable, ...args],
-	});
-	const analysisOf = (...commands: ReturnType<typeof invocation>[]) => ({
-		commands,
-		scripts: [],
-		texts: [],
-		executed: [],
-		written: [],
-	});
-
-	void it("skips flag clusters and long options", () => {
-		assert.deepStrictEqual(deletionTargets(analysisOf(invocation("rm", ["-rf", "--interactive=never", "a.txt"]))), ["a.txt"]);
-	});
-
-	void it("collects everything after a bare -- including dash-prefixed names", () => {
-		assert.deepStrictEqual(deletionTargets(analysisOf(invocation("rm", ["--", "-weird-name", "b.txt"]))), ["-weird-name", "b.txt"]);
-	});
-
-	void it("projects find roots and defaults to . when bare", () => {
-		assert.deepStrictEqual(deletionTargets(analysisOf(invocation("find", ["-delete"]))), ["."]);
-		assert.deepStrictEqual(deletionTargets(analysisOf(invocation("find", [".", "-name", "*.log", "-delete"]))), ["."]);
-	});
-
-	void it("returns nothing when rm is fed by stdin", () => {
-		assert.deepStrictEqual(deletionTargets(analysisOf(invocation("rm", []))), []);
 	});
 });

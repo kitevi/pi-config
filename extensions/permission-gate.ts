@@ -53,10 +53,6 @@
  *
  * ASKS:
  * 1. Any command that deletes files: rm, rmdir, shred, `find -delete`.
- *    - Exemption: silent when EVERY target resolves inside the process cwd AND
- *      is tracked by the repository there (recoverable via `git restore`).
- *      Globs, any cd/pushd/popd, out-of-cwd targets, ignored/untracked paths
- *      (node_modules, dist, .env), and `find -delete` always ask.
  * 2. Shell-side file mutation via chmod, chown, tee, truncate, dd, in-place
  *    `sed -i`/`perl -pi`, and nushell `save`.
  * 3. Inline interpreter code (python, node, ruby, perl, php, awk) that writes
@@ -64,7 +60,7 @@
  * 4. Running a script this session created (write/edit tool, redirection, tee).
  * 5. Sudo/elevated commands unless already blocked.
  * 6. Destructive Git commands: reset --hard, clean -f, checkout -- ., restore ., force push,
- *    and any `git rm` (it stages the deletion, so no tracked-path exemption applies).
+ *    and any `git rm` (it removes paths and stages the deletion).
  * 7. Commits.
  * 8. Mutating package manager commands across npm/pnpm/yarn/bun, pip/uv/pipx/poetry,
  *    cargo, go, gem, brew, and system package managers.
@@ -82,8 +78,7 @@
  * 5. .env, .envrc, .npmrc, .netrc files (low-stakes project config).
  * 6. Basic shell operations: touch, mkdir, mv, cp, file redirections, npx, bunx.
  * 7. Inline interpreter code with no detected side effect.
- * 8. Deletions covered by the ASKS 1 exemption (tracked paths inside the repo).
- * 9. Non-agent Pi CLI operations: management, export, diagnostics, and promptless startup.
+ * 8. Non-agent Pi CLI operations: management, export, diagnostics, and promptless startup.
  *
  * ASK OUTCOMES:
  * - Allowed: the call runs.
@@ -100,9 +95,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { spawnSync } from "node:child_process";
-import { realpathSync } from "node:fs";
-import { resolve, sep } from "node:path";
+import { resolve } from "node:path";
 
 // ─── policy surface ──────────────────────────────────────────────────────────
 
@@ -973,92 +966,6 @@ const isFindDelete = (command: Invocation) => command.executable === "find" && c
 const hasFindDelete = (shell: ShellAnalysis) => shell.commands.some(isFindDelete);
 const hasDelete = (shell: ShellAnalysis) => usesExecutable(shell, DELETE_EXECUTABLES) || hasFindDelete(shell);
 
-// ─── tracked-deletion exemption ──────────────────────────────────────────────
-
-// A deletion needs no dialog exactly when git can undo it: every target sits
-// inside the process cwd and the cwd's index tracks it, so `git restore` brings
-// it back. Checks run cheapest-first so most asks never spawn git: flag
-// projection, glob rejection, cd bail-out, containment, then one batched index
-// query. Every failure mode — untracked, ignored, outside the repo, nested
-// submodule content, git missing — lands back on asking.
-const DELETION_GLOB_META = /[*?[]/;
-
-// Directory changes make relative targets resolve somewhere other than the cwd
-// these checks ran against, so any of them voids the exemption.
-const CWD_CHANGING_EXECUTABLES = new Set(["cd", "pushd", "popd"]);
-
-const hasCdInvocation = (shell: ShellAnalysis) => usesExecutable(shell, CWD_CHANGING_EXECUTABLES);
-
-/** Paths a delete command names: flags are skipped except after a bare `--`. */
-const deletionTargetsOf = (command: Invocation): string[] => {
-	const targets: string[] = [];
-	let pastEndOfFlags = false;
-	for (const argument of command.args) {
-		if (pastEndOfFlags) targets.push(argument);
-		else if (argument === "--") pastEndOfFlags = true;
-		else if (!argument.startsWith("-")) targets.push(argument);
-	}
-	return targets;
-};
-
-/** `find` projects to its root arguments ("." when bare); its predicates are not modeled. */
-const findDeleteTargets = (command: Invocation): string[] => {
-	const targets: string[] = [];
-	for (const argument of command.args) {
-		if (argument.startsWith("-")) break;
-		targets.push(argument);
-	}
-	return targets.length > 0 ? targets : ["."];
-};
-
-const deletionTargets = (shell: ShellAnalysis): string[] =>
-	shell.commands.flatMap((command) => {
-		if (DELETE_EXECUTABLES.has(command.executable)) return deletionTargetsOf(command);
-		if (isFindDelete(command)) return findDeleteTargets(command);
-		return [];
-	});
-
-/** Real path when the target exists (deletion targets usually do); lexical otherwise. */
-const resolveTargetPath = (target: string): string => {
-	const expanded = expandPath(target);
-	try {
-		return realpathSync(expanded);
-	} catch {
-		return resolve(expanded);
-	}
-};
-
-/** Takes an already-resolved path (see {@link resolveTargetPath}). */
-const isInsideCwd = (resolved: string): boolean => {
-	const cwd = process.cwd();
-	const prefix = cwd.endsWith(sep) ? cwd : cwd + sep;
-	return resolved === cwd || resolved.startsWith(prefix);
-};
-
-/**
- * Exit 0 iff every named path matches an index entry (files directly,
- * directories through tracked descendants). Anything else — unmatched path,
- * no repository, git absent — reads as "not exempt".
- */
-const allTargetsTracked = (targets: string[]): boolean =>
-	spawnSync("git", ["ls-files", "--error-unmatch", "--", ...targets], {
-		stdio: ["ignore", "ignore", "ignore"],
-	}).status === 0;
-
-const deletionExemptionHolds = (shell: ShellAnalysis): boolean => {
-	const targets = deletionTargets(shell);
-	if (targets.length === 0 || targets.some((target) => DELETION_GLOB_META.test(target))) return false;
-	if (hasCdInvocation(shell)) return false;
-	if (hasFindDelete(shell)) return false;
-
-	// Resolve BEFORE anything else consumes the targets: containment compares
-	// like-for-like, and the index query must see expanded paths (~, ..), not
-	// the shell's shorthand.
-	const resolved = targets.map(resolveTargetPath);
-	if (!resolved.every(isInsideCwd)) return false;
-	return allTargetsTracked(resolved);
-};
-
 const hasSudo = (shell: ShellAnalysis) => usesExecutable(shell, PRIVILEGE_EXECUTABLES);
 
 // `save` is nushell's write. touch, mkdir, mv, cp and plain redirections stay out.
@@ -1150,9 +1057,8 @@ const isDestructiveGit = (shell: ShellAnalysis) =>
 
 const isGitCommit = (shell: ShellAnalysis) => gitCommands(shell, "commit").length > 0;
 
-// `git rm` never qualifies for the tracked-deletion exemption: it stages the
-// deletion as it removes, so it writes history state even when recovery would
-// be possible. Always ask.
+// `git rm` is not a plain rm invocation and also stages the deletion, so it
+// retains a dedicated always-ask rule.
 const isGitRm = (shell: ShellAnalysis) => gitCommands(shell, "rm").length > 0;
 
 const bypassesGitHooks = (shell: ShellAnalysis) =>
@@ -1413,14 +1319,13 @@ const rules: Rule[] = [
 		matches: shellRule(bypassesGitHooks),
 	},
 
-	// Ask on any deletion, unless the whole batch is recoverable through git:
-	// contained in the cwd and tracked by the cwd's repository (ASKS 1).
+	// Deletion always requires explicit confirmation (ASKS 1).
 	{
 		id: "ask.rm",
 		decision: "ask",
 		description: "command deletes files",
 		guidance: GUIDANCE.rm,
-		matches: shellRule((shell) => hasDelete(shell) && !deletionExemptionHolds(shell)),
+		matches: shellRule(hasDelete),
 	},
 
 	// Ask when shell is used as a file editor. This nudges the agent toward the
@@ -1471,8 +1376,7 @@ const rules: Rule[] = [
 		matches: shellRule(isDestructiveGit),
 	},
 
-	// Ask on every git rm. Unlike plain rm of tracked paths, it also stages the
-	// deletion, so there is no recoverable-shape exemption for it.
+	// Ask on every git rm: it removes paths and stages the deletion.
 	{
 		id: "ask.git-rm",
 		decision: "ask",
@@ -1697,4 +1601,4 @@ export default function (pi: ExtensionAPI) {
 }
 
 // Exported for tests/permission-gate.test.ts.
-export { assessToolCall, deletionExemptionHolds, deletionTargets, describeAskOutcome, escalationNote, NESTED_PI_OVERRIDE_ENV, noteRuleHits, rememberWrittenPath, resetGateState, ASK_DENY };
+export { assessToolCall, describeAskOutcome, escalationNote, NESTED_PI_OVERRIDE_ENV, noteRuleHits, rememberWrittenPath, resetGateState, ASK_DENY };
