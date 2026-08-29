@@ -221,6 +221,14 @@ const nestedPiOverrideEnabled = () => /^(?:1|true|yes|on)$/i.test(process.env[NE
 // so those rules cannot drift apart.
 type ShellLexResult = { commands: string[][]; endIndex: number };
 
+const recoveredLookupWord = (commands: string[][], fallback: string) => {
+	if (commands.length !== 1) return fallback;
+	const [executable, ...args] = commands[0];
+	if (executable.toLowerCase() === "which" && args.length === 1 && !args[0].startsWith("-")) return args[0];
+	if (executable.toLowerCase() === "command" && args.length === 2 && args[0] === "-v") return args[1];
+	return fallback;
+};
+
 const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"): ShellLexResult => {
 	const commands: string[][] = [];
 	let words: string[] = [];
@@ -272,7 +280,7 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 		if (character === "$" && source[index + 1] === "(") {
 			const nested = lexShellCommands(source, index + 2, ")");
 			commands.push(...nested.commands);
-			current += "$()";
+			current += recoveredLookupWord(nested.commands, "$()");
 			wordStarted = true;
 			index = nested.endIndex;
 			continue;
@@ -280,7 +288,7 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 		if (character === "`") {
 			const nested = lexShellCommands(source, index + 1, "`");
 			commands.push(...nested.commands);
-			current += "``";
+			current += recoveredLookupWord(nested.commands, "``");
 			wordStarted = true;
 			index = nested.endIndex;
 			continue;
@@ -319,18 +327,21 @@ const isEnvironmentAssignment = (value: string) => /^[a-z_][a-z0-9_]*=/i.test(va
 const SHELL_CONTROL_PREFIXES = new Set(["!", "{", "do", "elif", "else", "if", "then", "time", "until", "while"]);
 const OPTION_ONLY_PREFIXES = new Set(["exec", "nohup", "setsid", "stdbuf", "nice", "ionice"]);
 
-/** Index of the word that actually names the process, after shell noise. */
-const commandExecutableIndex = (words: string[]): number => {
+type ResolvedCommandWords = { words: string[]; executableIndex: number };
+
+/** A private normalized copy with shell prefixes removed and env -S expanded. */
+const resolveCommandWords = (inputWords: string[]): ResolvedCommandWords | undefined => {
+	const words = [...inputWords];
 	let index = 0;
 
 	while (index < words.length) {
 		while (index < words.length && SHELL_CONTROL_PREFIXES.has(words[index])) index++;
 		while (index < words.length && isEnvironmentAssignment(words[index])) index++;
-		if (index >= words.length) return -1;
+		if (index >= words.length) return undefined;
 
 		const executable = executableBasename(words[index]);
 		if (executable === "command") {
-			if (words[index + 1] === "-v" || words[index + 1] === "-V") return -1;
+			if (words[index + 1] === "-v" || words[index + 1] === "-V") return undefined;
 			index++;
 			while (words[index]?.startsWith("-")) index++;
 			continue;
@@ -344,6 +355,16 @@ const commandExecutableIndex = (words: string[]): number => {
 			index++;
 			while (index < words.length) {
 				const word = words[index];
+				if (word === "-S" || word === "--split-string") {
+					const splitWords = lexShellCommands(words[index + 1] ?? "").commands.at(0) ?? [];
+					words.splice(index, 2, ...splitWords);
+					continue;
+				}
+				if (word.startsWith("--split-string=")) {
+					const splitWords = lexShellCommands(word.slice("--split-string=".length)).commands.at(0) ?? [];
+					words.splice(index, 1, ...splitWords);
+					continue;
+				}
 				if (word === "--") {
 					index++;
 					break;
@@ -371,10 +392,10 @@ const commandExecutableIndex = (words: string[]): number => {
 			continue;
 		}
 
-		return index;
+		return { words, executableIndex: index };
 	}
 
-	return -1;
+	return undefined;
 };
 
 // Wrappers that run another program as a subcommand. Unlike `sudo`, they carry no
@@ -404,12 +425,13 @@ const resolveInvocation = (words: string[]): Invocation | undefined => {
 	let current = words;
 
 	for (let round = 0; round < 4; round++) {
-		const index = commandExecutableIndex(current);
-		if (index < 0) return undefined;
+		const resolved = resolveCommandWords(current);
+		if (!resolved) return undefined;
 
-		const raw = current[index];
+		const { words: commandWords, executableIndex } = resolved;
+		const raw = commandWords[executableIndex];
 		const executable = executableBasename(raw);
-		const args = current.slice(index + 1);
+		const args = commandWords.slice(executableIndex + 1);
 		const wrapper = RUNNER_WRAPPERS.get(executable);
 		if (wrapper && args[0] === wrapper.subcommand) {
 			const rest = skipWrapperOptions(args.slice(1), wrapper.valueOptions);
@@ -590,13 +612,21 @@ const SCRIPT_EFFECTS: Array<{ kind: ScriptEffect; languages?: ScriptLanguage[]; 
 const SSH_KEY_TOKEN = /\bid_(?:rsa|dsa|ecdsa|ed25519|ed25519_sk|ecdsa_sk)\b/;
 const scriptNamesPrivateKey = (analysis: ShellAnalysis) => analysis.scripts.some((script) => SSH_KEY_TOKEN.test(script.code));
 
+type AnalyzedScript = ShellAnalysis["scripts"][number];
+
+const effectsForScript = (script: AnalyzedScript): Set<ScriptEffect> => {
+	const effects = new Set<ScriptEffect>();
+	for (const effect of SCRIPT_EFFECTS) {
+		if (effect.languages && !effect.languages.includes(script.language)) continue;
+		if (effect.pattern.test(script.code)) effects.add(effect.kind);
+	}
+	return effects;
+};
+
 const scriptEffects = (analysis: ShellAnalysis): Set<ScriptEffect> => {
 	const effects = new Set<ScriptEffect>();
 	for (const script of analysis.scripts) {
-		for (const effect of SCRIPT_EFFECTS) {
-			if (effect.languages && !effect.languages.includes(script.language)) continue;
-			if (effect.pattern.test(script.code)) effects.add(effect.kind);
-		}
+		for (const effect of effectsForScript(script)) effects.add(effect);
 	}
 	return effects;
 };
@@ -661,6 +691,11 @@ function collectCommand(words: string[], analysis: ShellAnalysis, depth: number)
 		collectShellInvocation(args, analysis, depth);
 		return;
 	}
+	if (executable === "source" || executable === ".") {
+		const path = args.find((arg) => !arg.startsWith("-"));
+		if (path) analysis.executed.push(path);
+		return;
+	}
 	if (executable === "eval") {
 		collectSource(args.join(" "), analysis, depth + 1);
 		return;
@@ -692,7 +727,18 @@ function collectCommand(words: string[], analysis: ShellAnalysis, depth: number)
 	}
 }
 
-const PRIVILEGE_OPTIONS_WITH_VALUES = new Set(["-u", "--user", "-g", "--group", "-p", "--prompt", "-C", "--close-from"]);
+const PRIVILEGE_OPTIONS_WITH_VALUES = new Set([
+	"-u",
+	"--user",
+	"-g",
+	"--group",
+	"-p",
+	"--prompt",
+	"-C",
+	"--close-from",
+	"-D",
+	"--chdir",
+]);
 
 const stripPrivilegeOptions = (args: string[]) => {
 	let index = 0;
@@ -796,7 +842,7 @@ const isCredentialPath = (path: string) => {
 	if (isEnvTemplatePath(normalized)) return false;
 
 	return [
-		/(^|\/)\.ssh\/[^/]*(?:_key|id_[a-z0-9]+)$/,
+		/(^|\/)\.ssh\/[^/]*(?:_key|id_[a-z0-9_]+)$/,
 		/(^|\/)\.gnupg(\/|$)/,
 		/\.(pem|key|p12|pfx)$/,
 		/(^|\/)\.aws\/credentials$/,
@@ -889,12 +935,29 @@ const resetGateState = () => {
 	ruleHits.clear();
 };
 
+const observedWorkingDirectories = (shell: ShellAnalysis) => {
+	const directories = [process.cwd()];
+	for (const command of shell.commands) {
+		if (command.executable !== "cd") continue;
+		const target = command.args.find((arg) => !arg.startsWith("-")) ?? HOME;
+		if (!target) continue;
+		const current = directories.at(-1) ?? process.cwd();
+		directories.push(resolve(current, expandPath(target)));
+	}
+	return directories;
+};
+
+const pathCandidates = (path: string, directories: string[]) =>
+	directories.map((directory) => normalize(resolve(directory, expandPath(path))));
+
 const runsGeneratedScript = (shell: ShellAnalysis) => {
-	const writtenHere = new Set(shell.written.map((path) => normalizedPath(path)));
-	return shell.executed.some((path) => {
-		const normalized = normalizedPath(path);
-		return sessionWrittenPaths.has(normalized) || writtenHere.has(normalized);
-	});
+	const directories = observedWorkingDirectories(shell);
+	const writtenHere = new Set(shell.written.flatMap((path) => pathCandidates(path, directories)));
+	return shell.executed.some((path) =>
+		pathCandidates(path, directories).some(
+			(normalized) => sessionWrittenPaths.has(normalized) || writtenHere.has(normalized),
+		),
+	);
 };
 
 // ─── predicates ──────────────────────────────────────────────────────────────
@@ -902,6 +965,8 @@ const runsGeneratedScript = (shell: ShellAnalysis) => {
 const executablesIn = (shell: ShellAnalysis, names: Set<string>) => shell.commands.filter((command) => names.has(command.executable));
 const usesExecutable = (shell: ShellAnalysis, names: Set<string>) => executablesIn(shell, names).length > 0;
 const anyText = (shell: ShellAnalysis, pattern: RegExp) => shell.texts.some((text) => pattern.test(text));
+const anyLogicalShellText = (shell: ShellAnalysis, pattern: RegExp) =>
+	shell.texts.some((text) => pattern.test(text.replace(/\|[ \t]*\\?\r?\n[ \t]*/g, "| ")));
 
 const DELETE_EXECUTABLES = new Set(["rm", "rmdir", "shred", "srm", "unlink"]);
 const isFindDelete = (command: Invocation) => command.executable === "find" && command.args.includes("-delete");
@@ -998,12 +1063,13 @@ const hasSudo = (shell: ShellAnalysis) => usesExecutable(shell, PRIVILEGE_EXECUT
 
 // `save` is nushell's write. touch, mkdir, mv, cp and plain redirections stay out.
 const MUTATING_EXECUTABLES = new Set(["tee", "chmod", "chown", "chgrp", "truncate", "install", "dd", "save"]);
+const IN_PLACE_EDITORS = new Set(["sed", "gsed", "perl", "ruby"]);
 // `sed -i` and `perl -pi` edit files in place, which is the same thing as an edit
 // tool call but without a reviewable diff.
-const editsInPlace = (shell: ShellAnalysis) =>
-	executablesIn(shell, new Set(["sed", "gsed", "perl", "ruby"])).some((command) =>
-		command.args.some((arg) => /^-[a-z]*i/.test(arg) || arg.startsWith("--in-place")),
-	);
+const editsInPlaceCommand = (command: Invocation) =>
+	IN_PLACE_EDITORS.has(command.executable) &&
+	command.args.some((arg) => /^-[a-z]*i/.test(arg) || arg.startsWith("--in-place"));
+const editsInPlace = (shell: ShellAnalysis) => shell.commands.some(editsInPlaceCommand);
 
 const hasShellWrite = (shell: ShellAnalysis) => usesExecutable(shell, MUTATING_EXECUTABLES) || editsInPlace(shell);
 
@@ -1016,15 +1082,23 @@ const isCatastrophic = (shell: ShellAnalysis) =>
 	executablesIn(shell, new Set(["chmod"])).some(
 		(command) =>
 			command.args.some((arg) => /^-{1,2}(?:r|recursive)$/i.test(arg) || /^-[a-z]*r[a-z]*$/i.test(arg)) &&
-			command.args.includes("777") &&
+			command.args.some((arg) => /^0*777$/.test(arg)) &&
 			command.args.some((arg) => arg === "/" || arg === "~" || arg === "$HOME" || arg === HOME),
 	) ||
-	anyText(shell, /\b(?:curl|wget)\b[^\n]*\|[^\n]*\b(?:sudo|doas)\b[^\n]*\b(?:sh|bash|zsh)\b/i);
+	anyLogicalShellText(shell, /\b(?:curl|wget)\b[^\n]*\|[^\n]*\b(?:sudo|doas)\b[^\n]*\b(?:sh|bash|zsh)\b/i);
+
+const PSEUDO_FS_MUTATORS = new Set([...MUTATING_EXECUTABLES, "cp", "mv", "touch", "mkdir"]);
+const textMentionsPseudoFs = (text: string) => extractPathMentions(text).some((path) => isPseudoFsPath(path));
+const commandWritesPseudoFs = (command: Invocation) =>
+	(PSEUDO_FS_MUTATORS.has(command.executable) || editsInPlaceCommand(command)) &&
+	command.args.some((arg) => textMentionsPseudoFs(arg));
+const scriptWritesPseudoFs = (script: AnalyzedScript) =>
+	effectsForScript(script).has("mutate") && textMentionsPseudoFs(script.code);
 
 const shellWritesPseudoFs = (shell: ShellAnalysis) =>
 	shell.written.some((path) => isPseudoFsPath(path)) ||
-	anyText(shell, /(?:^|[\s;|&])(?:\d?>{1,2})(?!&|\d)\s*\/?(?:proc\/|sys\/|dev\/(?!null(?:\s|$|[;&|)])))/i) ||
-	anyText(shell, /\b(?:tee|dd|cp|mv|touch|mkdir|chmod|chown)\b[^\n]*(?:\s|=)\/?(?:proc\/|sys\/|dev\/(?!null(?:\s|$|[;&|)])))/i);
+	shell.commands.some(commandWritesPseudoFs) ||
+	shell.scripts.some(scriptWritesPseudoFs);
 
 const mentionsCredentials = (shell: ShellAnalysis) =>
 	shell.texts.some((text) => mentionsCredentialPath(text)) ||
@@ -1087,7 +1161,7 @@ const bypassesGitHooks = (shell: ShellAnalysis) =>
 // ─── package managers ────────────────────────────────────────────────────────
 
 const MUTATING_PACKAGE_COMMANDS = new Map<string, RegExp>([
-	["npm", /^(?:install|i|add|remove|rm|uninstall|update|upgrade|audit|exec|link|publish)$/],
+	["npm", /^(?:install|ci|i|add|remove|rm|uninstall|update|upgrade|audit|exec|link|publish)$/],
 	["pnpm", /^(?:install|i|add|remove|rm|uninstall|update|upgrade|audit|exec|dlx|link|publish)$/],
 	["yarn", /^(?:install|add|remove|up|upgrade|dlx|link|publish)$/],
 	["bun", /^(?:install|i|add|remove|rm|update|link|publish)$/],
@@ -1109,6 +1183,22 @@ const MUTATING_PACKAGE_COMMANDS = new Map<string, RegExp>([
 	["composer", /^(?:require|remove|install|update)$/],
 ]);
 
+const PACKAGE_OPTIONS_WITH_VALUES = new Map<string, Set<string>>([["npm", new Set(["--prefix"])]]);
+
+const packagePositionals = (command: Invocation) => {
+	const valueOptions = PACKAGE_OPTIONS_WITH_VALUES.get(command.executable) ?? new Set<string>();
+	const positional: string[] = [];
+	for (let index = 0; index < command.args.length; index++) {
+		const arg = command.args[index];
+		if (valueOptions.has(arg)) {
+			index++;
+			continue;
+		}
+		if (!arg.startsWith("-")) positional.push(arg);
+	}
+	return positional;
+};
+
 const isMutatingPackageManager = (shell: ShellAnalysis) =>
 	shell.commands.some((command) => {
 		const pattern = MUTATING_PACKAGE_COMMANDS.get(command.executable);
@@ -1118,35 +1208,71 @@ const isMutatingPackageManager = (shell: ShellAnalysis) =>
 
 		// Match the subcommand and, for two-word forms like `uv pip install`, the
 		// pair. Later positionals are package names, not subcommands.
-		const positional = command.args.filter((arg) => !arg.startsWith("-")).slice(0, 2);
+		const positional = packagePositionals(command).slice(0, 2);
 		return positional.some((_, index) => pattern.test(positional.slice(0, index + 1).join(" ")));
 	});
 
 // ─── network ─────────────────────────────────────────────────────────────────
 
 const NETWORK_EXECUTABLES = new Set(["ssh", "scp", "rsync", "sftp", "nc", "ncat", "netcat", "socat", "telnet"]);
-const CURL_UPLOAD_OPTIONS = new Set(["-T", "--upload-file", "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "-F", "--form"]);
+const CURL_UPLOAD_OPTIONS = new Set([
+	"-T",
+	"--upload-file",
+	"-d",
+	"--data",
+	"--data-ascii",
+	"--data-raw",
+	"--data-binary",
+	"--data-urlencode",
+	"-F",
+	"--form",
+]);
+const CURL_AUTH_OPTIONS = new Set(["-u", "--user"]);
+const CURL_METHOD_OPTIONS = new Set(["-X", "--request"]);
+const CURL_HEADER_OPTIONS = new Set(["-H", "--header"]);
+const CURL_SHORT_VALUE_OPTIONS = ["-T", "-d", "-F", "-u", "-X", "-H"];
 const CURL_MUTATING_METHODS = /^(?:POST|PUT|PATCH|DELETE)$/i;
+const WGET_AUTH_OPTIONS = new Set(["--user", "--password", "--http-user", "--http-password", "--ftp-user", "--ftp-password"]);
+
+const optionName = (arg: string) => {
+	const equals = arg.indexOf("=");
+	return equals < 0 ? arg : arg.slice(0, equals);
+};
+
+const curlOptionAt = (args: string[], index: number) => {
+	const arg = args[index];
+	if (arg.startsWith("--")) {
+		const name = optionName(arg);
+		return { name, value: name === arg ? args[index + 1] : arg.slice(name.length + 1) };
+	}
+
+	const name = CURL_SHORT_VALUE_OPTIONS.find((option) => arg === option || arg.startsWith(option));
+	if (!name) return { name: arg, value: undefined };
+	return { name, value: arg === name ? args[index + 1] : arg.slice(name.length) };
+};
 
 const curlSendsData = (command: Invocation) =>
-	command.args.some((arg, index) => {
-		if (CURL_UPLOAD_OPTIONS.has(arg)) return true;
-		if (arg.startsWith("--data")) return true;
-		if ((arg === "-X" || arg === "--request") && CURL_MUTATING_METHODS.test(command.args[index + 1] ?? "")) return true;
-		if ((arg === "-H" || arg === "--header") && /authorization:/i.test(command.args[index + 1] ?? "")) return true;
-		if (arg === "-u" || arg === "--user") return true;
-		return false;
+	command.args.some((_, index) => {
+		const { name, value } = curlOptionAt(command.args, index);
+		return (
+			CURL_UPLOAD_OPTIONS.has(name) ||
+			CURL_AUTH_OPTIONS.has(name) ||
+			(CURL_METHOD_OPTIONS.has(name) && CURL_MUTATING_METHODS.test(value ?? "")) ||
+			(CURL_HEADER_OPTIONS.has(name) && /authorization:/i.test(value ?? ""))
+		);
 	});
 
 const isRiskyNetwork = (shell: ShellAnalysis) =>
 	usesExecutable(shell, NETWORK_EXECUTABLES) ||
 	gitCommands(shell, "push").length > 0 ||
 	executablesIn(shell, new Set(["curl"])).some((command) => curlSendsData(command)) ||
-	executablesIn(shell, new Set(["wget"])).some((command) => command.args.some((arg) => arg.startsWith("--post"))) ||
+	executablesIn(shell, new Set(["wget"])).some((command) =>
+		command.args.some((arg) => arg.startsWith("--post") || WGET_AUTH_OPTIONS.has(optionName(arg))),
+	) ||
 	// nushell: `http post https://... $payload`
 	executablesIn(shell, new Set(["http"])).some((command) => /^(?:post|put|patch|delete)$/i.test(command.args[0] ?? "")) ||
 	scriptEffects(shell).has("network") ||
-	anyText(shell, /\b(?:curl|wget)\b[^\n]*\|[^\n]*\b(?:sh|bash|zsh|nu)\b/i);
+	anyLogicalShellText(shell, /\b(?:curl|wget)\b[^\n]*\|[^\n]*\b(?:sh|bash|zsh|nu)\b/i);
 
 // ─── nested pi ───────────────────────────────────────────────────────────────
 
