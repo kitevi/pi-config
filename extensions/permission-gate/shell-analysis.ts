@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 type ScriptLanguage = "python" | "javascript" | "ruby" | "perl" | "php" | "awk";
 type ScriptEffect = "mutate" | "exec" | "network";
 export type PathEffect = { path: string; cwd: string };
-type PipelineStage = { executable: string; elevated: boolean };
+type PipelineCommand = { executable: string; elevated: boolean };
+type PipelineStage = { commands: PipelineCommand[] };
 
 /** One resolved command: `env FOO=1 sudo rm -rf x` resolves to executable `sudo`. */
 export type Invocation = {
@@ -42,10 +43,19 @@ export const HOME = process.env.HOME ? resolve(process.env.HOME) : undefined;
 // process launches; it is behavior shaping, not a security sandbox. One lexer
 // handles command boundaries, words, quoting, and nested command substitutions
 // so those rules cannot drift apart.
-type LexedCommand = { words: string[]; substitutions: ShellLexResult[] };
-type ShellLexResult = { commands: LexedCommand[]; pipelines: LexedCommand[][]; endIndex: number };
+type LexedCommand = { kind: "command"; words: string[]; substitutions: ShellLexResult[] };
+type LexedSubshell = { kind: "subshell"; body: ShellLexResult };
+type LexedStage = LexedCommand | LexedSubshell;
+type LexedPipeline = { stages: LexedStage[]; background: boolean };
+type ShellLexResult = { pipelines: LexedPipeline[]; endIndex: number };
 
-const recoveredLookupWord = (commands: LexedCommand[], fallback: string) => {
+const commandsIn = (result: ShellLexResult): LexedCommand[] =>
+	result.pipelines.flatMap((pipeline) =>
+		pipeline.stages.flatMap((stage) => (stage.kind === "command" ? [stage] : commandsIn(stage.body))),
+	);
+
+const recoveredLookupWord = (result: ShellLexResult, fallback: string) => {
+	const commands = commandsIn(result);
 	if (commands.length !== 1) return fallback;
 	const [executable, ...args] = commands[0].words;
 	if (executable.toLowerCase() === "which" && args.length === 1 && !args[0].startsWith("-")) return args[0];
@@ -54,9 +64,8 @@ const recoveredLookupWord = (commands: LexedCommand[], fallback: string) => {
 };
 
 const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"): ShellLexResult => {
-	const commands: LexedCommand[] = [];
-	const pipelines: LexedCommand[][] = [];
-	let pipeline: LexedCommand[] = [];
+	const pipelines: LexedPipeline[] = [];
+	let stages: LexedStage[] = [];
 	let substitutions: ShellLexResult[] = [];
 	let words: string[] = [];
 	let current = "";
@@ -72,18 +81,14 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 	};
 	const pushCommand = () => {
 		pushWord();
-		if (words.length > 0) {
-			const command = { words, substitutions };
-			commands.push(command);
-			pipeline.push(command);
-		}
+		if (words.length > 0) stages.push({ kind: "command", words, substitutions });
 		words = [];
 		substitutions = [];
 	};
-	const finishPipeline = () => {
+	const finishPipeline = (background = false) => {
 		pushCommand();
-		if (pipeline.length > 1) pipelines.push(pipeline);
-		pipeline = [];
+		if (stages.length > 0) pipelines.push({ stages, background });
+		stages = [];
 		afterPipe = false;
 	};
 
@@ -112,7 +117,7 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 		}
 		if (!quote && terminator && character === terminator) {
 			finishPipeline();
-			return { commands, pipelines, endIndex: index };
+			return { pipelines, endIndex: index };
 		}
 		if (quote === "'") {
 			if (character === "'") quote = undefined;
@@ -130,7 +135,7 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 		if (character === "$" && source[index + 1] === "(") {
 			const nested = lexShellCommands(source, index + 2, ")");
 			substitutions.push(nested);
-			current += recoveredLookupWord(nested.commands, "$()");
+			current += recoveredLookupWord(nested, "$()");
 			wordStarted = true;
 			afterPipe = false;
 			index = nested.endIndex;
@@ -139,7 +144,7 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 		if (character === "`") {
 			const nested = lexShellCommands(source, index + 1, "`");
 			substitutions.push(nested);
-			current += recoveredLookupWord(nested.commands, "``");
+			current += recoveredLookupWord(nested, "``");
 			wordStarted = true;
 			afterPipe = false;
 			index = nested.endIndex;
@@ -157,6 +162,14 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 			afterPipe = false;
 			continue;
 		}
+		if (character === "(") {
+			pushCommand();
+			const nested = lexShellCommands(source, index + 1, ")");
+			stages.push({ kind: "subshell", body: nested });
+			afterPipe = false;
+			index = nested.endIndex;
+			continue;
+		}
 		if (character === "|" && source[index + 1] === "|") {
 			finishPipeline();
 			index++;
@@ -172,9 +185,19 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 			if (!afterPipe) finishPipeline();
 			continue;
 		}
-		if (character === ";" || character === "&" || character === "(" || character === ")") {
+		if (character === ";") {
 			finishPipeline();
-			if ((character === ";" || character === "&") && source[index + 1] === character) index++;
+			if (source[index + 1] === ";") index++;
+			continue;
+		}
+		if (character === "&") {
+			const asynchronous = source[index + 1] !== "&";
+			finishPipeline(asynchronous);
+			if (!asynchronous) index++;
+			continue;
+		}
+		if (character === ")") {
+			finishPipeline();
 			continue;
 		}
 		if (/\s/.test(character)) {
@@ -188,7 +211,7 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 	}
 
 	finishPipeline();
-	return { commands, pipelines, endIndex: source.length };
+	return { pipelines, endIndex: source.length };
 };
 export const normalize = (value: string) => value.replaceAll("\\", "/").toLowerCase();
 // Nushell calls external commands as `^python`; the caret is not part of the name.
@@ -226,12 +249,12 @@ const resolveCommandWords = (inputWords: string[]): ResolvedCommandWords | undef
 			while (index < words.length) {
 				const word = words[index];
 				if (word === "-S" || word === "--split-string") {
-					const splitWords = lexShellCommands(words[index + 1] ?? "").commands.at(0)?.words ?? [];
+					const splitWords = commandsIn(lexShellCommands(words[index + 1] ?? "")).at(0)?.words ?? [];
 					words.splice(index, 2, ...splitWords);
 					continue;
 				}
 				if (word.startsWith("--split-string=")) {
-					const splitWords = lexShellCommands(word.slice("--split-string=".length)).commands.at(0)?.words ?? [];
+					const splitWords = commandsIn(lexShellCommands(word.slice("--split-string=".length))).at(0)?.words ?? [];
 					words.splice(index, 1, ...splitWords);
 					continue;
 				}
@@ -509,9 +532,9 @@ export const scriptEffects = (analysis: ShellAnalysis): Set<ScriptEffect> => {
 
 const emptyAnalysis = (): ShellAnalysis => ({ commands: [], scripts: [], texts: [], pipelines: [], executed: [], written: [] });
 
-export const analyzeShellCommand = (source: string): ShellAnalysis => {
+export const analyzeShellCommand = (source: string, cwd = process.cwd()): ShellAnalysis => {
 	const analysis = emptyAnalysis();
-	collectSource(source, analysis, 0, process.cwd());
+	collectSource(source, analysis, 0, cwd);
 	return analysis;
 };
 
@@ -526,20 +549,32 @@ function collectLexedCommands(lexed: ShellLexResult, analysis: ShellAnalysis, de
 	if (depth > MAX_NESTING_DEPTH) return cwd;
 
 	for (const pipeline of lexed.pipelines) {
-		const stages = pipeline
-			.map((command) => resolvePipelineStage(command.words))
-			.filter((stage): stage is PipelineStage => stage !== undefined);
+		const stages = pipeline.stages
+			.map((stage) => ({
+				commands: (stage.kind === "command" ? [stage] : commandsIn(stage.body))
+					.map((command) => resolvePipelineCommand(command.words))
+					.filter((command): command is PipelineCommand => command !== undefined),
+			}))
+			.filter((stage) => stage.commands.length > 0);
 		if (stages.length > 1) analysis.pipelines.push(stages);
 	}
 
 	let currentCwd = cwd;
-	for (const command of lexed.commands) {
-		for (const substitution of command.substitutions) {
-			collectLexedCommands(substitution, analysis, depth + 1, currentCwd);
+	for (const pipeline of lexed.pipelines) {
+		const mutatesParentCwd = !pipeline.background && pipeline.stages.length === 1;
+		const pipelineCwd = currentCwd;
+		for (const stage of pipeline.stages) {
+			if (stage.kind === "subshell") {
+				collectLexedCommands(stage.body, analysis, depth + 1, pipelineCwd);
+				continue;
+			}
+			for (const substitution of stage.substitutions) {
+				collectLexedCommands(substitution, analysis, depth + 1, pipelineCwd);
+			}
+			analysis.written.push(...redirectionTargets(stage.words).map((path) => ({ path, cwd: pipelineCwd })));
+			collectCommand(stage.words, analysis, depth, pipelineCwd);
+			if (mutatesParentCwd) currentCwd = workingDirectoryAfter(stage.words, currentCwd);
 		}
-		analysis.written.push(...redirectionTargets(command.words).map((path) => ({ path, cwd: currentCwd })));
-		collectCommand(command.words, analysis, depth, currentCwd);
-		currentCwd = workingDirectoryAfter(command.words, currentCwd);
 	}
 	return currentCwd;
 }
@@ -557,7 +592,7 @@ function collectSource(source: string, analysis: ShellAnalysis, depth: number, c
 	}
 }
 function collectHeredoc(segment: { owner: string; body: string }, analysis: ShellAnalysis, depth: number, cwd: string) {
-	const ownerWords = lexShellCommands(segment.owner).commands.at(-1)?.words ?? [];
+	const ownerWords = commandsIn(lexShellCommands(segment.owner)).at(-1)?.words ?? [];
 	const invocation = resolveInvocation(ownerWords);
 	const interpreter = invocation ? interpreterFor(invocation.executable) : undefined;
 
@@ -651,7 +686,7 @@ const stripPrivilegeOptions = (args: string[]) => {
 	return args.slice(index);
 };
 
-const resolvePipelineStage = (words: string[]): PipelineStage | undefined => {
+const resolvePipelineCommand = (words: string[]): PipelineCommand | undefined => {
 	let invocation = resolveInvocation(words);
 	let elevated = false;
 	for (let depth = 0; invocation && PRIVILEGE_EXECUTABLES.has(invocation.executable) && depth < MAX_NESTING_DEPTH; depth++) {
@@ -741,3 +776,4 @@ const looksLikePath = (value: string) => value.includes("/") || /\.(?:sh|bash|zs
 
 export const expandPath = (path: string) => path.replace(/^~(?=\/|$)/, HOME ?? "~");
 export const normalizedPath = (path: string) => normalize(resolve(expandPath(path)));
+export const normalizedEffectPath = ({ path, cwd }: PathEffect) => normalize(resolve(cwd, expandPath(path)));

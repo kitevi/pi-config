@@ -1,5 +1,6 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { assessToolCall, commitWrites, noteRuleHits, resetRuleHits } from "./policy.ts";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { assessToolCall } from "./policy.ts";
+import { detailsWithWrittenPaths, PermissionGateState } from "./state.ts";
 import { ASK_ALLOW, ASK_DENY, describeAskOutcome, formatAskPrompt, formatReason } from "./presentation.ts";
 
 const askTimeoutMs = () => {
@@ -9,28 +10,41 @@ const askTimeoutMs = () => {
 const ASK_TIMEOUT_BACKSTOP_MS = 2000;
 const ASK_TIMEOUT_SLACK_MS = 500;
 
-// Pi's extension selector host mounts exactly one dialog at a time. A second
-// concurrent ask unmounts the first without disposing it or settling its
-// promise: the orphaned ask then sits invisible until its countdown expires and
-// looks like a no-show. Serialize asks so parallel gated calls queue instead.
-let askSlot: Promise<void> = Promise.resolve();
-
-// ─── extension ───────────────────────────────────────────────────────────────
-
 export default function (pi: ExtensionAPI) {
+	// Pi's extension selector host mounts exactly one dialog at a time. A second
+	// concurrent ask unmounts the first without disposing it or settling its
+	// promise, so serialize permission dialogs within this extension instance.
+	let askSlot: Promise<void> = Promise.resolve();
+	const state = new PermissionGateState();
+
+	const restoreState = (ctx: ExtensionContext) => {
+		state.restoreFromBranch(ctx.sessionManager.getBranch());
+	};
+
+	pi.on("session_start", (_event, ctx) => restoreState(ctx));
+	pi.on("session_tree", (_event, ctx) => restoreState(ctx));
+
 	pi.on("agent_start", () => {
-		resetRuleHits();
+		state.resetRuleHits();
 	});
 
+	pi.on("agent_end", () => {
+		state.clearPendingWrites();
+	});
+
+	pi.on("tool_result", (event) => {
+		const writtenPaths = state.completeWrites(event.toolCallId, !event.isError);
+		if (writtenPaths.length > 0) return { details: detailsWithWrittenPaths(event.details, writtenPaths) };
+	});
 	pi.on("tool_call", async (event, ctx) => {
-		const assessment = assessToolCall(event.toolName, event.input);
+		const assessment = assessToolCall(event.toolName, event.input, { state, cwd: ctx.cwd });
 		if (assessment.decision === "allow") {
-			commitWrites(assessment);
+			state.stageWrites(event.toolCallId, assessment.writes);
 			return undefined;
 		}
 
 		const ids = assessment.matches.map((match) => match.id);
-		const hits = noteRuleHits(ids);
+		const hits = state.noteRuleHits(ids);
 		const reason = formatReason(assessment, hits);
 
 		if (assessment.decision === "block") {
@@ -77,7 +91,7 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		if (choice === ASK_ALLOW) {
-			commitWrites(assessment);
+			state.stageWrites(event.toolCallId, assessment.writes);
 			return undefined;
 		}
 

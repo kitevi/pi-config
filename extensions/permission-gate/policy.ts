@@ -1,10 +1,9 @@
-import { resolve } from "node:path";
 import {
 	analyzeShellCommand,
 	effectsForScript,
-	expandPath,
 	HOME,
 	normalize,
+	normalizedEffectPath,
 	normalizedPath,
 	PRIVILEGE_EXECUTABLES,
 	scriptEffects,
@@ -14,14 +13,15 @@ import {
 	type PathEffect,
 	type ShellAnalysis,
 } from "./shell-analysis.ts";
+import { PermissionGateState } from "./state.ts";
 
 // ─── policy surface ──────────────────────────────────────────────────────────
 
 type Decision = "allow" | "ask" | "block";
 
 type GateCall =
-	| { kind: "shell"; toolName: string; command: string; shell: ShellAnalysis }
-	| { kind: "path"; toolName: string; path: string }
+	| { kind: "shell"; toolName: string; command: string; shell: ShellAnalysis; state: PermissionGateState }
+	| { kind: "path"; toolName: string; path: string; cwd: string }
 	| { kind: "other"; toolName: string };
 
 type Match = {
@@ -149,38 +149,9 @@ const invocationMentionsCredential = (invocation: Invocation) => {
 	});
 };
 
-// ─── session state ───────────────────────────────────────────────────────────
-
-// Writing a script and then running it defeats every command-level rule, because
-// the payload never appears in a shell command. Remember what this session
-// created so the run can be surfaced.
-const sessionWrittenPaths = new Set<string>();
-
-// Repeating the same rule is the signature failure of a weaker model: it retries
-// the blocked action in a new shape instead of stopping. Count hits so the reason
-// can say so explicitly. Reset per agent run.
-const ruleHits = new Map<string, number>();
-
-const normalizedEffectPath = ({ path, cwd }: PathEffect) => normalize(resolve(cwd, expandPath(path)));
-
-export const rememberWrittenPath = (path: string, cwd = process.cwd()) => {
-	if (!path) return;
-	sessionWrittenPaths.add(normalizedEffectPath({ path, cwd }));
-};
-
-export const resetRuleHits = () => ruleHits.clear();
-
-export const resetGateState = () => {
-	sessionWrittenPaths.clear();
-	resetRuleHits();
-};
-
-const runsGeneratedScript = (shell: ShellAnalysis) => {
+const runsGeneratedScript = (shell: ShellAnalysis, state: PermissionGateState) => {
 	const writtenHere = new Set(shell.written.map(normalizedEffectPath));
-	return shell.executed.some((effect) => {
-		const path = normalizedEffectPath(effect);
-		return sessionWrittenPaths.has(path) || writtenHere.has(path);
-	});
+	return shell.executed.some((effect) => state.hasWrittenPath(effect) || writtenHere.has(normalizedEffectPath(effect)));
 };
 
 // ─── predicates ──────────────────────────────────────────────────────────────
@@ -194,11 +165,11 @@ const remoteShellPipeline = (shell: ShellAnalysis, requireElevation = false) =>
 	shell.pipelines.some((pipeline) => {
 		let hasRemoteInput = false;
 		for (const stage of pipeline) {
-			if (DOWNLOAD_EXECUTABLES.has(stage.executable)) {
-				hasRemoteInput = true;
-				continue;
-			}
-			if (hasRemoteInput && REMOTE_SHELLS.has(stage.executable) && (!requireElevation || stage.elevated)) return true;
+			const runsRemoteShell = stage.commands.some(
+				(command) => REMOTE_SHELLS.has(command.executable) && (!requireElevation || command.elevated),
+			);
+			if (hasRemoteInput && runsRemoteShell) return true;
+			if (stage.commands.some((command) => DOWNLOAD_EXECUTABLES.has(command.executable))) hasRemoteInput = true;
 		}
 		return false;
 	});
@@ -598,7 +569,7 @@ const rules: Rule[] = [
 		decision: "ask",
 		description: "runs a script created during this session",
 		guidance: GUIDANCE.generatedScript,
-		matches: shellRule(runsGeneratedScript),
+		matches: (call) => call.kind === "shell" && runsGeneratedScript(call.shell, call.state),
 	},
 
 	// Ask for elevated privileges. Sudo is sometimes legitimate, but it should
@@ -675,12 +646,8 @@ const matchingRules = (call: GateCall, decision: Exclude<Decision, "allow">): Ma
 
 const writesForCall = (call: GateCall): PathEffect[] => {
 	if (call.kind === "shell") return call.shell.written;
-	if (call.kind === "path" && WRITE_TOOLS.has(call.toolName)) return [{ path: call.path, cwd: process.cwd() }];
+	if (call.kind === "path" && WRITE_TOOLS.has(call.toolName)) return [{ path: call.path, cwd: call.cwd }];
 	return [];
-};
-
-export const commitWrites = (assessment: Assessment) => {
-	for (const effect of assessment.writes) rememberWrittenPath(effect.path, effect.cwd);
 };
 
 const stringInput = (input: unknown, key: string) => {
@@ -689,20 +656,23 @@ const stringInput = (input: unknown, key: string) => {
 	return typeof value === "string" ? value.trim() : "";
 };
 
-const normalizeToolCall = (toolName: string, input: unknown): GateCall => {
+const normalizeToolCall = (toolName: string, input: unknown, state: PermissionGateState, cwd: string): GateCall => {
 	if (SHELL_TOOLS.has(toolName)) {
 		const command = stringInput(input, "command");
-		return { kind: "shell", toolName, command, shell: analyzeShellCommand(command) };
+		return { kind: "shell", toolName, command, shell: analyzeShellCommand(command, cwd), state };
 	}
 	if (READ_TOOLS.has(toolName) || WRITE_TOOLS.has(toolName)) {
 		const path = stringInput(input, "path");
-		if (path) return { kind: "path", toolName, path };
+		if (path) return { kind: "path", toolName, path, cwd };
 	}
 	return { kind: "other", toolName };
 };
 
-export const assessToolCall = (toolName: string, input: unknown): Assessment => {
-	const call = normalizeToolCall(toolName, input);
+export type AssessmentContext = { state?: PermissionGateState; cwd?: string };
+
+export const assessToolCall = (toolName: string, input: unknown, context: AssessmentContext = {}): Assessment => {
+	const state = context.state ?? new PermissionGateState();
+	const call = normalizeToolCall(toolName, input, state, context.cwd ?? process.cwd());
 	const writes = writesForCall(call);
 	const blockMatches = matchingRules(call, "block");
 	if (blockMatches.length > 0) return { decision: "block", matches: blockMatches, target: targetForCall(call), writes };
@@ -711,16 +681,6 @@ export const assessToolCall = (toolName: string, input: unknown): Assessment => 
 	if (askMatches.length > 0) return { decision: "ask", matches: askMatches, target: targetForCall(call), writes };
 
 	return { decision: "allow", matches: [], target: targetForCall(call), writes };
-};
-
-export const noteRuleHits = (ids: string[]) => {
-	let highest = 0;
-	for (const id of ids) {
-		const count = (ruleHits.get(id) ?? 0) + 1;
-		ruleHits.set(id, count);
-		highest = Math.max(highest, count);
-	}
-	return highest;
 };
 
 export const escalationNote = (hits: number) =>
