@@ -34,10 +34,6 @@ export class PermissionGateState {
 		return [...this.#pendingWrites.values()].some((paths) => paths.has(path));
 	}
 
-	rememberWrittenPath(path: string, cwd = process.cwd()) {
-		if (path) this.#writtenPaths.add(normalizedEffectPath({ path, cwd }));
-	}
-
 	stageWrites(toolCallId: string, effects: PathEffect[]) {
 		const paths = new Set(effects.map(normalizedEffectPath));
 		if (paths.size > 0) this.#pendingWrites.set(toolCallId, paths);

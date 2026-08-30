@@ -20,8 +20,8 @@ import { PermissionGateState } from "./state.ts";
 type Decision = "allow" | "ask" | "block";
 
 type GateCall =
-	| { kind: "shell"; toolName: string; command: string; shell: ShellAnalysis; state: PermissionGateState }
-	| { kind: "path"; toolName: string; path: string; cwd: string }
+	| { kind: "shell"; toolName: string; command: string; shell: ShellAnalysis }
+	| { kind: "path"; toolName: string; path: string; cwd: string; access: "read" | "write" }
 	| { kind: "other"; toolName: string };
 
 type Match = {
@@ -36,8 +36,11 @@ type Rule = {
 	decision: Exclude<Decision, "allow">;
 	description: string;
 	guidance: string;
-	matches: (call: GateCall) => boolean;
+	matches: (call: GateCall, env: RuleEnv) => boolean;
 };
+
+/** Cross-call context; pure rules ignore it, session-aware rules read it. */
+type RuleEnv = { state: PermissionGateState };
 
 export type Assessment = {
 	decision: Decision;
@@ -67,9 +70,16 @@ const GUIDANCE = {
 	networkRisk: "This sends data out, pushes, or executes remote content.",
 } as const;
 
-const READ_TOOLS = new Set(["read", "grep", "find", "ls", "ast_search"]);
-const WRITE_TOOLS = new Set(["edit", "write"]);
 const SHELL_TOOLS = new Set(["bash", "nu"]);
+const PATH_TOOLS: ReadonlyMap<string, "read" | "write"> = new Map([
+	["read", "read"],
+	["grep", "read"],
+	["find", "read"],
+	["ls", "read"],
+	["ast_search", "read"],
+	["edit", "write"],
+	["write", "write"],
+]);
 
 export const NESTED_PI_OVERRIDE_ENV = "PI_PERMISSION_GATE_ALLOW_NESTED_PI";
 const nestedPiOverrideEnabled = () => /^(?:1|true|yes|on)$/i.test(process.env[NESTED_PI_OVERRIDE_ENV]?.trim() ?? "");
@@ -396,6 +406,8 @@ const isRiskyNetwork = (shell: ShellAnalysis) =>
 // ─── nested pi ───────────────────────────────────────────────────────────────
 
 const PI_MANAGEMENT_COMMANDS = new Set(["config", "install", "list", "remove", "uninstall", "update"]);
+// Agent-mode flags (-p, --print, --mode json) are rejected in isNonAgentPi
+// before this list is consulted for positional parsing.
 const PI_OPTIONS_WITH_VALUES = new Set([
 	"--api-key",
 	"--append-system-prompt",
@@ -474,10 +486,7 @@ const rules: Rule[] = [
 		decision: "block",
 		description: "credential/private material path accessed by structured tool",
 		guidance: GUIDANCE.credentials,
-		matches: (call) =>
-			call.kind === "path" &&
-			(READ_TOOLS.has(call.toolName) || WRITE_TOOLS.has(call.toolName)) &&
-			isCredentialPath(call.path),
+		matches: (call) => call.kind === "path" && isCredentialPath(call.path),
 	},
 	{
 		id: "block.credential-shell-access",
@@ -515,7 +524,7 @@ const rules: Rule[] = [
 		decision: "block",
 		description: "structured write to /dev, /proc, or /sys",
 		guidance: GUIDANCE.pseudoFs,
-		matches: (call) => call.kind === "path" && WRITE_TOOLS.has(call.toolName) && isPseudoFsPath(call.path),
+		matches: (call) => call.kind === "path" && call.access === "write" && isPseudoFsPath(call.path),
 	},
 	{
 		id: "block.pseudo-fs-shell-write",
@@ -569,7 +578,7 @@ const rules: Rule[] = [
 		decision: "ask",
 		description: "runs a script created during this session",
 		guidance: GUIDANCE.generatedScript,
-		matches: (call) => call.kind === "shell" && runsGeneratedScript(call.shell, call.state),
+		matches: (call, env) => call.kind === "shell" && runsGeneratedScript(call.shell, env.state),
 	},
 
 	// Ask for elevated privileges. Sudo is sometimes legitimate, but it should
@@ -639,14 +648,14 @@ const targetForCall = (call: GateCall) => {
 	return call.toolName;
 };
 
-const matchingRules = (call: GateCall, decision: Exclude<Decision, "allow">): Match[] =>
+const matchingRules = (call: GateCall, env: RuleEnv, decision: Exclude<Decision, "allow">): Match[] =>
 	rules
-		.filter((rule) => rule.decision === decision && rule.matches(call))
+		.filter((rule) => rule.decision === decision && rule.matches(call, env))
 		.map(({ id, decision, description, guidance }) => ({ id, decision, description, guidance }));
 
 const writesForCall = (call: GateCall): PathEffect[] => {
 	if (call.kind === "shell") return call.shell.written;
-	if (call.kind === "path" && WRITE_TOOLS.has(call.toolName)) return [{ path: call.path, cwd: call.cwd }];
+	if (call.kind === "path" && call.access === "write") return [{ path: call.path, cwd: call.cwd }];
 	return [];
 };
 
@@ -656,14 +665,15 @@ const stringInput = (input: unknown, key: string) => {
 	return typeof value === "string" ? value.trim() : "";
 };
 
-const normalizeToolCall = (toolName: string, input: unknown, state: PermissionGateState, cwd: string): GateCall => {
+const normalizeToolCall = (toolName: string, input: unknown, cwd: string): GateCall => {
 	if (SHELL_TOOLS.has(toolName)) {
 		const command = stringInput(input, "command");
-		return { kind: "shell", toolName, command, shell: analyzeShellCommand(command, cwd), state };
+		return { kind: "shell", toolName, command, shell: analyzeShellCommand(command, cwd) };
 	}
-	if (READ_TOOLS.has(toolName) || WRITE_TOOLS.has(toolName)) {
+	const access = PATH_TOOLS.get(toolName);
+	if (access) {
 		const path = stringInput(input, "path");
-		if (path) return { kind: "path", toolName, path, cwd };
+		if (path) return { kind: "path", toolName, path, cwd, access };
 	}
 	return { kind: "other", toolName };
 };
@@ -671,17 +681,15 @@ const normalizeToolCall = (toolName: string, input: unknown, state: PermissionGa
 export type AssessmentContext = { state?: PermissionGateState; cwd?: string };
 
 export const assessToolCall = (toolName: string, input: unknown, context: AssessmentContext = {}): Assessment => {
-	const state = context.state ?? new PermissionGateState();
-	const call = normalizeToolCall(toolName, input, state, context.cwd ?? process.cwd());
+	const env: RuleEnv = { state: context.state ?? new PermissionGateState() };
+	const call = normalizeToolCall(toolName, input, context.cwd ?? process.cwd());
 	const writes = writesForCall(call);
-	const blockMatches = matchingRules(call, "block");
-	if (blockMatches.length > 0) return { decision: "block", matches: blockMatches, target: targetForCall(call), writes };
+	const target = targetForCall(call);
+	const blockMatches = matchingRules(call, env, "block");
+	if (blockMatches.length > 0) return { decision: "block", matches: blockMatches, target, writes };
 
-	const askMatches = matchingRules(call, "ask");
-	if (askMatches.length > 0) return { decision: "ask", matches: askMatches, target: targetForCall(call), writes };
+	const askMatches = matchingRules(call, env, "ask");
+	if (askMatches.length > 0) return { decision: "ask", matches: askMatches, target, writes };
 
-	return { decision: "allow", matches: [], target: targetForCall(call), writes };
+	return { decision: "allow", matches: [], target, writes };
 };
-
-export const escalationNote = (hits: number) =>
-	hits > 1 ? `\nYou have hit this rule ${hits} times in this run. Stop trying variations and ask the user.` : "";

@@ -26,7 +26,8 @@ export type ShellAnalysis = {
 	scripts: Array<{ language: ScriptLanguage; code: string }>;
 	/** Command text plus every nested string, for credential path scanning. */
 	texts: string[];
-	/** Resolved stages connected by an actual shell pipe. */
+	/** Resolved stages connected by an actual shell pipe. Unlike `commands`, each
+	 *  stage lists only its representative commands (runners/privilege stripped). */
 	pipelines: PipelineStage[][];
 	/** Paths the call executes, resolved relative to the cwd active at that point. */
 	executed: PathEffect[];
@@ -303,7 +304,8 @@ const RUNNER_WRAPPERS = new Map<string, { subcommand: string; valueOptions: Set<
 	["mise", { subcommand: "exec", valueOptions: new Set(["-C", "--cd"]) }],
 ]);
 
-const skipWrapperOptions = (args: string[], valueOptions: Set<string>) => {
+/** Arguments past the leading option flags: `sudo -u root -- rm` resolves to `["rm"]`. */
+const argsAfterOptions = (args: string[], valueOptions: Set<string>) => {
 	let index = 0;
 	while (index < args.length) {
 		const arg = args[index];
@@ -314,10 +316,13 @@ const skipWrapperOptions = (args: string[], valueOptions: Set<string>) => {
 	return args.slice(index);
 };
 
+// Runner wrappers can nest (`mise exec uv run ...`); cap the unwrap rounds.
+const MAX_RUNNER_WRAPPERS = 4;
+
 const resolveInvocation = (words: string[]): Invocation | undefined => {
 	let current = words;
 
-	for (let round = 0; round < 4; round++) {
+	for (let round = 0; round < MAX_RUNNER_WRAPPERS; round++) {
 		const resolved = resolveCommandWords(current);
 		if (!resolved) return undefined;
 
@@ -327,7 +332,7 @@ const resolveInvocation = (words: string[]): Invocation | undefined => {
 		const args = commandWords.slice(executableIndex + 1);
 		const wrapper = RUNNER_WRAPPERS.get(executable);
 		if (wrapper && args[0] === wrapper.subcommand) {
-			const rest = skipWrapperOptions(args.slice(1), wrapper.valueOptions);
+			const rest = argsAfterOptions(args.slice(1), wrapper.valueOptions);
 			if (rest.length > 0) {
 				current = rest;
 				continue;
@@ -391,24 +396,6 @@ const XARGS_OPTIONS_WITH_VALUES = new Set([
 	"-n",
 	"-s",
 ]);
-
-const xargsCommandArgs = (args: string[]) => {
-	let index = 0;
-	while (index < args.length) {
-		const arg = args[index];
-		if (arg === "--") return args.slice(index + 1);
-		if (XARGS_OPTIONS_WITH_VALUES.has(arg)) {
-			index += 2;
-			continue;
-		}
-		if (arg.startsWith("-")) {
-			index++;
-			continue;
-		}
-		return args.slice(index);
-	}
-	return [];
-};
 
 /** `find . -exec rm {} +` hides a command behind an option. */
 const findExecCommands = (args: string[]) => {
@@ -548,7 +535,10 @@ const workingDirectoryAfter = (words: string[], cwd: string) => {
 function collectLexedCommands(lexed: ShellLexResult, analysis: ShellAnalysis, depth: number, cwd: string) {
 	if (depth > MAX_NESTING_DEPTH) return cwd;
 
+	let currentCwd = cwd;
 	for (const pipeline of lexed.pipelines) {
+		// Resolve each stage's representative command in the same pass that
+		// collects the full inventory, so the two views cannot drift apart.
 		const stages = pipeline.stages
 			.map((stage) => ({
 				commands: (stage.kind === "command" ? [stage] : commandsIn(stage.body))
@@ -557,10 +547,7 @@ function collectLexedCommands(lexed: ShellLexResult, analysis: ShellAnalysis, de
 			}))
 			.filter((stage) => stage.commands.length > 0);
 		if (stages.length > 1) analysis.pipelines.push(stages);
-	}
 
-	let currentCwd = cwd;
-	for (const pipeline of lexed.pipelines) {
 		const mutatesParentCwd = !pipeline.background && pipeline.stages.length === 1;
 		const pipelineCwd = currentCwd;
 		for (const stage of pipeline.stages) {
@@ -619,7 +606,7 @@ function collectCommand(words: string[], analysis: ShellAnalysis, depth: number,
 	const { executable, args } = invocation;
 
 	if (PRIVILEGE_EXECUTABLES.has(executable)) {
-		collectCommand(stripPrivilegeOptions(args), analysis, depth + 1, cwd);
+		collectCommand(argsAfterOptions(args, PRIVILEGE_OPTIONS_WITH_VALUES), analysis, depth + 1, cwd);
 		return;
 	}
 	if (SHELL_EXECUTABLES.has(executable)) {
@@ -636,7 +623,7 @@ function collectCommand(words: string[], analysis: ShellAnalysis, depth: number,
 		return;
 	}
 	if (executable === "xargs") {
-		collectCommand(xargsCommandArgs(args), analysis, depth + 1, cwd);
+		collectCommand(argsAfterOptions(args, XARGS_OPTIONS_WITH_VALUES), analysis, depth + 1, cwd);
 		return;
 	}
 	if (executable === "find") {
@@ -675,23 +662,15 @@ const PRIVILEGE_OPTIONS_WITH_VALUES = new Set([
 	"--chdir",
 ]);
 
-const stripPrivilegeOptions = (args: string[]) => {
-	let index = 0;
-	while (index < args.length) {
-		const arg = args[index];
-		if (arg === "--") return args.slice(index + 1);
-		if (!arg.startsWith("-")) break;
-		index += PRIVILEGE_OPTIONS_WITH_VALUES.has(arg) ? 2 : 1;
-	}
-	return args.slice(index);
-};
+// `sudo sudo sh` chains; capped separately from collection nesting depth.
+const MAX_PRIVILEGE_WRAPPERS = 3;
 
 const resolvePipelineCommand = (words: string[]): PipelineCommand | undefined => {
 	let invocation = resolveInvocation(words);
 	let elevated = false;
-	for (let depth = 0; invocation && PRIVILEGE_EXECUTABLES.has(invocation.executable) && depth < MAX_NESTING_DEPTH; depth++) {
+	for (let round = 0; invocation && PRIVILEGE_EXECUTABLES.has(invocation.executable) && round < MAX_PRIVILEGE_WRAPPERS; round++) {
 		elevated = true;
-		invocation = resolveInvocation(stripPrivilegeOptions(invocation.args));
+		invocation = resolveInvocation(argsAfterOptions(invocation.args, PRIVILEGE_OPTIONS_WITH_VALUES));
 	}
 	return invocation ? { executable: invocation.executable, elevated } : undefined;
 };

@@ -1,5 +1,8 @@
 import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
-import { escalationNote, type Assessment } from "./policy.ts";
+import type { Assessment } from "./policy.ts";
+
+export const escalationNote = (hits: number) =>
+	hits > 1 ? `\nYou have hit this rule ${hits} times in this run. Stop trying variations and ask the user.` : "";
 
 export const ASK_ALLOW = "Yes, allow once";
 export const ASK_DENY = "No, block it";

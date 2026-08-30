@@ -96,6 +96,6 @@
  */
 
 export { default } from "./permission-gate/runtime.ts";
-export { assessToolCall, escalationNote, NESTED_PI_OVERRIDE_ENV } from "./permission-gate/policy.ts";
+export { assessToolCall, NESTED_PI_OVERRIDE_ENV } from "./permission-gate/policy.ts";
 export { PermissionGateState } from "./permission-gate/state.ts";
-export { ASK_DENY, describeAskOutcome } from "./permission-gate/presentation.ts";
+export { ASK_DENY, describeAskOutcome, escalationNote } from "./permission-gate/presentation.ts";

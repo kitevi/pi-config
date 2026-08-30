@@ -573,7 +573,9 @@ void describe("running scripts the session created", () => {
 	});
 
 	void it("leaves pre-existing scripts alone", () => {
-		state.rememberWrittenPath("/tmp/mine.py");
+		state.stageWrites("setup-write", [{ path: "/tmp/mine.py", cwd: process.cwd() }]);
+		state.completeWrites("setup-write", true);
+		assert.strictEqual(assessToolCall("bash", shell("python3 /tmp/mine.py"), { state }).decision, "ask");
 		assert.strictEqual(assessToolCall("bash", shell("python3 /tmp/theirs.py"), { state }).decision, "allow");
 	});
 });

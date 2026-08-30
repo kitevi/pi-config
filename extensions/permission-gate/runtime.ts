@@ -54,7 +54,9 @@ export default function (pi: ExtensionAPI) {
 
 		if (!ctx.hasUI) return { block: true, reason: `${reason}\n\nConfirmation requires UI.` };
 
-		const askPrompt = formatAskPrompt(assessment, hits, event.toolName === "bash" ? "bash" : undefined);
+		// nu commands highlight fine with the bash grammar.
+		const language = event.toolName === "bash" || event.toolName === "nu" ? "bash" : undefined;
+		const askPrompt = formatAskPrompt(assessment, hits, language);
 
 		// The dialog renders its own countdown from `timeout`; the controller is a
 		// backstop for a host that does not honour it. Either way "nobody answered"
