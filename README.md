@@ -131,7 +131,8 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `extensions/` — pi extensions
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide`
   - `extensions/skill-guide.json` — startup skill-index display settings and summary overrides
-  - `extensions/permission-gate.ts` — rule-based permission gate for `bash`/`nu` tool calls (see [Permission gate](#permission-gate))
+  - `extensions/permission-gate.ts` — stable entry point for the rule-based `bash`/`nu` permission gate (see [Permission gate](#permission-gate))
+  - `extensions/permission-gate/` — shell analysis, policy, presentation, and runtime modules behind the gate
   - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus GPT verbosity and context "dumb zone" hints
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
