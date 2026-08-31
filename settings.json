@@ -1,5 +1,5 @@
 {
-  "theme": "github-colorblind",
+  "theme": "github-colorblind-light/github-colorblind-dark",
   "npmCommand": [
     "npm",
     "--ignore-scripts=false",
@@ -9,7 +9,9 @@
   "skills": [
     "git/github.com/dmmulroy/skills/tech-spec",
     "git/github.com/dmmulroy/skills/bro",
-    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me"
+    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me",
+    "git/github.com/cursor/plugins/cursor-team-kit/skills/thermo-nuclear-code-quality-review",
+    "git/github.com/anthropics/knowledge-work-plugins/engineering/skills/code-review"
   ],
   "packages": [
     {
@@ -23,17 +25,16 @@
       "themes": []
     },
     "npm:@pborck/pi-de",
-    "npm:@narumitw/pi-usage",
     "https://github.com/coctostan/pi-hashline-readmap",
     "npm:pi-web-tools",
     "npm:@monotykamary/pi-vcc",
     "npm:pi-neuralwatt-provider",
-    "npm:pi-deepseek-provider",
     "npm:@monotykamary/pi-tps",
+    "npm:@monotykamary/pi-retry",
     "npm:pi-lilac-provider",
+    "npm:pi-zro-provider",
     "npm:pi-model-sort",
     "npm:pi-invisible-continue",
-    "npm:@dustydonkey/pi-spinner",
     "npm:pi-system-reminders",
     {
       "source": "https://github.com/mattpocock/skills",
@@ -43,36 +44,61 @@
         "skills/engineering/grill-with-docs",
         "skills/engineering/implement",
         "skills/engineering/resolving-merge-conflicts",
-        "skills/engineering/domain-modeling",
         "skills/engineering/tdd",
-        "skills/engineering/prototype",
         "skills/engineering/diagnosing-bugs",
         "skills/productivity/writing-for-agents",
-        "skills/productivity/teach",
         "skills/productivity/handoff"
-      ]
+      ],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     },
     {
       "source": "npm:@sentiolabs/pi-frontend-design",
       "skills": [
         "skills/frontend-design"
-      ]
+      ],
+      "prompts": [],
+      "extensions": [],
+      "themes": []
     },
     {
       "source": "https://github.com/dmmulroy/skills",
-      "skills": []
+      "skills": [],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     },
     {
       "source": "https://github.com/humanlayer/skills",
-      "skills": []
+      "skills": [],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     },
     {
       "source": "https://github.com/emilkowalski/skills",
       "skills": [
         "skills/emil-design-eng",
-        "skills/review-animations",
-        "skills/animation-vocabulary"
-      ]
+        "skills/review-animations"
+      ],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
+    },
+    {
+      "source": "https://github.com/cursor/plugins",
+      "skills": [],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
+    },
+    {
+      "source": "https://github.com/anthropics/knowledge-work-plugins",
+      "skills": [],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
     }
   ],
   "showCacheMissNotices": true

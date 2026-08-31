@@ -32,5 +32,6 @@ Pi-specific adaptations without a direct Primer equivalent are intentional:
 - Markdown link URLs and punctuation use muted foreground colors.
 - Thinking borders use a monotonic blue contrast scale from subtle to prominent.
 - `thinkingMax` is explicit instead of relying on Pi's fallback to `thinkingXhigh`.
+- The fullscreen scrollbar thumb uses the dim foreground gray; Primer defines no scrollbar token, and Pi's default fallback to `selectedBg` is too subtle against the page background.
 
 `tests/github-colorblind-theme.test.ts` locks the resolved token mapping, schema provenance, thinking hierarchy, and tool-text contrast.

@@ -5,8 +5,6 @@
   "type": "module",
   "scripts": {
     "setup": "node bootstrap.mjs",
-    "setup-light": "node bootstrap.mjs --light",
-    "setup-dark": "node bootstrap.mjs --dark",
     "test": "vitest run"
   },
   "devDependencies": {

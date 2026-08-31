@@ -5,13 +5,10 @@
   "placement": "aboveEditor",
   "maxSummaryLength": 30,
   "summaryOverrides": {
-    "animation-vocabulary": "What's that motion called?",
     "bro": "Say it differently.",
     "buku-bookmarks": "Bookmark search/add/cleanup.",
-    "code-review": "Reviewing a branch/PR/diff.",
-    "codebase-design": "Designing a module boundary.",
+    "code-review": "Hunting bugs/security/perf.",
     "diagnosing-bugs": "Something's broken or slow.",
-    "domain-modeling": "Pinning down domain terms.",
     "emil-design-eng": "UI feels off/unpolished.",
     "frontend-design": "Starting a new UI/page.",
     "grill-me": "Want your idea challenged.",
@@ -19,14 +16,12 @@
     "grilling": "Want your idea challenged.",
     "handoff": "Passing work to next session.",
     "implement": "Executing a written spec.",
-    "improve-codebase-architecture": "Modules feel tangled/shallow.",
-    "prototype": "Unsure if an idea works.",
     "resolving-merge-conflicts": "Stuck on a merge/rebase.",
     "review-animations": "Auditing UI motion & feel.",
     "show-me": "Need a visual explanation.",
     "tdd": "Feature work, test-first.",
-    "teach": "Want code explained.",
     "tech-spec": "Feature needs a plan first.",
-    "writing-great-skills": "Writing a new skill."
+    "thermo-nuclear-code-quality-review": "Structure needs a beatdown.",
+    "writing-for-agents": "Writing a new skill."
   }
 }
