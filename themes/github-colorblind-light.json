@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/earendil-works/pi/1eee081e29c1323c40b98db11d0a62b919831881/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
-  "name": "github-colorblind",
+  "name": "github-colorblind-light",
   "vars": {
     "bgDefault": "#ffffff",
     "bgMuted": "#f6f8fa",
@@ -39,6 +39,7 @@
     "text": "fgDefault",
     "thinkingText": "fgMuted",
     "selectedBg": "bgAccentMuted",
+    "scrollbarThumb": "fgDim",
     "userMessageBg": "bgMuted",
     "userMessageText": "fgDefault",
     "customMessageBg": "bgMuted",

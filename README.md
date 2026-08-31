@@ -44,12 +44,8 @@ npm install
 npm run setup
 ```
 
-Theme defaults to light. You can also choose explicitly:
-
-```bash
-npm run setup-light
-npm run setup-dark
-```
+The theme follows your terminal appearance: pi switches between the
+`github-colorblind-light` and `github-colorblind-dark` variants automatically.
 
 `npm install` provides the pinned dependencies used by the extensions and their tests. The reconciliation script itself still uses only Node.js built-ins.
 
@@ -93,6 +89,8 @@ Setting that variable inside an agent’s child command does not bypass the gate
 `extensions/desktop-notifications.ts` requests terminal focus reporting and sends an attention notification only when Pi's terminal surface is known to be unfocused. It handles permission-gate asks (`Pi needs permission`) and the final `agent_settled` lifecycle event (`Pi is waiting for you`). Unknown focus is treated conservatively as focused, so unsupported or headless sessions stay silent.
 
 Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact surface focus, and OSC 777 raises the native desktop notification. The extension also supports Kitty's OSC 99 protocol. When no native notification protocol is recognized, it falls back to `notify-send` on Linux or `osascript` on macOS. If no terminal focus report has arrived, focus detection falls back to X11's active window when `DISPLAY` and `WINDOWID` are available, or the frontmost terminal application on macOS. Terminal reports take precedence over these best-effort fallbacks.
+
+
 ## What setup does
 
 `npm run setup` runs `bootstrap.mjs`, which:
@@ -103,22 +101,23 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
    - `prompts/`
    - `skills/`
    - `reminders/`
-   - `APPEND_SYSTEM.md`
    - `models.json`
    - `keybindings.json`
 
-3. **Symlinks** extension and theme directories from the repo into `~/.pi/agent`:
+3. **Installs** the repository-owned `APPEND_SYSTEM.md` as `~/.pi/agent/APPEND_SYSTEM.md`.
+
+4. **Symlinks** extension and theme directories from the repo into `~/.pi/agent`:
    - `extensions/` → `~/.pi/agent/extensions/`
    - `themes/` → `~/.pi/agent/themes/`
 
-4. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
+5. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
    - `settings.json` → `~/.pi/agent/settings.json`
    - `synthetic.json` → `~/.pi/agent/extensions/synthetic.json`
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
    - `web-tools.json` → `~/.pi/web-tools.json`
 
-5. **Switches the active theme** — symlinks the `github-colorblind.json` theme to the light or dark variant (defaults to light unless `--dark` or `--light` is passed to the script).
+6. **Links both theme variants** — `github-colorblind-light.json` and `github-colorblind-dark.json` are linked into `~/.pi/agent/themes/`; pi follows the terminal's light/dark appearance automatically.
 
 ## Repo layout
 
@@ -127,30 +126,34 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
 - `extensions/` — pi extensions
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide`
   - `extensions/skill-guide.json` — startup skill-index display settings and summary overrides
-  - `extensions/permission-gate.ts` — rule-based permission gate for `bash`/`nu` tool calls (see [Permission gate](#permission-gate))
+  - `extensions/permission-gate.ts` — stable entry point for the rule-based `bash`/`nu` permission gate (see [Permission gate](#permission-gate))
+  - `extensions/permission-gate/` — shell analysis, policy, state, presentation, and runtime modules behind the gate
   - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus GPT verbosity and context "dumb zone" hints
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/bash-context-guard.ts` — replaces oversized `bash` results with a small head/tail preview linked to the complete output
-  - `extensions/max-reasoning.ts` — raises the thinking level to a GLM/DeepSeek/Kimi model’s highest supported level on model select/start
+  - `extensions/readseek-output-guard.ts` — caps oversized ReadSeek reference and search results while preserving access to full output
+  - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
+  - `extensions/codex-usage.ts` — shows Codex 5h/7d rolling usage and reset times in the footer while a Codex model is active
+  - `extensions/opencode-go-usage.ts` — shows OpenCode Go 5h/weekly/monthly used quotas and reset times in the footer while an OpenCode Go model is active
 - `skills/` — pi skills
-- `themes/` — pi themes
+- `themes/` — pi themes (`github-colorblind` light/dark variants)
 - `reminders/` — global reminder definitions for `pi-system-reminders`
-- `APPEND_SYSTEM.md` — extra system prompt text appended into pi
+- `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
 - `models.json` — custom provider/model definitions symlinked into pi (for example OpenRouter via `OPENROUTER_API_KEY`)
 - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
 - `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
-- `pi-vcc-config.json` — pi-vcc extension configuration installed into `~/.pi/agent/pi-vcc-config.json`
+- `pi-vcc-config.json` — pi-vcc compaction configuration installed into `~/.pi/agent/pi-vcc-config.json`
 - `web-tools.json` — pi-web-tools configuration installed into `~/.pi/web-tools.json`
-- `tests/` — `node:test` suites for the extensions, run with `npm test`
+- `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
 The bootstrap script is plain Node.js, but pi extensions in `extensions/` can still stay TypeScript.
 Reminder files tracked in `reminders/` become global reminders via `~/.pi/agent/reminders`; project-specific reminders for some other repo should still live in that repo's `.pi/reminders/` directory.
 
 ## Re-run / update
 
-Re-run `npm run setup` any time you change files in this repo or set up a new machine.
+Re-run `npm run setup` any time you change files in this repo or set up a new machine. Reconciliation is offline — no network access is required.
 
 `bootstrap.mjs` resolves the repo from the script location, so it works even if you invoke it outside the repo root.
 

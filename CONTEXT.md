@@ -56,8 +56,8 @@ _Avoid_: Master copy, canonical copy.
 
 ## Relationships
 
-- A **Theme** has a `light` and `dark` variant. The bootstrap script auto-links
-the appropriate variant based on OS appearance mode.
+- A **Theme** has a `light` and `dark` variant. Pi follows the terminal's
+appearance automatically through the `light/dark` pair in the `theme` setting.
 - An **Extension** can be either a **Local Extension** (in `extensions/`) or a
 **Package Extension** (installed via npm/GitHub and tracked in `settings.json`).
 - A **Package** can bring any combination of **Extensions**, **Skills**, and
@@ -66,7 +66,9 @@ the appropriate variant based on OS appearance mode.
 (`settings.json`, `verbosity.json`). The repo
 owns leaf paths; local additions survive reconciliation.
 - **Symlink** is used for static assets that pi only reads (`prompts/`,
-`skills/`, `themes/`, `extensions/`, `APPEND_SYSTEM.md`, `models.json`).
+`skills/`, `themes/`, `extensions/`, `models.json`).
+- **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
+repository-owned file as-is (no network fetch). It contains only the cross-variant rules declared by this repository.
 - **Reconciliation** is idempotent — re-running it is safe and intended to be
 done after any change to this repo or on a fresh machine.
 - **Reminders** are static assets managed via symlink, but their *semantics*
@@ -100,7 +102,7 @@ manages *configuration*, not *credentials*.
 - "Prompt" was historically used for both **Skill** definitions and the
   `prompts/` directory. Resolved: **Skills** are behavioral task guidance
   (markdown instructions), while `prompts/` is for raw prompt text fragments
-  (currently unused). `APPEND_SYSTEM.md` serves as the de facto system prompt overlay.
+  (currently unused). The installed `~/.pi/agent/APPEND_SYSTEM.md` is a copy of the repository-owned file and serves as the de facto system prompt overlay.
 - "Bootstrap" is sometimes used casually for "first-time setup." Resolved:
   **Reconciliation** is the correct term — the script is idempotent and meant to
   be run repeatedly, not just once.

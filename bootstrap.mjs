@@ -12,35 +12,33 @@ const EXTENSIONS_DIR = join(REPO_DIR, "extensions");
 const PI_EXTENSIONS_DIR = join(PI_DIR, "extensions");
 const THEMES_DIR = join(REPO_DIR, "themes");
 const PI_THEMES_DIR = join(PI_DIR, "themes");
-
+const APPEND_SYSTEM_SOURCE = join(REPO_DIR, "APPEND_SYSTEM.md");
+const PI_APPEND_SYSTEM = join(PI_DIR, "APPEND_SYSTEM.md");
 const links = [
   { link: join(PI_DIR, "prompts"), target: join(REPO_DIR, "prompts") },
   { link: join(PI_DIR, "skills"), target: join(REPO_DIR, "skills") },
   { link: join(PI_DIR, "reminders"), target: join(REPO_DIR, "reminders") },
-  { link: join(PI_DIR, "APPEND_SYSTEM.md"), target: join(REPO_DIR, "APPEND_SYSTEM.md") },
   { link: join(PI_DIR, "models.json"), target: join(REPO_DIR, "models.json") },
   { link: join(PI_DIR, "keybindings.json"), target: join(REPO_DIR, "keybindings.json") },
 ];
 
 const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
 const PI_SETTINGS = join(PI_DIR, "settings.json");
-const WEB_TOOLS_OVERLAY = join(REPO_DIR, "web-tools.json");
-const PI_WEB_TOOLS = join(HOME, ".pi", "web-tools.json");
 const SYNTHETIC_OVERLAY = join(REPO_DIR, "synthetic.json");
 const NEURALWATT_OVERLAY = join(REPO_DIR, "neuralwatt.json");
 const PI_SYNTHETIC = join(PI_EXTENSIONS_DIR, "synthetic.json");
 const PI_NEURALWATT = join(PI_EXTENSIONS_DIR, "neuralwatt.json");
 const PI_VCC_CONFIG_OVERLAY = join(REPO_DIR, "pi-vcc-config.json");
 const PI_VCC_CONFIG = join(PI_DIR, "pi-vcc-config.json");
+const WEB_TOOLS_OVERLAY = join(REPO_DIR, "web-tools.json");
+const PI_WEB_TOOLS = join(HOME, ".pi", "web-tools.json");
 const RESETTABLE_PI_PATHS = [
   // Fully managed by this repo.
   ...links.map(({link}) => link),
-  // Remove the pre-simplification config link if it was installed previously.
-  join(PI_DIR, "context-guard.json"),
+  PI_APPEND_SYSTEM,
   PI_EXTENSIONS_DIR,
   PI_THEMES_DIR,
 ];
-
 
 function pathIsInside(root, targetPath) {
   const rel = relative(root, targetPath);
@@ -109,6 +107,13 @@ async function writeManagedJsonFile(path, value) {
   await writeFile(path, JSON.stringify(value, null, 2) + "\n");
 }
 
+async function writeManagedTextFile(path, content) {
+  assertSafePath(path, [HOME]);
+  await ensureParentDir(path);
+  await rm(path, { recursive: true, force: true });
+  await writeFile(path, content, "utf-8");
+}
+
 async function installJsonConfig(sourcePath, targetPath, label) {
   assertSafePath(targetPath, [HOME]);
   if (!existsSync(sourcePath)) {
@@ -147,31 +152,8 @@ async function syncDirectoryLinks(sourceDir, targetDir) {
     await relink(join(targetDir, entry.name), join(sourceDir, entry.name));
   }
 }
-function getThemeVariantFromArgs(args = process.argv.slice(2)) {
-  if (args.includes("--dark")) {
-    return "dark";
-  }
-
-  if (args.includes("--light")) {
-    return "light";
-  }
-
-  return "light";
-}
-
-async function switchTheme(variant = getThemeVariantFromArgs()) {
-  const themeDir = PI_THEMES_DIR;
-  const linkPath = join(themeDir, "github-colorblind.json");
-  const targetPath = join(themeDir, "github-colorblind", `${variant}.json`);
-  const symlinkTarget = relative(dirname(linkPath), targetPath);
-
-  try { await rm(linkPath, { force: true }); } catch {}
-  await symlink(symlinkTarget, linkPath);
-  console.log(`linked theme (${variant}): github-colorblind.json → ${symlinkTarget}`);
-}
-
 async function main() {
-  const themeVariant = getThemeVariantFromArgs();
+  const appendSystem = await readFile(APPEND_SYSTEM_SOURCE, "utf-8");
 
   if (!existsSync(PI_DIR)) {
     await mkdir(PI_DIR, { recursive: true });
@@ -183,16 +165,18 @@ async function main() {
     await relink(link, target);
   }
 
+  await writeManagedTextFile(PI_APPEND_SYSTEM, appendSystem);
+  console.log(`wrote APPEND_SYSTEM.md to ${PI_APPEND_SYSTEM}`);
+
   await syncDirectoryLinks(EXTENSIONS_DIR, PI_EXTENSIONS_DIR);
   await syncDirectoryLinks(THEMES_DIR, PI_THEMES_DIR);
 
   await installJsonConfig(SYNTHETIC_OVERLAY, PI_SYNTHETIC, "pi-synthetic settings");
   await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
-  await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
+  await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(WEB_TOOLS_OVERLAY, PI_WEB_TOOLS, "pi web-tools");
   console.log("bootstrap complete");
-  await switchTheme(themeVariant);
 }
 
 main().catch((err) => {

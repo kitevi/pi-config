@@ -2,15 +2,7 @@
   "providers": {
     "openrouter": {
       "baseUrl": "https://openrouter.ai/api/v1",
-      "apiKey": "$OPENROUTER_API_KEY",
-      "modelOverrides": {
-        "deepseek/deepseek-v4-flash": {
-          "compat": {
-            "sendSessionAffinityHeaders": true,
-            "sessionAffinityFormat": "openrouter"
-          }
-        }
-      }
+      "apiKey": "$OPENROUTER_API_KEY"
     }
   }
 }
