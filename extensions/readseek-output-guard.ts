@@ -1,16 +1,18 @@
 /**
  * ReadSeek Output Guard
  *
- * Keeps oversized readSeek_refs / readSeek_search results out of the context.
- * Those two pi-readseek tools emit every match with no limit (unlike readSeek_grep,
- * which has match limits and a line/byte budget, and readSeek_read/edit/write/view,
- * which truncate to pi's defaults).
+ * Keeps oversized model-visible output from pi-readseek's unbounded digest and
+ * discovery tools out of context. Guarded names are `read` / `readSeek_digest`,
+ * `readSeek_refs`, `readSeek_search`, and `readSeek_def`.
  *
+ * Digest emits complete requested facets by default. refs/search/def emit every
+ * result. grep has configured match/line/byte budgets; write/view truncate; and
+ * edit/rename return compact visible summaries.
+ *
+ * This tool_result hook is post-execution: the source tool has already built its
+ * full text/details. The guard only bounds what enters model-visible content.
  * Results over MAX_LINES or MAX_BYTES are replaced with a small head/tail preview
- * whose "Full output:" header points at a temp file containing the COMPLETE output.
- * Unlike bash-context-guard there is no native pi truncation to cooperate with:
- * the text in the event is already the complete output, and this guard is the
- * only truncation layer.
+ * whose "Full output:" header points at a temp file containing the COMPLETE text.
  *
  * Full-output files remain untouched as the source of truth. Only compact preview
  * text is sanitized: ANSI escapes are removed, CRLF becomes LF, and bare CR
@@ -30,7 +32,13 @@ const HEAD_LINES = 20;
 const TAIL_LINES = 50;
 const PREVIEW_LINE_MAX_BYTES = 1_024;
 
-const GUARDED_TOOLS = new Set(["readSeek_refs", "readSeek_search"]);
+const GUARDED_TOOLS = new Set([
+	"read",
+	"readSeek_digest",
+	"readSeek_refs",
+	"readSeek_search",
+	"readSeek_def",
+]);
 
 export type GuardMetadata = {
 	trimmed: true;
@@ -91,7 +99,7 @@ function renderPreview(fullText: string, outputPath: string): string {
 		`Full output: ${outputPath}`,
 		`Output: ${lineCount(fullText)} lines, ${byteCount(fullText)} bytes`,
 		`Trigger thresholds: ${MAX_LINES} lines, ${MAX_BYTES} bytes`,
-		"Refine instead of reading the full output: narrow 'path', use 'scope' (refs), or a more specific pattern (search).",
+		"Refine instead of reading the full output: use read 'at'/'limit' or 'map'; narrow 'path'; use refs 'scope'; qualify def names; tighten search patterns.",
 		"",
 		"Head:",
 		...head,
