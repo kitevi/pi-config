@@ -30,6 +30,8 @@ const PI_SYNTHETIC = join(PI_EXTENSIONS_DIR, "synthetic.json");
 const PI_NEURALWATT = join(PI_EXTENSIONS_DIR, "neuralwatt.json");
 const PI_VCC_CONFIG_OVERLAY = join(REPO_DIR, "pi-vcc-config.json");
 const PI_VCC_CONFIG = join(PI_DIR, "pi-vcc-config.json");
+const MCP_CONFIG_OVERLAY = join(REPO_DIR, "mcp.json");
+const PI_MCP_CONFIG = join(PI_DIR, "mcp.json");
 const WEB_TOOLS_OVERLAY = join(REPO_DIR, "web-tools.json");
 const PI_WEB_TOOLS = join(HOME, ".pi", "web-tools.json");
 const HASHLINE_READMAP_OVERLAY = join(REPO_DIR, "hashline-readmap-settings.json");
@@ -176,6 +178,7 @@ async function main() {
   await installJsonConfig(SYNTHETIC_OVERLAY, PI_SYNTHETIC, "pi-synthetic settings");
   await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
+  await installJsonConfig(MCP_CONFIG_OVERLAY, PI_MCP_CONFIG, "pi mcp config");
   await installJsonConfig(PI_VCC_CONFIG_OVERLAY, PI_VCC_CONFIG, "pi-vcc config");
   await installJsonConfig(WEB_TOOLS_OVERLAY, PI_WEB_TOOLS, "pi web-tools");
   await installJsonConfig(HASHLINE_READMAP_OVERLAY, PI_HASHLINE_READMAP_SETTINGS, "hashline-readmap settings");
