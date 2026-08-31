@@ -1,5 +1,7 @@
 {
   "settings": {
+    "mcpFooterStatus": "off",
+    "toolResultRendering": "boxed",
     "outputGuard": {
       "maxBytes": 16384,
       "maxLines": 200,
