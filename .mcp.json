@@ -1,0 +1,38 @@
+{
+  "settings": {
+    "outputGuard": {
+      "maxBytes": 16384,
+      "maxLines": 200,
+      "detailsMaxBytes": 16384
+    }
+  },
+  "mcpServers": {
+    "exa": {
+      "command": "npx",
+      "args": ["-y", "exa-mcp-server"],
+      "env": {
+        "EXA_API_KEY": "$env:EXA_API_KEY"
+      },
+      "includeTools": [
+        "web_search_exa",
+        "web_fetch_exa"
+      ]
+    },
+    "synthetic-web-search": {
+      "command": "npx",
+      "args": ["-y", "synthetic-web-search-mcp@latest"],
+      "env": {
+        "SYNTHETIC_API_KEY": "$env:SYNTHETIC_API_KEY"
+      },
+      "includeTools": ["search_web"]
+    },
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "includeTools": [
+        "resolve-library-id",
+        "query-docs"
+      ]
+    }
+  },
+  "imports": []
+}
