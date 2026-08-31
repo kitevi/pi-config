@@ -51,4 +51,27 @@ void describe("bootstrap reconciliation", () => {
 		}
 	});
 
+	void it("installs the repo mcp.json as the Pi global MCP config (idempotent)", async () => {
+		const home = await mkdtemp(join(tmpdir(), "pi-config-bootstrap-"));
+
+		try {
+			const mcpPath = join(home, ".pi", "agent", "mcp.json");
+
+			await runBootstrap(home);
+
+			const repoMcp = await readFile(join(repoRoot, "mcp.json"), "utf8");
+			const firstOutput = await readFile(mcpPath, "utf8");
+			const targetStat = await lstat(mcpPath);
+
+			assert.equal(targetStat.isFile(), true);
+			assert.equal(targetStat.isSymbolicLink(), false);
+			assert.deepEqual(JSON.parse(firstOutput), JSON.parse(repoMcp));
+
+			await runBootstrap(home);
+			assert.equal(await readFile(mcpPath, "utf8"), firstOutput);
+		} finally {
+			await rm(home, { recursive: true, force: true });
+		}
+	});
+
 });

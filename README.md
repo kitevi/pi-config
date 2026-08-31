@@ -116,6 +116,7 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
    - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
    - `web-tools.json` → `~/.pi/web-tools.json`
+   - `mcp.json` → `~/.pi/agent/mcp.json` (the Pi global MCP override — declared MCP servers are available from any working directory)
 
 6. **Links both theme variants** — `github-colorblind-light.json` and `github-colorblind-dark.json` are linked into `~/.pi/agent/themes/`; pi follows the terminal's light/dark appearance automatically.
 
@@ -146,6 +147,7 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
 - `pi-vcc-config.json` — pi-vcc compaction configuration installed into `~/.pi/agent/pi-vcc-config.json`
 - `web-tools.json` — pi-web-tools configuration installed into `~/.pi/web-tools.json`
+- `mcp.json` — MCP server config (Exa, synthetic-web-search, context7) installed into `~/.pi/agent/mcp.json`, the Pi global override; servers load from any working directory, not just this repo
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
 The bootstrap script is plain Node.js, but pi extensions in `extensions/` can still stay TypeScript.
@@ -159,6 +161,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, and `web-tools.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `synthetic.json`, `neuralwatt.json`, `pi-vcc-config.json`, `mcp.json`, and `web-tools.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.

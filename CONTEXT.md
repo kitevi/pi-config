@@ -69,6 +69,12 @@ owns leaf paths; local additions survive reconciliation.
 `skills/`, `themes/`, `extensions/`, `models.json`).
 - **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
 repository-owned file as-is (no network fetch). It contains only the cross-variant rules declared by this repository.
+- **Managed copy** is also used for `mcp.json`: reconciliation installs the
+  repository's MCP server config to `~/.pi/agent/mcp.json` (the Pi global
+  override), so the declared MCP servers are available from any working
+  directory. No project-local `.mcp.json` remains in this repo — the installed
+  `~/.pi/agent/mcp.json` is the only MCP config pi loads, and it is kept in
+  sync with the repository copy by reconciliation.
 - **Reconciliation** is idempotent — re-running it is safe and intended to be
 done after any change to this repo or on a fresh machine.
 - **Reminders** are static assets managed via symlink, but their *semantics*
