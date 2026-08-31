@@ -5,6 +5,10 @@
  * after Pi's terminal surface is known to be unfocused. Ghostty uses native OSC
  * 777 notifications on both Linux and macOS; OS focus/notification adapters are
  * conservative best-effort fallbacks when terminal protocols are unavailable.
+ *
+ * The agent_settled "waiting" notification is debounced: when a new agent run
+ * starts within the delay (auto-retry, compaction retry, queued follow-up),
+ * the settle was transient and no notification is sent.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -17,12 +21,18 @@ type ReadCommand = (command: string, args: string[]) => Promise<string | undefin
 
 type FocusState = "unknown" | "focused" | "unfocused";
 
+const DEFAULT_SETTLE_NOTIFY_DELAY_MS = 10_000;
+
 export type DesktopNotificationDependencies = {
 	platform: NodeJS.Platform;
 	env: NodeJS.ProcessEnv;
 	writeTerminal: (data: string) => void;
 	runDetached: RunDetached;
 	readCommand?: ReadCommand;
+	/** Delay before honoring agent_settled; a resumed run cancels the notification. */
+	settleNotifyDelayMs?: number;
+	setTimer?: (fn: () => void, delayMs: number) => unknown;
+	clearTimer?: (handle: unknown) => void;
 };
 
 const runtimeDependencies: DesktopNotificationDependencies = {
@@ -153,6 +163,18 @@ export const createDesktopNotificationsExtension = (dependencies: DesktopNotific
 		let focusReportingEnabled = false;
 		let tuiSessionActive = false;
 		const notify = createDesktopNotificationSender(dependencies);
+		const settleDelayMs = dependencies.settleNotifyDelayMs ?? DEFAULT_SETTLE_NOTIFY_DELAY_MS;
+		const setTimer = dependencies.setTimer ?? ((fn: () => void, delayMs: number) => setTimeout(fn, delayMs));
+		const clearTimer =
+			dependencies.clearTimer ?? ((handle: unknown) => clearTimeout(handle as NodeJS.Timeout));
+		let settleTimer: unknown;
+		let agentBusy = false;
+
+		const cancelSettleNotification = () => {
+			if (settleTimer === undefined) return;
+			clearTimer(settleTimer);
+			settleTimer = undefined;
+		};
 
 		const focusForAttention = async () => {
 			if (!tuiSessionActive) return "unknown";
@@ -182,6 +204,8 @@ export const createDesktopNotificationsExtension = (dependencies: DesktopNotific
 
 		pi.on("session_start", (_event, ctx) => {
 			stopFocusTracking();
+			agentBusy = false;
+			cancelSettleNotification();
 			if (ctx.mode !== "tui") return;
 			tuiSessionActive = true;
 
@@ -198,16 +222,31 @@ export const createDesktopNotificationsExtension = (dependencies: DesktopNotific
 			focusReportingEnabled = writeTerminalSafely(ENABLE_FOCUS_REPORTING);
 		});
 
+		pi.on("agent_start", () => {
+			// A run starting means any pending settle was transient (auto-retry,
+			// compaction retry, queued follow-up); stay silent.
+			agentBusy = true;
+			cancelSettleNotification();
+		});
+
 		pi.on("agent_settled", (_event, ctx) => {
+			agentBusy = false;
+			cancelSettleNotification();
 			if (!ctx.isIdle() || focus === "focused") return;
 			const notifyWaiting = () => notify("Pi is waiting for you", "The agent has finished and is ready for input.");
-			if (focus === "unfocused") {
-				notifyWaiting();
-				return;
-			}
-			return focusForAttention().then((current) => {
-				if (current === "unfocused") notifyWaiting();
-			});
+			// Debounce: only notify if the agent is still settled when the delay
+			// elapses, re-checking busy/focus state at fire time.
+			settleTimer = setTimer(() => {
+				settleTimer = undefined;
+				if (agentBusy || !ctx.isIdle() || focus === "focused") return;
+				if (focus === "unfocused") {
+					notifyWaiting();
+					return;
+				}
+				void focusForAttention().then((current) => {
+					if (current === "unfocused" && !agentBusy) notifyWaiting();
+				});
+			}, settleDelayMs);
 		});
 
 		const stopGateAskListener = pi.events.on("permission_gate:ask", (data) => {
@@ -230,6 +269,8 @@ export const createDesktopNotificationsExtension = (dependencies: DesktopNotific
 		pi.on("session_shutdown", () => {
 			stopFocusTracking();
 			stopGateAskListener();
+			agentBusy = false;
+			cancelSettleNotification();
 		});
 	};
 };

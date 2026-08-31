@@ -12,12 +12,14 @@ import {
 } from "../extensions/desktop-notifications.ts";
 
 type ExtensionHandler = (event: unknown, ctx: ExtensionContext) => unknown;
+type ScheduledTimer = { fn: () => void; delayMs: number; cancelled: boolean };
 
 const createHarness = (overrides: Partial<DesktopNotificationDependencies> = {}) => {
 	const lifecycle = new Map<string, ExtensionHandler>();
 	const channels = new Map<string, Set<(data: unknown) => void>>();
 	const writes: string[] = [];
 	let terminalInput: TerminalInputHandler | undefined;
+	const scheduled: ScheduledTimer[] = [];
 
 	const pi = {
 		on(event: string, handler: ExtensionHandler) {
@@ -54,6 +56,14 @@ const createHarness = (overrides: Partial<DesktopNotificationDependencies> = {})
 		env: { TERM_PROGRAM: "ghostty" },
 		writeTerminal: (data) => writes.push(data),
 		runDetached: () => {},
+		setTimer: (fn: () => void, delayMs: number) => {
+			const timer: ScheduledTimer = { fn, delayMs, cancelled: false };
+			scheduled.push(timer);
+			return timer;
+		},
+		clearTimer: (handle: unknown) => {
+			(handle as ScheduledTimer).cancelled = true;
+		},
 		...overrides,
 	})(pi);
 
@@ -62,6 +72,14 @@ const createHarness = (overrides: Partial<DesktopNotificationDependencies> = {})
 		writes,
 		emit: (channel: string, data: unknown) => pi.events.emit(channel, data),
 		channelListeners: (channel: string) => channels.get(channel)?.size ?? 0,
+		pendingSettleTimers: () => scheduled.filter((timer) => !timer.cancelled).length,
+		flushTimers: async () => {
+			for (const timer of scheduled.splice(0)) {
+				if (!timer.cancelled) timer.fn();
+			}
+			// Drain focus-fallback promises chained off the timer callbacks.
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		},
 		run: (event: string, data: unknown = { type: event }) => lifecycle.get(event)?.(data, ctx),
 		input: (data: string) => {
 			assert.ok(terminalInput, "session_start must install a terminal input listener");
@@ -71,7 +89,7 @@ const createHarness = (overrides: Partial<DesktopNotificationDependencies> = {})
 };
 
 void describe("desktop notifications", () => {
-	it("notifies through Ghostty when Pi settles while its surface is unfocused", () => {
+	it("notifies through Ghostty when Pi settles while its surface is unfocused", async () => {
 		const harness = createHarness();
 
 		harness.run("session_start");
@@ -81,7 +99,31 @@ void describe("desktop notifications", () => {
 		harness.writes.length = 0;
 		harness.run("agent_settled");
 
+		// The waiting notification is debounced: nothing fires synchronously.
+		assert.deepStrictEqual(harness.writes, []);
+		assert.strictEqual(harness.pendingSettleTimers(), 1);
+
+		await harness.flushTimers();
+
 		assert.deepStrictEqual(harness.writes, ["\x1b]777;notify;Pi is waiting for you;The agent has finished and is ready for input.\x1b\\"]);
+	});
+
+	it("stays silent when a new agent run resumes before the settle debounce fires", async () => {
+		const harness = createHarness();
+
+		harness.run("session_start");
+		harness.input("\x1b[O");
+		harness.writes.length = 0;
+
+		harness.run("agent_settled");
+		assert.strictEqual(harness.pendingSettleTimers(), 1);
+
+		// Auto-retry/continuation resumed the agent: the settle was transient.
+		harness.run("agent_start");
+		assert.strictEqual(harness.pendingSettleTimers(), 0);
+
+		await harness.flushTimers();
+		assert.deepStrictEqual(harness.writes, []);
 	});
 
 	it("notifies when the permission gate asks while Pi is unfocused", () => {
@@ -109,15 +151,17 @@ void describe("desktop notifications", () => {
 		harness.run("agent_settled");
 
 		assert.deepStrictEqual(harness.writes, []);
+		assert.strictEqual(harness.pendingSettleTimers(), 0);
 	});
 
-	it("removes focus reports without swallowing adjacent terminal input", () => {
+	it("removes focus reports without swallowing adjacent terminal input", async () => {
 		const harness = createHarness();
 
 		harness.run("session_start");
 		assert.deepStrictEqual(harness.input("\x1b[Oa"), { data: "a" });
 		harness.writes.length = 0;
 		harness.run("agent_settled");
+		await harness.flushTimers();
 
 		assert.strictEqual(harness.writes.length, 1);
 	});
@@ -182,7 +226,8 @@ void describe("desktop notifications", () => {
 		});
 
 		harness.run("session_start");
-		await harness.run("agent_settled");
+		harness.run("agent_settled");
+		await harness.flushTimers();
 
 		assert.strictEqual(commands[0]?.command, "notify-send");
 	});
@@ -200,7 +245,8 @@ void describe("desktop notifications", () => {
 
 		harness.run("session_start");
 		harness.writes.length = 0;
-		await harness.run("agent_settled");
+		harness.run("agent_settled");
+		await harness.flushTimers();
 
 		assert.strictEqual(reads[0]?.command, "osascript");
 		assert.match(harness.writes[0] ?? "", /Pi is waiting for you/);
@@ -220,27 +266,34 @@ void describe("desktop notifications", () => {
 		harness.ctx.mode = "rpc";
 
 		harness.run("session_start");
-		await harness.run("agent_settled");
+		harness.run("agent_settled");
+		await harness.flushTimers();
 
 		assert.strictEqual(reads, 0);
 		assert.deepStrictEqual(commands, []);
 	});
 
-	it("drops a pending focus fallback when the session shuts down", async () => {
-		let resolveFocus!: (output: string) => void;
+	it("cancels a pending settle notification when the session shuts down", async () => {
+		let reads = 0;
 		const commands: string[] = [];
 		const harness = createHarness({
 			env: { TERM: "xterm-256color", DISPLAY: ":0", WINDOWID: "6291459" },
-			readCommand: () => new Promise((resolve) => (resolveFocus = resolve)),
+			readCommand: async () => {
+				reads++;
+				return "_NET_ACTIVE_WINDOW(WINDOW): window id # 0x700003\n";
+			},
 			runDetached: (command) => commands.push(command),
 		});
 
 		harness.run("session_start");
-		const settled = harness.run("agent_settled") as Promise<void>;
-		harness.run("session_shutdown");
-		resolveFocus("_NET_ACTIVE_WINDOW(WINDOW): window id # 0x700003\n");
-		await settled;
+		harness.run("agent_settled");
+		assert.strictEqual(harness.pendingSettleTimers(), 1);
 
+		harness.run("session_shutdown");
+		assert.strictEqual(harness.pendingSettleTimers(), 0);
+		await harness.flushTimers();
+
+		assert.strictEqual(reads, 0);
 		assert.deepStrictEqual(commands, []);
 	});
 
