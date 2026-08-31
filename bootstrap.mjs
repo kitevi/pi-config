@@ -18,7 +18,6 @@ const links = [
   { link: join(PI_DIR, "prompts"), target: join(REPO_DIR, "prompts") },
   { link: join(PI_DIR, "skills"), target: join(REPO_DIR, "skills") },
   { link: join(PI_DIR, "reminders"), target: join(REPO_DIR, "reminders") },
-  { link: join(PI_DIR, "models.json"), target: join(REPO_DIR, "models.json") },
   { link: join(PI_DIR, "keybindings.json"), target: join(REPO_DIR, "keybindings.json") },
 ];
 

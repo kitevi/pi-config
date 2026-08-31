@@ -100,13 +100,12 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 
 `npm run setup` runs `bootstrap.mjs`, which:
 
-1. **Clears** all repo-managed paths under `~/.pi/agent/` (prompts, skills, reminders, APPEND_SYSTEM.md, models.json, keybindings.json, extensions/, themes/) — stale symlinks and files are cleaned out before re-creation.
+1. **Clears** all repo-managed paths under `~/.pi/agent/` (prompts, skills, reminders, APPEND_SYSTEM.md, keybindings.json, extensions/, themes/) — stale symlinks and files are cleaned out before re-creation.
 
 2. **Symlinks** directories and files into `~/.pi/agent`:
    - `prompts/`
    - `skills/`
    - `reminders/`
-   - `models.json`
    - `keybindings.json`
 
 3. **Installs** the repository-owned `APPEND_SYSTEM.md` as `~/.pi/agent/APPEND_SYSTEM.md`.
@@ -143,7 +142,6 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `reminders/` — global reminder definitions for `pi-system-reminders`
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
-- `models.json` — custom provider/model definitions symlinked into pi (for example OpenRouter via `OPENROUTER_API_KEY`)
 - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
 - `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`

@@ -66,7 +66,7 @@ appearance automatically through the `light/dark` pair in the `theme` setting.
 (`settings.json`, `verbosity.json`). The repo
 owns leaf paths; local additions survive reconciliation.
 - **Symlink** is used for static assets that pi only reads (`prompts/`,
-`skills/`, `themes/`, `extensions/`, `models.json`).
+`skills/`, `themes/`, `extensions/`).
 - **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
 repository-owned file as-is (no network fetch). Its MCP web/docs and `fabric_exec` guidance applies to every model.
 - **Reconciliation** is idempotent — re-running it is safe and intended to be
