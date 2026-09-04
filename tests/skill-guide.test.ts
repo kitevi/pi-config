@@ -161,4 +161,93 @@ void describe("skill guide extension", () => {
 		assert.strictEqual(widgetCalls.at(-1)?.content, undefined);
 		assert.strictEqual(widgetCalls.length, 4);
 	});
+
+	void it("only auto-shows on startup", async () => {
+		const handlers = new Map<string, Array<(event: any, ctx: any) => any>>();
+		const widgetCalls: Array<{ content: unknown; options?: unknown }> = [];
+		let commandHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+
+		const pi = {
+			on(event: string, handler: (event: any, ctx: any) => any) {
+				handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+			},
+			registerCommand(_name: string, command: { handler: (args: string, ctx: any) => Promise<void> }) {
+				commandHandler = command.handler;
+			},
+			getCommands: () => commands,
+		};
+		const ctx = {
+			mode: "tui",
+			hasUI: true,
+			ui: {
+				setWidget(_key: string, content: unknown, options?: unknown) {
+					widgetCalls.push({ content, options });
+				},
+				notify() {},
+			},
+		};
+
+		registerSkillGuide(pi as never, () => config);
+		await handlers.get("session_start")?.[0]?.({ reason: "startup" }, ctx);
+		assert.strictEqual(typeof widgetCalls.at(-1)?.content, "function");
+
+		await handlers.get("input")?.[0]?.({ source: "interactive", text: "hello" }, ctx);
+		assert.strictEqual(widgetCalls.at(-1)?.content, undefined);
+
+		// Later starts never re-show an already-dismissed guide.
+		const afterHide = widgetCalls.length;
+		for (const reason of ["resume", "fork", "new", "reload"]) {
+			await handlers.get("session_start")?.[0]?.({ reason }, ctx);
+		}
+		assert.strictEqual(widgetCalls.length, afterHide);
+
+		// Manual toggle still works.
+		await commandHandler?.("", ctx);
+		assert.strictEqual(typeof widgetCalls.at(-1)?.content, "function");
+	});
+
+	void it("refreshes the auto-shown widget as skills load after startup", async () => {
+		const handlers = new Map<string, Array<(event: any, ctx: any) => any>>();
+		const widgetCalls: Array<{ content: unknown; options?: unknown }> = [];
+		const mutableCommands = [...commands];
+
+		const pi = {
+			on(event: string, handler: (event: any, ctx: any) => any) {
+				handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+			},
+			registerCommand() {},
+			getCommands: () => mutableCommands,
+		};
+		const ctx = {
+			mode: "tui",
+			hasUI: true,
+			ui: {
+				setWidget(_key: string, content: unknown, options?: unknown) {
+					widgetCalls.push({ content, options });
+				},
+				notify() {},
+			},
+		};
+		const countOf = (content: unknown): number => {
+				const factory = content as (tui: unknown, theme: unknown) => { render: (width: number) => string[] };
+				const title = factory({}, plainTheme).render(100)[0] ?? "";
+				return Number(/· (\d+) loaded/.exec(title)?.[1]);
+			};
+
+		registerSkillGuide(pi as never, () => config);
+		await handlers.get("session_start")?.[0]?.({ reason: "startup" }, ctx);
+		const autoShown = widgetCalls.at(-1)?.content;
+		assert.strictEqual(countOf(autoShown), 2);
+
+		// pi emits session_start before extension skill paths finish loading.
+		mutableCommands.push({
+			name: "skill:late-skill",
+			description: "A skill that arrives after startup.",
+			source: "skill",
+			sourceInfo: {},
+		} as never);
+
+		// Same widget, next TUI redraw — no manual toggle involved.
+		assert.strictEqual(countOf(autoShown), 3);
+	});
 });

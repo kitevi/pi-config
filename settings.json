@@ -36,6 +36,7 @@
     "npm:@monotykamary/pi-retry",
     "npm:pi-zro-provider",
     "npm:pi-hypercharm-provider",
+    "npm:pi-opencode-go-provider",
     "npm:pi-model-sort",
     "npm:pi-invisible-continue",
     "npm:pi-system-reminders",

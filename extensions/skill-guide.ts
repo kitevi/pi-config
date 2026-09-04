@@ -177,23 +177,18 @@ export function registerSkillGuide(pi: ExtensionAPI, loadConfig: ConfigLoader = 
 	let visible = false;
 
 	const hide = (ctx: GuideContext): void => {
+		visible = false;
 		if (ctx.mode !== "tui") return;
 		ctx.ui.setWidget(WIDGET_ID, undefined);
-		visible = false;
 	};
 
 	const show = (ctx: GuideContext, nextConfig: SkillGuideConfig): void => {
 		if (ctx.mode !== "tui") return;
-		const entries = collectSkillGuideEntries(pi.getCommands(), nextConfig);
-		if (entries.length === 0) {
-			ctx.ui.notify("No skill commands are loaded.", "warning");
-			return;
-		}
-
+		// Live-collect: session_start fires before skill discovery finishes.
 		ctx.ui.setWidget(
 			WIDGET_ID,
 			(_tui, theme) => ({
-				render: (width) => renderSkillGuide(entries, nextConfig, width, theme),
+				render: (width) => renderSkillGuide(collectSkillGuideEntries(pi.getCommands(), nextConfig), nextConfig, width, theme),
 				invalidate() {},
 			}),
 			{ placement: nextConfig.placement },
@@ -212,8 +207,10 @@ export function registerSkillGuide(pi: ExtensionAPI, loadConfig: ConfigLoader = 
 		}
 	};
 
-	pi.on("session_start", async (_event, ctx) => {
+	pi.on("session_start", async (event, ctx) => {
 		visible = false;
+		// Auto-show once: later starts bypass input-hide (slash commands).
+		if (event.reason !== "startup") return;
 		const nextConfig = reloadConfig(ctx);
 		if (nextConfig?.showOnStartup) show(ctx, nextConfig);
 	});
