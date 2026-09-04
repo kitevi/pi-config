@@ -24,12 +24,7 @@
       "prompts": [],
       "themes": []
     },
-    {
-      "source": "npm:pi-fabric",
-      "skills": [
-        "skills/fabric-exec"
-      ]
-    },
+    "npm:pi-fabric",
     "npm:@pborck/pi-de",
     "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",

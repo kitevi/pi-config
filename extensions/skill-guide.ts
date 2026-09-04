@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
@@ -9,9 +7,43 @@ import type {
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const WIDGET_ID = "skill-guide";
-const DEFAULT_CONFIG_PATH = fileURLToPath(new URL("./skill-guide.json", import.meta.url));
 const DEFAULT_MAX_SUMMARY_LENGTH = 30;
 const WIDE_LAYOUT_MIN_WIDTH = 76;
+const DEFAULT_PINNED_SKILLS = ["fabric-exec"];
+
+// Single source of truth for the guide: edit values here, then /reload.
+// hiddenSkills supports exact skill names or "prefix*" globs. pinnedSkills
+// (default: fabric-exec) always stays visible; set it to [] to hide everything
+// matched by hiddenSkills.
+const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
+	title: "Skill index",
+	showOnStartup: true,
+	hideOnPrompt: true,
+	placement: "aboveEditor",
+	maxSummaryLength: DEFAULT_MAX_SUMMARY_LENGTH,
+	hiddenSkills: ["fabric-*"],
+	pinnedSkills: [...DEFAULT_PINNED_SKILLS],
+	summaryOverrides: {
+		bro: "Say it differently.",
+		"buku-bookmarks": "Bookmark search/add/cleanup.",
+		"code-review": "Hunting bugs/security/perf.",
+		"diagnosing-bugs": "Something's broken or slow.",
+		"emil-design-eng": "UI feels off/unpolished.",
+		"frontend-design": "Starting a new UI/page.",
+		"grill-me": "Want your idea challenged.",
+		"grill-with-docs": "Challenge + record decisions.",
+		grilling: "Want your idea challenged.",
+		handoff: "Passing work to next session.",
+		implement: "Executing a written spec.",
+		"resolving-merge-conflicts": "Stuck on a merge/rebase.",
+		"review-animations": "Auditing UI motion & feel.",
+		"show-me": "Need a visual explanation.",
+		tdd: "Feature work, test-first.",
+		"tech-spec": "Feature needs a plan first.",
+		"thermo-nuclear-code-quality-review": "Structure needs a beatdown.",
+		"writing-for-agents": "Writing a new skill.",
+	},
+};
 
 export interface SkillGuideConfig {
 	title: string;
@@ -20,6 +52,8 @@ export interface SkillGuideConfig {
 	placement: "aboveEditor" | "belowEditor";
 	maxSummaryLength: number;
 	summaryOverrides: Record<string, string>;
+	hiddenSkills: string[];
+	pinnedSkills: string[];
 }
 
 export interface SkillGuideEntry {
@@ -48,6 +82,14 @@ function optionalString(value: unknown, fallback: string, path: string): string 
 		throw new Error(`${path} must be a non-empty string`);
 	}
 	return value.trim();
+}
+
+function optionalStringArray(value: unknown, fallback: string[], path: string): string[] {
+	if (value === undefined) return [...fallback];
+	if (!Array.isArray(value) || !value.every((entry) => typeof entry === "string" && entry.trim() !== "")) {
+		throw new Error(`${path} must be an array of non-empty strings`);
+	}
+	return (value as string[]).map((entry) => entry.trim());
 }
 
 export function parseSkillGuideConfig(value: unknown): SkillGuideConfig {
@@ -84,11 +126,18 @@ export function parseSkillGuideConfig(value: unknown): SkillGuideConfig {
 		placement,
 		maxSummaryLength: maxSummaryLength as number,
 		summaryOverrides,
+		hiddenSkills: optionalStringArray(value.hiddenSkills, [], "hiddenSkills"),
+		pinnedSkills: optionalStringArray(value.pinnedSkills, DEFAULT_PINNED_SKILLS, "pinnedSkills"),
 	};
 }
 
-export function loadSkillGuideConfig(path = DEFAULT_CONFIG_PATH): SkillGuideConfig {
-	return parseSkillGuideConfig(JSON.parse(readFileSync(path, "utf8")) as unknown);
+export function loadSkillGuideConfig(): SkillGuideConfig {
+	return parseSkillGuideConfig({
+		...DEFAULT_SKILL_GUIDE_CONFIG,
+		hiddenSkills: [...DEFAULT_SKILL_GUIDE_CONFIG.hiddenSkills],
+		pinnedSkills: [...DEFAULT_SKILL_GUIDE_CONFIG.pinnedSkills],
+		summaryOverrides: { ...DEFAULT_SKILL_GUIDE_CONFIG.summaryOverrides },
+	});
 }
 
 export function shortenSkillSummary(description: string | undefined, maxLength: number): string {
@@ -110,12 +159,26 @@ function baseSkillName(commandName: string): string {
 	return withoutPrefix.replace(/:\d+$/, "");
 }
 
+function matchesSkillPattern(pattern: string, skill: string, commandName: string): boolean {
+	if (pattern.endsWith("*")) {
+		const prefix = pattern.slice(0, -1);
+		return skill.startsWith(prefix) || commandName.startsWith(prefix);
+	}
+	return skill === pattern || commandName === pattern;
+}
+
+export function isSkillHidden(skill: string, commandName: string, config: SkillGuideConfig): boolean {
+	if (config.pinnedSkills.some((pinned) => skill === pinned || commandName === pinned)) return false;
+	return config.hiddenSkills.some((pattern) => matchesSkillPattern(pattern, skill, commandName));
+}
+
 export function collectSkillGuideEntries(
 	commands: SlashCommandInfo[],
 	config: SkillGuideConfig,
 ): SkillGuideEntry[] {
 	return commands
 		.filter((command) => command.source === "skill")
+		.filter((command) => !isSkillHidden(baseSkillName(command.name), command.name, config))
 		.map((command): SkillGuideEntry => {
 			const skill = baseSkillName(command.name);
 			const invocationName = command.name.startsWith("skill:") ? command.name : `skill:${command.name}`;
@@ -167,7 +230,7 @@ export function renderSkillGuide(
 
 	lines.push("");
 	const behavior = config.hideOnPrompt ? " · hides on next prompt" : "";
-	const footer = `/skill-guide toggles · edit extensions/skill-guide.json${behavior}`;
+	const footer = `/skill-guide toggles · edit extensions/skill-guide.ts${behavior}`;
 	lines.push(truncateToWidth(theme.fg("dim", footer), safeWidth, "…"));
 	return lines;
 }

@@ -53,7 +53,7 @@ The theme follows your terminal appearance: pi switches between the
 
 `extensions/skill-guide.ts` renders every loaded skill command and a short summary in a TUI-only widget when a session starts. The widget is not added to the conversation or sent to the model provider. It hides whenever you submit a prompt; use `/skill-guide` to reopen it until your next prompt.
 
-Configure it in `extensions/skill-guide.json`:
+Configure it in `extensions/skill-guide.ts` (`DEFAULT_SKILL_GUIDE_CONFIG`, then `/reload`):
 
 - `title` — widget heading text (`"Skill index"` by default).
 - `showOnStartup` — show the index when a session starts.
@@ -61,6 +61,8 @@ Configure it in `extensions/skill-guide.json`:
 - `placement` — `aboveEditor` or `belowEditor`.
 - `maxSummaryLength` — maximum summary length before shortening (30 characters by default).
 - `summaryOverrides` — replace unclear upstream descriptions by skill name.
+- `hiddenSkills` — hide skills by exact name or `"prefix*"` glob (`["fabric-*"]` by default).
+- `pinnedSkills` — always shown even under a glob (`["fabric-exec"]` by default; `[]` hides everything matched).
 
 ## Permission gate
 
@@ -128,8 +130,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `bootstrap.mjs` — setup/link/merge script
 - `prompts/` — prompt files
 - `extensions/` — pi extensions
-  - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide`
-  - `extensions/skill-guide.json` — startup skill-index display settings and summary overrides
+  - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide` (settings live in `DEFAULT_SKILL_GUIDE_CONFIG` at the top of the file)
   - `extensions/permission-gate.ts` — stable entry point for the rule-based `bash`/`nu` permission gate (see [Permission gate](#permission-gate))
   - `extensions/permission-gate/` — shell analysis, policy, state, presentation, and runtime modules behind the gate
   - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus GPT verbosity and context "dumb zone" hints

@@ -1,6 +1,5 @@
 import { assert } from "vitest";
 import { describe, it } from "vitest";
-import { fileURLToPath } from "node:url";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import {
 	collectSkillGuideEntries,
@@ -23,6 +22,8 @@ const config: SkillGuideConfig = {
 	hideOnPrompt: true,
 	placement: "aboveEditor",
 	maxSummaryLength: 30,
+	hiddenSkills: [],
+	pinnedSkills: ["fabric-exec"],
 	summaryOverrides: {
 		"code-review": "Review a diff vs its spec.",
 	},
@@ -61,14 +62,16 @@ void describe("skill guide config", () => {
 		assert.strictEqual(parsed.placement, "aboveEditor");
 		assert.strictEqual(parsed.maxSummaryLength, 30);
 		assert.strictEqual(parsed.summaryOverrides["code-review"], "Review a diff.");
+		assert.deepStrictEqual(parsed.hiddenSkills, []);
+		assert.deepStrictEqual(parsed.pinnedSkills, ["fabric-exec"]);
 	});
 
 	void it("keeps every configured summary within the display budget", () => {
-		const configured = loadSkillGuideConfig(
-			fileURLToPath(new URL("../extensions/skill-guide.json", import.meta.url)),
-		);
+		const configured = loadSkillGuideConfig();
 
 		assert.strictEqual(configured.maxSummaryLength, 30);
+		assert.deepStrictEqual(configured.hiddenSkills, ["fabric-*"]);
+		assert.deepStrictEqual(configured.pinnedSkills, ["fabric-exec"]);
 		for (const [skill, summary] of Object.entries(configured.summaryOverrides)) {
 			assert.ok(summary.length <= 30, `${skill} summary is ${summary.length} characters`);
 		}
@@ -78,6 +81,9 @@ void describe("skill guide config", () => {
 		assert.throws(() => parseSkillGuideConfig({ placement: "sidebar" }), /placement/);
 		assert.throws(() => parseSkillGuideConfig({ maxSummaryLength: 12 }), /at least 24/);
 		assert.throws(() => parseSkillGuideConfig({ summaryOverrides: [] }), /must be an object/);
+		assert.throws(() => parseSkillGuideConfig({ hiddenSkills: "fabric-*" }), /hiddenSkills/);
+		assert.throws(() => parseSkillGuideConfig({ hiddenSkills: [""] }), /hiddenSkills/);
+		assert.throws(() => parseSkillGuideConfig({ pinnedSkills: ["", "x"] }), /pinnedSkills/);
 	});
 });
 
@@ -91,6 +97,33 @@ void describe("skill guide entries", () => {
 		);
 		assert.strictEqual(entries[0]?.summary, "Review a diff vs its spec.");
 		assert.strictEqual(entries[1]?.summary, "Scan a codebase for…");
+	});
+
+	void it("hides glob-matched skills but keeps pinned fabric-exec", () => {
+		const fabricCommands = [
+			{ name: "skill:fabric-exec", description: "Pi core work.", source: "skill", sourceInfo: {} },
+			{ name: "skill:fabric-guide", description: "Choose a workflow.", source: "skill", sourceInfo: {} },
+			{ name: "skill:fabric-swarm", description: "Coordinate actors.", source: "skill", sourceInfo: {} },
+			{ name: "skill:code-review", description: "Review a diff.", source: "skill", sourceInfo: {} },
+		] as never[];
+		const hidden = { ...config, hiddenSkills: ["fabric-*"] };
+
+		assert.deepStrictEqual(
+			collectSkillGuideEntries(fabricCommands, hidden).map((entry) => entry.command),
+			["/skill:code-review", "/skill:fabric-exec"],
+		);
+	});
+
+	void it("lets an empty pin list hide fabric-exec too", () => {
+		const fabricCommands = [
+			{ name: "skill:fabric-exec", description: "Pi core work.", source: "skill", sourceInfo: {} },
+		] as never[];
+		const hidden = { ...config, hiddenSkills: ["fabric-*"], pinnedSkills: [] };
+
+		assert.deepStrictEqual(
+			collectSkillGuideEntries(fabricCommands, hidden).map((entry) => entry.command),
+			[],
+		);
 	});
 
 	void it("shortens long descriptions without cutting the final word in half", () => {
