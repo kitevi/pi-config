@@ -35,6 +35,7 @@
     "npm:pi-model-sort",
     "npm:pi-invisible-continue",
     "npm:pi-system-reminders",
+    "npm:pi-streaming-guard",
     {
       "source": "https://github.com/mattpocock/skills",
       "skills": [
