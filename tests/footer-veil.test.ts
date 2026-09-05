@@ -1,10 +1,11 @@
 import { assert } from "vitest";
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { FooterComponent } from "@earendil-works/pi-coding-agent";
+import { FooterComponent, InteractiveMode } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import footerVeilExtension from "../extensions/footer-veil.ts";
 import {
 	filterUsageStatuses,
+	filterUsageWidgets,
 	withVeiledExtensionStatuses,
 	formatFooterTokenCount,
 	injectDumbZoneIntoFooterLine,
@@ -85,6 +86,36 @@ void describe("footer-veil usage status filter", () => {
 	void it("returns an empty map when every status is a usage widget", () => {
 		const statuses = statusMap(["synthetic-usage", "week:82%"]);
 		assert.strictEqual(filterUsageStatuses(statuses, true).size, 0);
+	});
+});
+
+void describe("footer-veil usage widget filter", () => {
+	function widgetMap(...entries: Array<[string, unknown]>): Map<string, unknown> {
+		return new Map(entries);
+	}
+
+	void it("passes the map through untouched when the veil is lifted", () => {
+		const widgets = widgetMap(["hypercharm", { tag: "hc" }], ["fabric-prewalk", { tag: "armed" }]);
+		assert.strictEqual(filterUsageWidgets(widgets, false), widgets);
+	});
+
+	void it("drops provider usage widget keys but keeps unrelated widgets while veiled", () => {
+		const hypercharm = { tag: "hc" };
+		const other = { tag: "other" };
+		const widgets = widgetMap(
+			["hypercharm", hypercharm],
+			["zro", { tag: "zro" }],
+			["neuralwatt", { tag: "nw" }],
+			["other-ext", other],
+		);
+		const filtered = filterUsageWidgets(widgets, true);
+		assert.deepStrictEqual(Array.from(filtered.keys()), ["other-ext"]);
+		assert.strictEqual(filtered.get("other-ext"), other);
+	});
+
+	void it("returns the same map when nothing is veiled", () => {
+		const widgets = widgetMap(["other-ext", { tag: "other" }]);
+		assert.strictEqual(filterUsageWidgets(widgets, true), widgets);
 	});
 });
 
@@ -206,14 +237,19 @@ void describe("footer-veil extension wiring", () => {
 	}
 
 	let savedRender: unknown;
+	let savedRenderWidgetContainer: unknown;
 	beforeEach(() => {
 		savedRender = FooterComponent.prototype.render;
+		savedRenderWidgetContainer = (InteractiveMode.prototype as unknown as { renderWidgetContainer: unknown })
+			.renderWidgetContainer;
 	});
 	afterEach(async () => {
 		try {
 			for (const shutdown of shutdowns.splice(0)) await shutdown();
 		} finally {
 			FooterComponent.prototype.render = savedRender as typeof FooterComponent.prototype.render;
+			(InteractiveMode.prototype as unknown as { renderWidgetContainer: unknown }).renderWidgetContainer =
+				savedRenderWidgetContainer;
 		}
 	});
 
@@ -333,5 +369,96 @@ void describe("footer-veil extension wiring", () => {
 		await sessionStart(s);
 		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
 		assert.ok(s.ui.notices.some((n) => n.includes("shown")));
+	});
+
+	void describe("widget veiling", () => {
+		type RenderWidgetContainerFn = (
+			container: { children: Array<unknown>; clear(): void; addChild(c: unknown): void },
+			widgets: ReadonlyMap<string, unknown>,
+			spacerWhenEmpty: boolean,
+			leadingSpacer: boolean,
+		) => void;
+
+		function protoRenderWidgetContainer(): RenderWidgetContainerFn {
+			return (InteractiveMode.prototype as unknown as { renderWidgetContainer: RenderWidgetContainerFn })
+				.renderWidgetContainer;
+		}
+
+		function fakeContainer(): { children: Array<unknown>; clear(): void; addChild(c: unknown): void } {
+			const children: Array<unknown> = [];
+			return {
+				children,
+				clear() {
+					children.length = 0;
+				},
+				addChild(c: unknown) {
+					children.push(c);
+				},
+			};
+		}
+
+		void it("patches the widget container render on session start and restores it on shutdown", async () => {
+			const s = setup();
+			const original = protoRenderWidgetContainer();
+			await sessionStart(s);
+			assert.notStrictEqual(protoRenderWidgetContainer(), original);
+			for (const handler of s.events["session_shutdown"]) await handler(undefined as never, s.ctx as never);
+			assert.strictEqual(protoRenderWidgetContainer(), original);
+		});
+
+		void it("hides usage widgets while veiled and keeps unrelated widgets", async () => {
+			const s = setup();
+			await sessionStart(s);
+			const container = fakeContainer();
+			const other = { tag: "other" };
+			protoRenderWidgetContainer().call(
+				{ renderWidgets() {} },
+				container,
+				new Map([
+					["hypercharm", { tag: "hc" }],
+					["other-ext", other],
+				]),
+				false,
+				false,
+			);
+			assert.deepStrictEqual(container.children, [other]);
+		});
+
+		void it("reveals usage widgets after ctrl+p and refreshes the live host's containers", async () => {
+			const s = setup();
+			await sessionStart(s);
+			let refreshes = 0;
+			const host = {
+				renderWidgets() {
+					refreshes += 1;
+				},
+			};
+			const hypercharm = { tag: "hc" };
+			const widgets = () => new Map<string, unknown>([["hypercharm", hypercharm]]);
+			const container = fakeContainer();
+			protoRenderWidgetContainer().call(host, container, widgets(), false, false);
+			assert.deepStrictEqual(container.children, []);
+			await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+			assert.strictEqual(refreshes, 1);
+			protoRenderWidgetContainer().call(host, container, widgets(), false, false);
+			assert.deepStrictEqual(container.children, [hypercharm]);
+			await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+			assert.strictEqual(refreshes, 2);
+			protoRenderWidgetContainer().call(host, container, widgets(), false, false);
+			assert.deepStrictEqual(container.children, []);
+		});
+
+		void it("warns once when the widget surface is missing", async () => {
+			const proto = InteractiveMode.prototype as unknown as { renderWidgetContainer: unknown };
+			const original = proto.renderWidgetContainer;
+			proto.renderWidgetContainer = undefined;
+			try {
+				const s = setup();
+				await sessionStart(s);
+				assert.ok(s.ui.notices.some((n) => n.includes("widget surface")));
+			} finally {
+				proto.renderWidgetContainer = original;
+			}
+		});
 	});
 });

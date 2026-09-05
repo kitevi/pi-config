@@ -53,7 +53,9 @@ The theme follows your terminal appearance: pi switches between the
 
 `extensions/footer-veil.ts` starts with model information and provider usage
 veiled. Press `Ctrl+P` to show or hide them; context statistics and the inline
-`dumb` zone hint retain their existing behavior.
+`dumb` zone hint retain their existing behavior. Provider usage covers both the
+footer status slots and the below-editor widget lines used by hypercharm, zro,
+and neuralwatt.
 
 For Better OpenAI, the veil delegates to the fork's
 `/openai-usage-presentation hide|show` command. This reaches its TUI status widget

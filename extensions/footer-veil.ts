@@ -1,5 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
-import { type ExtensionAPI, type ExtensionContext, FooterComponent } from "@earendil-works/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionContext, FooterComponent, InteractiveMode } from "@earendil-works/pi-coding-agent";
 import type { KeyId } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 const DEFAULT_SHOW_MODEL_INFO = false;
@@ -20,6 +20,34 @@ export const USAGE_STATUS_KEYS: ReadonlySet<string> = new Set([
 	"neuralwatt-quota", // pi-neuralwatt-provider STATUS_KEY_QUOTA (statusbar mode)
 	"neuralwatt-mcr", // pi-neuralwatt-provider STATUS_KEY_MCR (statusbar mode)
 ]);
+
+/** Widget keys owned by provider usage widgets (below-editor status lines); veiled while model info is hidden. */
+export const USAGE_WIDGET_KEYS: ReadonlySet<string> = new Set([
+	"hypercharm", // pi-hypercharm-provider WIDGET_KEY
+	"zro", // pi-zro-provider WIDGET_KEY
+	"neuralwatt", // pi-neuralwatt-provider widget key
+]);
+
+export function filterUsageWidgets<T>(
+	widgets: ReadonlyMap<string, T>,
+	hidden: boolean,
+	keys: ReadonlySet<string> = USAGE_WIDGET_KEYS,
+): ReadonlyMap<string, T> {
+	if (!hidden) return widgets;
+	let removed = false;
+	for (const key of widgets.keys()) {
+		if (keys.has(key)) {
+			removed = true;
+			break;
+		}
+	}
+	if (!removed) return widgets;
+	const kept = new Map<string, T>();
+	for (const [key, widget] of widgets) {
+		if (!keys.has(key)) kept.set(key, widget);
+	}
+	return kept;
+}
 
 export function filterUsageStatuses(
 	statuses: ReadonlyMap<string, string>,
@@ -204,6 +232,74 @@ function unpatchFooterRender(): void {
 	originalFooterRender = undefined;
 }
 
+type RenderWidgetContainerFn = (
+	this: unknown,
+	container: unknown,
+	widgets: ReadonlyMap<string, unknown>,
+	spacerWhenEmpty: boolean,
+	leadingSpacer: boolean,
+) => void;
+
+interface WidgetRenderHost {
+	renderWidgets(): void;
+}
+
+let originalRenderWidgetContainer: RenderWidgetContainerFn | undefined;
+let widgetRenderPatched = false;
+let widgetShapeWarningShown = false;
+let widgetRenderHost: WidgetRenderHost | undefined;
+
+/**
+ * Provider usage widgets (hypercharm, zro, neuralwatt) bypass the footer's
+ * extension-status line entirely: they render via ctx.ui.setWidget into
+ * InteractiveMode's above/below-editor containers. Veil them by filtering the
+ * widget map inside renderWidgetContainer, which rebuilds both containers.
+ */
+function patchWidgetRender(getShowModelInfo: () => boolean, onWidgetShapeWarning: () => void): void {
+	if (widgetRenderPatched) return;
+	const proto = InteractiveMode.prototype as unknown as {
+		renderWidgetContainer?: RenderWidgetContainerFn;
+		renderWidgets?: () => void;
+	};
+	if (typeof proto.renderWidgetContainer !== "function" || typeof proto.renderWidgets !== "function") {
+		onWidgetShapeWarning();
+		return;
+	}
+	originalRenderWidgetContainer = proto.renderWidgetContainer;
+	proto.renderWidgetContainer = function renderWidgetContainerWithFooterVeil(
+		this: unknown,
+		container: unknown,
+		widgets: ReadonlyMap<string, unknown>,
+		spacerWhenEmpty: boolean,
+		leadingSpacer: boolean,
+	): void {
+		widgetRenderHost = this as WidgetRenderHost;
+		const visible = filterUsageWidgets(widgets, !getShowModelInfo());
+		originalRenderWidgetContainer?.call(this, container, visible, spacerWhenEmpty, leadingSpacer);
+	};
+	widgetRenderPatched = true;
+}
+
+function unpatchWidgetRender(): void {
+	if (!widgetRenderPatched || !originalRenderWidgetContainer) return;
+
+	(InteractiveMode.prototype as unknown as { renderWidgetContainer: RenderWidgetContainerFn }).renderWidgetContainer =
+		originalRenderWidgetContainer;
+	widgetRenderPatched = false;
+	originalRenderWidgetContainer = undefined;
+	widgetRenderHost = undefined;
+}
+
+/** Rebuild the widget containers so a veil-state change applies without waiting for the next setWidget. */
+function refreshWidgetContainers(): void {
+	if (!widgetRenderPatched) return;
+	try {
+		widgetRenderHost?.renderWidgets();
+	} catch {
+		// The host may be mid-teardown; the next render cycle reapplies the veil.
+	}
+}
+
 const OPENAI_PRESENTATION_COMMAND = "openai-usage-presentation";
 type OpenAIPresentationAction = "hide" | "show";
 type PresentationDispatchResult = "dispatched" | "unavailable";
@@ -241,6 +337,7 @@ export default function footerVeilExtension(pi: ExtensionAPI): void {
 				synchronizeOpenAI(ctx);
 				ctx.ui.notify("Model info and usage " + (showModelInfo ? "shown" : "hidden") + ".", "info");
 			}
+			refreshWidgetContainers();
 		},
 	});
 
@@ -256,6 +353,15 @@ export default function footerVeilExtension(pi: ExtensionAPI): void {
 				ctx.ui.notify("Footer veil: unexpected footer shape; usage statuses left visible.", "warning");
 			},
 		);
+		patchWidgetRender(
+			() => showModelInfo,
+			() => {
+				if (widgetShapeWarningShown || !ctx.hasUI) return;
+				widgetShapeWarningShown = true;
+				ctx.ui.notify("Footer veil: unexpected widget surface; usage widgets left visible.", "warning");
+			},
+		);
+		refreshWidgetContainers();
 	});
 
 	pi.on("resources_discover", (_event, ctx) => {
@@ -265,5 +371,6 @@ export default function footerVeilExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_shutdown", async () => {
 		unpatchFooterRender();
+		unpatchWidgetRender();
 	});
 }
