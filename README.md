@@ -49,6 +49,30 @@ The theme follows your terminal appearance: pi switches between the
 
 `npm install` provides the pinned dependencies used by the extensions and their tests. The reconciliation script itself still uses only Node.js built-ins.
 
+## Footer veil
+
+`extensions/footer-veil.ts` starts with model information and provider usage
+veiled. Press `Ctrl+P` to show or hide them; context statistics and the inline
+`dumb` zone hint retain their existing behavior.
+
+For Better OpenAI, the veil delegates to the fork's
+`/openai-usage-presentation hide|show` command. This reaches its TUI status widget
+and replacement footer/pets as well as status text, without stopping usage
+polling or changing `pi-better-openai.json`.
+
+**Runtime requirement:** the bridge uses Pi's `sendUserMessage` command-dispatch
+option `expandPromptTemplates: true`, tested on **Pi 0.85.1**. Older Pi versions
+such as 0.80.10 do not support this option and are not supported by the bridge.
+The command must be registered as an extension command; if it is unavailable,
+the veil skips dispatch and warns once per session instead of submitting a
+normal model prompt. Other providers' status filtering continues to work.
+
+Synchronization runs in `resources_discover`, after all `session_start`
+handlers, and on every `Ctrl+P` press. Reloads and new/resumed/forked sessions
+therefore restore the initially veiled state. A manual OpenAI presentation
+command can override its visibility until the next synchronization. Better
+OpenAI retains its normal command notifications; there is no two-way state bus.
+
 ## Skill index
 
 `extensions/skill-guide.ts` renders every loaded skill command and a short summary in a TUI-only widget when a session starts. The widget is not added to the conversation or sent to the model provider. It hides whenever you submit a prompt; use `/skill-guide` to reopen it until your next prompt.

@@ -1,5 +1,5 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
-import { CURSOR_MARKER, getKeybindings, TUI, type Component, type Terminal } from "@earendil-works/pi-tui";
+import { CURSOR_MARKER, getKeybindings, TuiMainScreen, type TUI, type Component, type Terminal } from "@earendil-works/pi-tui";
 import { stripVTControlCharacters } from "node:util";
 import { assert, beforeAll, it } from "vitest";
 import { showAskDialog } from "../extensions/permission-gate/ask-ui.ts";
@@ -20,7 +20,7 @@ it.each([1, 100])("covers background characters and the editor cursor behind a %
 		start() {}, stop() {}, async drainInput() {}, write() {}, moveBy() {}, hideCursor() {}, showCursor() {},
 		clearLine() {}, clearFromCursor() {}, clearScreen() {}, setTitle() {}, setProgress() {},
 	} satisfies Terminal;
-	const tui = new TUI(terminal, true);
+	const tui = new TuiMainScreen(terminal, true);
 	const compositor = tui as unknown as Compositor;
 	const controller = new AbortController();
 	let dialog: (Component & { dispose?: () => void }) | undefined;

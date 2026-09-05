@@ -1,5 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
-import { type ExtensionAPI, FooterComponent } from "@earendil-works/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionContext, FooterComponent } from "@earendil-works/pi-coding-agent";
 import type { KeyId } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 const DEFAULT_SHOW_MODEL_INFO = false;
@@ -9,6 +9,7 @@ const DUMB_ZONE_LABEL = "dumb";
 
 /** Status-line keys owned by provider usage widgets; veiled while model info is hidden. */
 export const USAGE_STATUS_KEYS: ReadonlySet<string> = new Set([
+	"better-openai", // pi-better-openai STATUS_KEY (non-TUI status surface)
 	"synthetic-usage", // @aliou/pi-synthetic usage-status EXTENSION_ID
 	"opencode-go-usage", // local extensions/opencode-go-usage.ts STATUS_ID
 	"zro-session", // pi-zro-provider STATUS_KEY_SESSION
@@ -203,14 +204,41 @@ function unpatchFooterRender(): void {
 	originalFooterRender = undefined;
 }
 
+const OPENAI_PRESENTATION_COMMAND = "openai-usage-presentation";
+type OpenAIPresentationAction = "hide" | "show";
+type PresentationDispatchResult = "dispatched" | "unavailable";
+
+function syncOpenAIPresentation(
+	pi: Pick<ExtensionAPI, "getCommands" | "sendUserMessage">,
+	action: OpenAIPresentationAction,
+): PresentationDispatchResult {
+	if (!pi.getCommands().some((command) => command.source === "extension" && command.name === OPENAI_PRESENTATION_COMMAND)) {
+		return "unavailable";
+	}
+	// Pi 0.85.1 dispatches recognized extension commands before prompting, even while streaming.
+	pi.sendUserMessage(`/${OPENAI_PRESENTATION_COMMAND} ${action}`, { expandPromptTemplates: true });
+	return "dispatched";
+}
+
 export default function footerVeilExtension(pi: ExtensionAPI): void {
 	let showModelInfo = DEFAULT_SHOW_MODEL_INFO;
+	let openAIWarningShown = false;
+
+	function synchronizeOpenAI(ctx: ExtensionContext): void {
+		if (!ctx.hasUI) return;
+		const result = syncOpenAIPresentation(pi, showModelInfo ? "show" : "hide");
+		if (result === "unavailable" && !openAIWarningShown) {
+			openAIWarningShown = true;
+			ctx.ui.notify("Footer veil: OpenAI presentation unavailable; load Better OpenAI with /openai-usage-presentation support.", "warning");
+		}
+	}
 
 	pi.registerShortcut(TOGGLE_MODEL_INFO_SHORTCUT, {
 		description: "Toggle footer veil (model info + usage widgets)",
 		handler: async (ctx) => {
 			showModelInfo = !showModelInfo;
 			if (ctx.hasUI) {
+				synchronizeOpenAI(ctx);
 				ctx.ui.notify("Model info and usage " + (showModelInfo ? "shown" : "hidden") + ".", "info");
 			}
 		},
@@ -218,6 +246,7 @@ export default function footerVeilExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (_event, ctx) => {
 		showModelInfo = DEFAULT_SHOW_MODEL_INFO;
+		openAIWarningShown = false;
 		patchFooterRender(
 			() => showModelInfo,
 			() => ctx.ui.theme.fg("warning", DUMB_ZONE_LABEL),
@@ -227,6 +256,11 @@ export default function footerVeilExtension(pi: ExtensionAPI): void {
 				ctx.ui.notify("Footer veil: unexpected footer shape; usage statuses left visible.", "warning");
 			},
 		);
+	});
+
+	pi.on("resources_discover", (_event, ctx) => {
+		// This runs after every session_start handler, including Better OpenAI's visibility reset.
+		synchronizeOpenAI(ctx);
 	});
 
 	pi.on("session_shutdown", async () => {

@@ -29,7 +29,7 @@
     "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",
     "npm:@monotykamary/pi-retry",
-    "npm:@monotykamary/pi-better-openai",
+    "https://github.com/kitevi/pi-better-openai",
     "npm:pi-zro-provider",
     "npm:pi-hypercharm-provider",
     "npm:pi-opencode-go-provider",

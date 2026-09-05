@@ -1,5 +1,5 @@
 import { ExtensionSelectorComponent, initTheme, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
-import { getKeybindings, TUI, visibleWidth, type Component, type KeybindingsManager, type Terminal } from "@earendil-works/pi-tui";
+import { getKeybindings, TuiMainScreen, visibleWidth, type TUI, type Component, type KeybindingsManager, type Terminal } from "@earendil-works/pi-tui";
 import { stripVTControlCharacters } from "node:util";
 import { afterEach, assert, beforeAll, beforeEach, it, vi } from "vitest";
 import gate from "../extensions/permission-gate.ts";
@@ -34,7 +34,7 @@ const install = () => {
 		stop() {}, async drainInput() {}, write() {}, moveBy() {}, hideCursor() {}, showCursor() {},
 		clearLine() {}, clearFromCursor() {}, clearScreen() {}, setTitle() {}, setProgress() {},
 	} satisfies Terminal;
-	const tui = new TUI(terminal);
+	const tui = new TuiMainScreen(terminal);
 	tui.start();
 	let component: Dialog | undefined;
 	let close = (_choice?: string) => {};
