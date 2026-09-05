@@ -37,7 +37,6 @@
     "npm:pi-invisible-continue",
     "npm:pi-system-reminders",
     "npm:pi-streaming-guard",
-    "https://github.com/kitevi/pide",
     {
       "source": "https://github.com/mattpocock/skills",
       "skills": [
