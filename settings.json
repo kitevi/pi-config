@@ -29,6 +29,7 @@
     "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",
     "npm:@monotykamary/pi-retry",
+    "npm:@monotykamary/pi-better-openai",
     "npm:pi-zro-provider",
     "npm:pi-hypercharm-provider",
     "npm:pi-opencode-go-provider",
@@ -36,6 +37,7 @@
     "npm:pi-invisible-continue",
     "npm:pi-system-reminders",
     "npm:pi-streaming-guard",
+    "https://github.com/kitevi/pide",
     {
       "source": "https://github.com/mattpocock/skills",
       "skills": [

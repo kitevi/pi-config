@@ -133,10 +133,9 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide` (settings live in `DEFAULT_SKILL_GUIDE_CONFIG` at the top of the file)
   - `extensions/permission-gate.ts` — stable entry point for the rule-based `bash`/`nu` permission gate (see [Permission gate](#permission-gate))
   - `extensions/permission-gate/` — shell analysis, policy, state, presentation, and runtime modules behind the gate
-  - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus GPT verbosity and context "dumb zone" hints
+  - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus context "dumb zone" hints
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
-  - `extensions/codex-usage.ts` — shows Codex 5h/7d rolling usage and reset times in the footer while a Codex model is active
   - `extensions/opencode-go-usage.ts` — shows OpenCode Go 5h/weekly/monthly used quotas and reset times in the footer while an OpenCode Go model is active
 - `skills/` — pi skills
 - `themes/` — pi themes (`github-colorblind` light/dark variants)

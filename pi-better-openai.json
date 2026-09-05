@@ -1,0 +1,26 @@
+{
+  "persistState": false,
+  "desiredActive": false,
+  "supportedModels": [],
+  "usage": {
+    "enabled": true,
+    "refreshIntervalMs": 60000,
+    "showOnlyOnSubscriptionModels": true,
+    "showResetTimes": true
+  },
+  "footer": {
+    "mode": "status"
+  },
+  "image": {
+    "enabled": false
+  },
+  "websearch": {
+    "enabled": false
+  },
+  "live": {
+    "enabled": false
+  },
+  "pets": {
+    "enabled": false
+  }
+}

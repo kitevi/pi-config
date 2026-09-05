@@ -3,50 +3,13 @@ import { type ExtensionAPI, FooterComponent } from "@earendil-works/pi-coding-ag
 import type { KeyId } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
-export type Verbosity = "low" | "medium" | "high";
-
-type SupportedVerbosityApi = "openai-responses" | "openai-codex-responses" | "azure-openai-responses";
-
 const DEFAULT_SHOW_MODEL_INFO = false;
-const GPT_VERBOSITY: Verbosity = "low";
 const TOGGLE_MODEL_INFO_SHORTCUT = "ctrl+p" as KeyId;
 const DUMB_ZONE_TOKEN_THRESHOLD = 128_000;
 const DUMB_ZONE_LABEL = "dumb";
-const SUPPORTED_APIS = new Set<SupportedVerbosityApi>([
-	"openai-responses",
-	"openai-codex-responses",
-	"azure-openai-responses",
-]);
 
 let originalFooterRender: ((this: FooterComponent, width: number) => string[]) | undefined;
 let footerPatched = false;
-
-function isObject(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function supportsVerbosityControl(model: Pick<Model<Api>, "api"> | undefined): boolean {
-	return !!model && SUPPORTED_APIS.has(model.api as SupportedVerbosityApi);
-}
-
-export function getModelVerbosity(model: Pick<Model<Api>, "api" | "id"> | undefined): Verbosity | undefined {
-	if (!model || !supportsVerbosityControl(model)) return undefined;
-	return model.id.startsWith("gpt-") ? GPT_VERBOSITY : undefined;
-}
-
-export function patchPayloadVerbosity(payload: unknown, verbosity: Verbosity): unknown {
-	if (!isObject(payload)) return payload;
-
-	const text = isObject(payload.text) ? payload.text : {};
-
-	return {
-		...payload,
-		text: {
-			...text,
-			verbosity,
-		},
-	};
-}
 
 export function formatFooterTokenCount(count: number): string {
 	if (count < 1000) return count.toString();
@@ -130,27 +93,6 @@ export function stripModelInfoFromFooterLine(
 	return line.slice(0, match.paddingStart) + line.slice(match.candidateStart + match.candidate.length);
 }
 
-export function injectVerbosityIntoFooterLine(
-	line: string,
-	model: Pick<Model<Api>, "provider" | "id" | "reasoning">,
-	thinkingLevel: string | undefined,
-	verbosity: Verbosity,
-): string {
-	const match = findFooterRightSide(line, model, thinkingLevel);
-	if (!match) return line;
-
-	const verbositySuffix = ` • 🗣  ${verbosity}`;
-	const prefix = line.slice(0, match.paddingStart);
-	const suffixAnsi = line.slice(match.candidateStart + match.candidate.length);
-	const availableWidth = match.candidateStart - match.paddingStart + visibleWidth(match.candidate);
-	const desiredRightSide = `${match.candidate}${verbositySuffix}`;
-	const fittedRightSide = truncateToWidth(desiredRightSide, availableWidth, "");
-	const fittedWidth = visibleWidth(fittedRightSide);
-	const nextPadding = " ".repeat(Math.max(0, availableWidth - fittedWidth));
-
-	return `${prefix}${nextPadding}${fittedRightSide}${suffixAnsi}`;
-}
-
 function patchFooterRender(
 	getShowModelInfo: () => boolean,
 	getDumbZoneLabel: () => string,
@@ -172,15 +114,8 @@ function patchFooterRender(
 		const nextLines = [...lines];
 		let footerLine = lines[1] ?? "";
 
-		if (model) {
-			if (!getShowModelInfo()) {
-				footerLine = stripModelInfoFromFooterLine(footerLine, model, session?.state?.thinkingLevel);
-			} else {
-				const verbosity = getModelVerbosity(model);
-				if (verbosity) {
-					footerLine = injectVerbosityIntoFooterLine(footerLine, model, session?.state?.thinkingLevel, verbosity);
-				}
-			}
+		if (model && !getShowModelInfo()) {
+			footerLine = stripModelInfoFromFooterLine(footerLine, model, session?.state?.thinkingLevel);
 		}
 
 		const usage = session?.getContextUsage?.();
@@ -226,12 +161,5 @@ export default function modelInfoToggleExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_shutdown", async () => {
 		unpatchFooterRender();
-	});
-
-	pi.on("before_provider_request", (event, ctx) => {
-		const verbosity = getModelVerbosity(ctx.model);
-		if (!verbosity) return undefined;
-
-		return patchPayloadVerbosity(event.payload, verbosity);
 	});
 }
