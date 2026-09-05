@@ -135,7 +135,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide` (settings live in `DEFAULT_SKILL_GUIDE_CONFIG` at the top of the file)
   - `extensions/permission-gate.ts` — stable entry point for the rule-based `bash`/`nu` permission gate (see [Permission gate](#permission-gate))
   - `extensions/permission-gate/` — shell analysis, policy, state, presentation, and runtime modules behind the gate
-  - `extensions/model-info-toggle.ts` — `Ctrl+P` footer toggle for model info, plus context "dumb zone" hints
+  - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets, plus context "dumb zone" hints
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
   - `extensions/opencode-go-usage.ts` — shows OpenCode Go 5h/weekly/monthly used quotas and reset times in the footer while an OpenCode Go model is active
@@ -144,7 +144,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `reminders/` — global reminder definitions for `pi-system-reminders`
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
-- `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `model-info-toggle` can own it
+- `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `footer-veil` can own it
 - `synthetic.json` — pi-synthetic configuration installed into `~/.pi/agent/extensions/synthetic.json`
 - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
 - `fabric.json` — Pi Fabric configuration installed into `~/.pi/agent/fabric.json` (see [Pi Fabric](#pi-fabric))
