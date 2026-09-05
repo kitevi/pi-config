@@ -54,7 +54,7 @@ export const formatAskPrompt = (assessment: Assessment, hits: number, language?:
 };
 
 // Pure classification of a finished yes/no ask, kept separate from the handler so
-// the decline/timeout logic is testable. `choice` is what ctx.ui.select resolved to
+// the decline/timeout logic is testable. `choice` is what the ask dialog resolved to
 // (ASK_ALLOW, ASK_DENY, or undefined for a dismissal / timeout / caught throw).
 // `timedOut` is whether the dialog ran out its countdown rather than being answered.
 //

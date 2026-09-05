@@ -1,7 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { assessToolCall } from "./policy.ts";
 import { detailsWithWrittenPaths, PermissionGateState } from "./state.ts";
-import { ASK_ALLOW, ASK_DENY, describeAskOutcome, formatAskPrompt, formatReason } from "./presentation.ts";
+import { ASK_ALLOW, describeAskOutcome, formatAskPrompt, formatReason } from "./presentation.ts";
+import { showAskDialog } from "./ask-ui.ts";
 
 const askTimeoutMs = () => {
 	const override = Number(process.env.PI_GATE_ASK_TIMEOUT_MS);
@@ -11,9 +12,9 @@ const ASK_TIMEOUT_BACKSTOP_MS = 2000;
 const ASK_TIMEOUT_SLACK_MS = 500;
 
 export default function (pi: ExtensionAPI) {
-	// Pi's extension selector host mounts exactly one dialog at a time. A second
-	// concurrent ask unmounts the first without disposing it or settling its
-	// promise, so serialize permission dialogs within this extension instance.
+	// Keep one permission review active at a time. Selector-only hosts can also
+	// unmount an earlier dialog without settling its promise, so preserve this
+	// serialization for both custom reviews and native selector fallbacks.
 	let askSlot: Promise<void> = Promise.resolve();
 	const state = new PermissionGateState();
 
@@ -80,7 +81,7 @@ export default function (pi: ExtensionAPI) {
 				// Notification listeners are advisory; the ask must still run.
 			}
 			try {
-				choice = await ctx.ui.select(`⚠️ Permission gate ask\n\n${askPrompt}\n\nAllow?`, [ASK_DENY, ASK_ALLOW], {
+				choice = await showAskDialog(ctx, askPrompt, {
 					signal: controller.signal,
 					timeout: timeoutMs,
 				});
