@@ -16,6 +16,11 @@ export default function (pi: ExtensionAPI) {
 	// unmount an earlier dialog without settling its promise, so preserve this
 	// serialization for both custom reviews and native selector fallbacks.
 	let askSlot: Promise<void> = Promise.resolve();
+	// Bumped whenever the current run stops owning its asks: a denial, a
+	// timeout, an external abort, or the run ending. Queued siblings that
+	// wake to a stale epoch settle as blocked without mounting a dialog.
+	let askEpoch = 0;
+	const activeAsks = new Set<AbortController>();
 	const state = new PermissionGateState();
 
 	const restoreState = (ctx: ExtensionContext) => {
@@ -26,11 +31,20 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_tree", (_event, ctx) => restoreState(ctx));
 
 	pi.on("agent_start", () => {
+		askEpoch++;
 		state.resetRuleHits();
 	});
 
 	pi.on("agent_end", () => {
+		askEpoch++;
 		state.clearPendingWrites();
+		for (const pending of [...activeAsks]) {
+			try {
+				pending.abort();
+			} catch {
+				// Aborting is best-effort; the epoch bump already cancels the ask.
+			}
+		}
 	});
 
 	pi.on("tool_result", (event) => {
@@ -63,14 +77,30 @@ export default function (pi: ExtensionAPI) {
 		// backstop for a host that does not honour it. Either way "nobody answered"
 		// is told apart from "answered no" by how long the dialog stayed up.
 		const timeoutMs = askTimeoutMs();
+		const myEpoch = askEpoch;
 		const previous = askSlot;
 		let releaseSlot: () => void = () => {};
 		askSlot = new Promise((resolve) => {
 			releaseSlot = resolve;
 		});
 		await previous;
+		const runSignal = ctx.signal as AbortSignal | undefined;
+		if (askEpoch !== myEpoch || runSignal?.aborted) {
+			releaseSlot();
+			return { block: true, reason };
+		}
 		const controller = new AbortController();
+		activeAsks.add(controller);
 		const timer = setTimeout(() => controller.abort(), timeoutMs + ASK_TIMEOUT_BACKSTOP_MS);
+		const cancelRun = () => {
+			askEpoch++;
+			try {
+				controller.abort();
+			} catch {
+				// Aborting is best-effort; the epoch bump already cancels the ask.
+			}
+		};
+		runSignal?.addEventListener("abort", cancelRun, { once: true });
 		const startedAt = Date.now();
 		let choice: string | undefined;
 		try {
@@ -81,22 +111,42 @@ export default function (pi: ExtensionAPI) {
 				// Notification listeners are advisory; the ask must still run.
 			}
 			try {
-				choice = await showAskDialog(ctx, askPrompt, {
-					signal: controller.signal,
-					timeout: timeoutMs,
-				});
+				// The backstop races the dialog so an ask always settles even
+				// when a custom host ignores both the countdown and the signal.
+				choice = await Promise.race([
+					showAskDialog(ctx, askPrompt, {
+						signal: controller.signal,
+						timeout: timeoutMs,
+					}),
+					new Promise<undefined>((resolve) => {
+						if (controller.signal.aborted) resolve(undefined);
+						else controller.signal.addEventListener("abort", () => resolve(undefined), { once: true });
+					}),
+				]);
 			} catch {
 				choice = undefined;
 			}
 		} finally {
 			clearTimeout(timer);
+			runSignal?.removeEventListener("abort", cancelRun);
+			activeAsks.delete(controller);
 			releaseSlot();
 		}
+
+		// The run moved on while asking (external abort, run end, or a new
+		// run): stay silent so a stale denial is never reported and the next
+		// run is never aborted for it.
+		if (runSignal?.aborted || askEpoch !== myEpoch) return { block: true, reason };
 
 		if (choice === ASK_ALLOW) {
 			state.stageWrites(event.toolCallId, assessment.writes);
 			return undefined;
 		}
+
+		// A denial or timeout owns the turn: cancel queued siblings before they
+		// can mount. The bump is synchronous here so no sibling microtask can
+		// slip through between the slot release above and this point.
+		askEpoch++;
 
 		// A dismissal in the countdown's final slack window is misread as a
 		// timeout. Harmless: both kinds abort the turn; only the wording differs.

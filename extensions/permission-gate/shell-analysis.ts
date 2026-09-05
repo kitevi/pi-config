@@ -14,6 +14,8 @@ export type Invocation = {
 	raw: string;
 	/** Arguments after the executable. */
 	args: string[];
+	/** Effective directory after cwd-changing wrappers have been applied. */
+	cwd: string;
 	/** The full lexed command, wrappers included. */
 	words: string[];
 };
@@ -221,10 +223,10 @@ const isEnvironmentAssignment = (value: string) => /^[a-z_][a-z0-9_]*=/i.test(va
 const SHELL_CONTROL_PREFIXES = new Set(["!", "{", "do", "elif", "else", "if", "then", "time", "until", "while"]);
 const OPTION_ONLY_PREFIXES = new Set(["exec", "nohup", "setsid", "stdbuf", "nice", "ionice"]);
 
-type ResolvedCommandWords = { words: string[]; executableIndex: number };
+type ResolvedCommandWords = { words: string[]; executableIndex: number; cwd: string };
 
 /** A private normalized copy with shell prefixes removed and env -S expanded. */
-const resolveCommandWords = (inputWords: string[]): ResolvedCommandWords | undefined => {
+const resolveCommandWords = (inputWords: string[], cwd = process.cwd()): ResolvedCommandWords | undefined => {
 	const words = [...inputWords];
 	let index = 0;
 
@@ -267,9 +269,16 @@ const resolveCommandWords = (inputWords: string[]): ResolvedCommandWords | undef
 					index++;
 					continue;
 				}
+				if (word === "-C" || word === "--chdir" || word.startsWith("--chdir=") || word.startsWith("-C")) {
+					const attached = word.startsWith("--chdir=") ? word.slice(8) : word.startsWith("-C") ? word.slice(2) : "";
+					const directory = attached || words[index + 1];
+					if (directory) cwd = resolve(cwd, expandPath(directory));
+					index += attached ? 1 : 2;
+					continue;
+				}
 				if (word.startsWith("-")) {
 					index++;
-					if (["-u", "--unset", "-C", "--chdir"].includes(word)) index++;
+					if (["-u", "--unset"].includes(word)) index++;
 					continue;
 				}
 				break;
@@ -286,7 +295,7 @@ const resolveCommandWords = (inputWords: string[]): ResolvedCommandWords | undef
 			continue;
 		}
 
-		return { words, executableIndex: index };
+		return { words, executableIndex: index, cwd };
 	}
 
 	return undefined;
@@ -294,53 +303,62 @@ const resolveCommandWords = (inputWords: string[]): ResolvedCommandWords | undef
 
 // Wrappers that run another program as a subcommand. Unlike `sudo`, they carry no
 // risk of their own, so the wrapped command replaces them entirely.
-const RUNNER_WRAPPERS = new Map<string, { subcommand: string; valueOptions: Set<string> }>([
-	["uv", { subcommand: "run", valueOptions: new Set(["--with", "--python", "-p", "--directory", "--project", "--extra", "--group", "--index"]) }],
-	["poetry", { subcommand: "run", valueOptions: new Set(["-C", "--directory"]) }],
+const RUNNER_WRAPPERS = new Map<string, { subcommand: string; valueOptions: Set<string>; cwdOptions?: Set<string> }>([
+	["uv", { subcommand: "run", valueOptions: new Set(["--with", "--python", "-p", "--directory", "--project", "--extra", "--group", "--index"]), cwdOptions: new Set(["--directory"]) }],
+	["poetry", { subcommand: "run", valueOptions: new Set(["-C", "--directory"]), cwdOptions: new Set(["-C", "--directory"]) }],
 	["pipenv", { subcommand: "run", valueOptions: new Set([]) }],
 	["rye", { subcommand: "run", valueOptions: new Set([]) }],
 	["pdm", { subcommand: "run", valueOptions: new Set(["-p", "--project"]) }],
 	["hatch", { subcommand: "run", valueOptions: new Set(["-e", "--env"]) }],
-	["mise", { subcommand: "exec", valueOptions: new Set(["-C", "--cd"]) }],
+	["mise", { subcommand: "exec", valueOptions: new Set(["-C", "--cd"]), cwdOptions: new Set(["-C", "--cd"]) }],
 ]);
 
-/** Arguments past the leading option flags: `sudo -u root -- rm` resolves to `["rm"]`. */
-const argsAfterOptions = (args: string[], valueOptions: Set<string>) => {
+/** Strip option values without losing directory changes or attached values. */
+const optionsAfter = (args: string[], valueOptions: Set<string>, cwd: string, cwdOptions?: Set<string>) => {
 	let index = 0;
 	while (index < args.length) {
 		const arg = args[index];
-		if (arg === "--") return args.slice(index + 1);
+		if (arg === "--") return { args: args.slice(index + 1), cwd };
 		if (!arg.startsWith("-")) break;
-		index += valueOptions.has(arg) ? 2 : 1;
+		const short = !arg.startsWith("--") && valueOptions.has(arg.slice(0, 2)) ? arg.slice(0, 2) : undefined;
+		const name = short ?? arg.split("=", 1)[0];
+		const attached = short && arg.length > 2 ? arg.slice(2) : arg.includes("=") ? arg.slice(arg.indexOf("=") + 1) : undefined;
+		const value = attached ?? args[index + 1];
+		if (cwdOptions?.has(name) && value !== undefined) cwd = resolve(cwd, expandPath(value));
+		index += valueOptions.has(name) && attached === undefined ? 2 : 1;
 	}
-	return args.slice(index);
+	return { args: args.slice(index), cwd };
 };
+
+const argsAfterOptions = (args: string[], valueOptions: Set<string>) => optionsAfter(args, valueOptions, process.cwd()).args;
 
 // Runner wrappers can nest (`mise exec uv run ...`); cap the unwrap rounds.
 const MAX_RUNNER_WRAPPERS = 4;
 
-const resolveInvocation = (words: string[]): Invocation | undefined => {
+const resolveInvocation = (words: string[], cwd = process.cwd()): Invocation | undefined => {
 	let current = words;
-
 	for (let round = 0; round < MAX_RUNNER_WRAPPERS; round++) {
-		const resolved = resolveCommandWords(current);
+		const resolved = resolveCommandWords(current, cwd);
 		if (!resolved) return undefined;
-
 		const { words: commandWords, executableIndex } = resolved;
+		cwd = resolved.cwd;
 		const raw = commandWords[executableIndex];
 		const executable = executableBasename(raw);
 		const args = commandWords.slice(executableIndex + 1);
 		const wrapper = RUNNER_WRAPPERS.get(executable);
-		if (wrapper && args[0] === wrapper.subcommand) {
-			const rest = argsAfterOptions(args.slice(1), wrapper.valueOptions);
-			if (rest.length > 0) {
-				current = rest;
-				continue;
+		if (wrapper) {
+			const leading = optionsAfter(args, wrapper.valueOptions, cwd, wrapper.cwdOptions);
+			if (leading.args[0] === wrapper.subcommand) {
+				const child = optionsAfter(leading.args.slice(1), wrapper.valueOptions, leading.cwd, wrapper.cwdOptions);
+				if (child.args.length > 0) {
+					current = child.args;
+					cwd = child.cwd;
+					continue;
+				}
 			}
 		}
-		return { executable, raw, args, words };
+		return { executable, raw, args, words, cwd };
 	}
-
 	return undefined;
 };
 
@@ -362,8 +380,8 @@ type Interpreter = {
 };
 
 const INTERPRETERS: Interpreter[] = [
-	{ pattern: /^(?:python|python2|python3(?:\.\d+)?|py|pypy|pypy3)$/, language: "python", inlineFlags: new Set(["-c"]) },
-	{ pattern: /^(?:node|nodejs|bun|deno|tsx|ts-node)$/, language: "javascript", inlineFlags: new Set(["-e", "--eval", "-p", "--print"]) },
+	{ pattern: /^(?:python|python2|python3(?:\.\d+)?|py|pypy|pypy3)$/, language: "python", inlineFlags: new Set(["-c"]), valueOptions: new Set(["-W", "-X", "--check-hash-based-pycs"]) },
+	{ pattern: /^(?:node|nodejs|bun|deno|tsx|ts-node)$/, language: "javascript", inlineFlags: new Set(["-e", "--eval", "-p", "--print"]), valueOptions: new Set(["-r", "--require", "--import", "--loader", "--experimental-loader", "--input-type", "-C", "--conditions", "--inspect-port", "--title", "--env-file", "--env-file-if-exists"]) },
 	{ pattern: /^(?:ruby|jruby)$/, language: "ruby", inlineFlags: new Set(["-e"]) },
 	{ pattern: /^perl$/, language: "perl", inlineFlags: new Set(["-e", "-E"]) },
 	{ pattern: /^php$/, language: "php", inlineFlags: new Set(["-r"]) },
@@ -460,7 +478,8 @@ const QUOTED_LIST_ITEM = /(["'])((?:\\.|(?!\1)[^\\])*)\1/g;
 
 const SCRIPT_EFFECTS: Array<{ kind: ScriptEffect; languages?: ScriptLanguage[]; pattern: RegExp }> = [
 	// python
-	{ kind: "mutate", languages: ["python"], pattern: /\bopen\s*\([^)]*,\s*(["'])[^"']*[wax+][^"']*\1/ },
+	// Both positional modes and mode= are writes; a filename alone is not a mode.
+	{ kind: "mutate", languages: ["python"], pattern: /\bopen\s*\((?:[^)]*,\s*(?:mode\s*=\s*)?|\s*mode\s*=\s*)(["'])[^"']*[wax+][^"']*\1/ },
 	{ kind: "mutate", languages: ["python"], pattern: /\b(?:write_text|write_bytes|writelines)\s*\(/ },
 	{ kind: "mutate", languages: ["python"], pattern: /\bos\.(?:remove|unlink|rmdir|removedirs|rename|replace|truncate|chmod|chown)\s*\(/ },
 	{ kind: "mutate", languages: ["python"], pattern: /\bshutil\.(?:rmtree|move|chown|copystat)\s*\(/ },
@@ -526,7 +545,7 @@ export const analyzeShellCommand = (source: string, cwd = process.cwd()): ShellA
 };
 
 const workingDirectoryAfter = (words: string[], cwd: string) => {
-	const invocation = resolveInvocation(words);
+	const invocation = resolveInvocation(words, cwd);
 	if (invocation?.executable !== "cd") return cwd;
 	const target = invocation.args.find((arg) => !arg.startsWith("-")) ?? HOME;
 	return target ? resolve(cwd, expandPath(target)) : cwd;
@@ -580,7 +599,8 @@ function collectSource(source: string, analysis: ShellAnalysis, depth: number, c
 }
 function collectHeredoc(segment: { owner: string; body: string }, analysis: ShellAnalysis, depth: number, cwd: string) {
 	const ownerWords = commandsIn(lexShellCommands(segment.owner)).at(-1)?.words ?? [];
-	const invocation = resolveInvocation(ownerWords);
+	const invocation = resolveInvocation(ownerWords, cwd);
+	cwd = invocation?.cwd ?? cwd;
 	const interpreter = invocation ? interpreterFor(invocation.executable) : undefined;
 
 	if (interpreter) {
@@ -599,14 +619,16 @@ function collectHeredoc(segment: { owner: string; body: string }, analysis: Shel
 function collectCommand(words: string[], analysis: ShellAnalysis, depth: number, cwd: string) {
 	if (words.length === 0 || depth > MAX_NESTING_DEPTH) return;
 
-	const invocation = resolveInvocation(words);
+	const invocation = resolveInvocation(words, cwd);
 	if (!invocation) return;
 	analysis.commands.push(invocation);
+	cwd = invocation.cwd;
 
 	const { executable, args } = invocation;
 
 	if (PRIVILEGE_EXECUTABLES.has(executable)) {
-		collectCommand(argsAfterOptions(args, PRIVILEGE_OPTIONS_WITH_VALUES), analysis, depth + 1, cwd);
+		const child = optionsAfter(args, PRIVILEGE_OPTIONS_WITH_VALUES, cwd, new Set(["-D", "--chdir"]));
+		collectCommand(child.args, analysis, depth + 1, child.cwd);
 		return;
 	}
 	if (SHELL_EXECUTABLES.has(executable)) {
@@ -754,5 +776,5 @@ function collectScript(language: ScriptLanguage, code: string, analysis: ShellAn
 const looksLikePath = (value: string) => value.includes("/") || /\.(?:sh|bash|zsh|fish|nu|py|js|mjs|cjs|ts|rb|pl|php)$/i.test(value);
 
 export const expandPath = (path: string) => path.replace(/^~(?=\/|$)/, HOME ?? "~");
-export const normalizedPath = (path: string) => normalize(resolve(expandPath(path)));
+export const normalizedPath = (path: string, cwd = process.cwd()) => normalize(resolve(cwd, expandPath(path)));
 export const normalizedEffectPath = ({ path, cwd }: PathEffect) => normalize(resolve(cwd, expandPath(path)));

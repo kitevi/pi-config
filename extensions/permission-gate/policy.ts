@@ -104,8 +104,8 @@ const isCredentialPath = (path: string) => {
 	].some((pattern) => pattern.test(normalized));
 };
 
-const isPseudoFsPath = (path: string) => {
-	const normalized = normalizedPath(path);
+const isPseudoFsPath = (path: string, cwd?: string) => {
+	const normalized = cwd === undefined ? normalizedPath(path) : normalizedPath(path, cwd);
 	return (
 		normalized === "/dev" ||
 		normalized.startsWith("/dev/") ||
@@ -152,10 +152,11 @@ const invocationMentionsCredential = (invocation: Invocation) => {
 	const isCommitMessage = (index: number) =>
 		invocation.executable === "git" && (invocation.args[index - 1] === "-m" || invocation.args[index - 1] === "--message");
 
+	// Resolve every argument against the command's effective directory: a bare
+	// `id_ed25519` inside `~/.ssh` is the same credential as the absolute path.
 	return invocation.args.some((arg, index) => {
 		if (isCommitMessage(index)) return false;
-		if (!arg.includes("/") && !arg.includes("~") && !arg.includes(".")) return false;
-		return isCredentialPath(normalize(arg)) || isCredentialPath(normalizedPath(arg));
+		return isCredentialPath(normalizedPath(arg, invocation.cwd));
 	});
 };
 
@@ -221,7 +222,7 @@ const PSEUDO_FS_MUTATORS = new Set([...MUTATING_EXECUTABLES, "cp", "mv", "touch"
 const textMentionsPseudoFs = (text: string) => extractPathMentions(text).some((path) => isPseudoFsPath(path));
 const commandWritesPseudoFs = (command: Invocation) =>
 	(PSEUDO_FS_MUTATORS.has(command.executable) || editsInPlaceCommand(command)) &&
-	command.args.some((arg) => textMentionsPseudoFs(arg));
+	command.args.some((arg) => textMentionsPseudoFs(arg) || isPseudoFsPath(arg, command.cwd));
 const scriptWritesPseudoFs = (script: AnalyzedScript) =>
 	effectsForScript(script).has("mutate") && textMentionsPseudoFs(script.code);
 
@@ -233,6 +234,8 @@ const shellWritesPseudoFs = (shell: ShellAnalysis) =>
 const mentionsCredentials = (shell: ShellAnalysis) =>
 	shell.texts.some((text) => mentionsCredentialPath(text)) ||
 	shell.commands.some((command) => invocationMentionsCredential(command)) ||
+	shell.written.some((effect) => isCredentialPath(normalizedEffectPath(effect))) ||
+	shell.executed.some((effect) => isCredentialPath(normalizedEffectPath(effect))) ||
 	scriptNamesPrivateKey(shell);
 
 // ─── git ─────────────────────────────────────────────────────────────────────
@@ -284,8 +287,51 @@ const isGitCommit = (shell: ShellAnalysis) => gitCommands(shell, "commit").lengt
 // retains a dedicated always-ask rule.
 const isGitRm = (shell: ShellAnalysis) => gitCommands(shell, "rm").length > 0;
 
+// `git commit -n` bypasses hooks exactly like `--no-verify`, but `-n` is a
+// dry-run for push and a message value after `-m`, so it only counts for
+// commit positionals. A short group containing `m`/`F`/`C`/`S` treats the
+// remainder as that option's value (`-mnonsense` is `-m nonsense`, not `-n`).
+const gitArgsAfterSubcommand = (command: Invocation): string[] | undefined => {
+	if (command.executable !== "git") return undefined;
+	let index = 0;
+	while (index < command.args.length) {
+		const argument = command.args[index];
+		if (argument === "--") return [];
+		if (!argument.startsWith("-")) return command.args.slice(index + 1);
+		const [option] = argument.split("=", 1);
+		index += GIT_GLOBAL_OPTIONS_WITH_VALUES.has(option) && !argument.includes("=") ? 2 : 1;
+	}
+	return undefined;
+};
+
+const gitCommitBypassesHooks = (args: string[]) => {
+	const valueOptions = new Set(["-m", "--message", "-F", "--file", "-C", "--reuse-message", "-c", "--reedit-message", "--template", "--author", "--date"]);
+	for (let index = 0; index < args.length; index++) {
+		const arg = args[index];
+		if (arg === "--") return false;
+		if (arg === "--no-verify") return true;
+		if (valueOptions.has(arg)) {
+			index++;
+			continue;
+		}
+		if (arg.startsWith("--")) continue;
+		if (/^-[a-z]+$/i.test(arg)) {
+			for (const letter of arg.slice(1)) {
+				if (letter === "m" || letter === "F" || letter === "C" || letter === "c" || letter === "S") break;
+				if (letter === "n") return true;
+			}
+		}
+	}
+	return false;
+};
+
 const bypassesGitHooks = (shell: ShellAnalysis) =>
-	shell.commands.some((command) => command.executable === "git" && command.args.includes("--no-verify"));
+	shell.commands.some((command) => {
+		if (command.executable !== "git") return false;
+		if (command.args.includes("--no-verify")) return true;
+		const rest = gitArgsAfterSubcommand(command);
+		return rest !== undefined && gitSubcommand(command) === "commit" && gitCommitBypassesHooks(rest);
+	});
 
 // ─── package managers ────────────────────────────────────────────────────────
 
@@ -312,13 +358,40 @@ const MUTATING_PACKAGE_COMMANDS = new Map<string, RegExp>([
 	["composer", /^(?:require|remove|install|update)$/],
 ]);
 
-const PACKAGE_OPTIONS_WITH_VALUES = new Map<string, Set<string>>([["npm", new Set(["--prefix"])]]);
+// Options that consume the next word (or carry it after `=` / attached),
+// so their values are never mistaken for the subcommand. Only value-taking
+// options are listed: skipping a boolean flag's "value" would hide the real
+// subcommand instead.
+const PACKAGE_OPTIONS_WITH_VALUES = new Map<string, Set<string>>([
+	["npm", new Set(["--prefix", "--workspace", "-w", "--registry", "--cache", "--userconfig", "--otp", "--tag", "--scope", "--auth-type", "--access"])],
+	["pnpm", new Set(["-C", "--dir", "--filter", "--registry", "--prefix", "--cache-dir", "--store-dir", "--auth-token", "--otp", "--tag", "--reporter", "--loglevel", "--shamefully-hoist"])],
+	["yarn", new Set(["--cwd", "--registry", "--cache-folder", "--otp", "--tag", "--scope", "--network-timeout"])],
+	["bun", new Set(["--cwd", "--registry", "--cache-dir"])],
+	["pip", new Set(["--proxy", "--index-url", "--extra-index-url", "--find-links", "--cert", "--client-cert", "--trusted-host", "--python"])],
+	["pip3", new Set(["--proxy", "--index-url", "--extra-index-url", "--find-links", "--cert", "--client-cert", "--trusted-host", "--python"])],
+	["uv", new Set(["--directory", "--project", "--python", "-p", "--index", "--default-index", "--cache-dir", "--auth-token", "--with"])],
+	["cargo", new Set(["--manifest-path", "--target", "--target-dir", "--profile", "--config", "-Z"])],
+]);
 
 const packagePositionals = (command: Invocation) => {
 	const valueOptions = PACKAGE_OPTIONS_WITH_VALUES.get(command.executable) ?? new Set<string>();
 	const positional: string[] = [];
 	for (let index = 0; index < command.args.length; index++) {
 		const arg = command.args[index];
+		if (arg === "--") {
+			positional.push(...command.args.slice(index + 1));
+			break;
+		}
+		if (arg.startsWith("--")) {
+			const name = optionName(arg);
+			if (name === arg && valueOptions.has(name)) index++;
+			continue;
+		}
+		if (/^-[a-z]+$/i.test(arg) && arg.length > 2) {
+			// Attached value (`-C/tmp`) or a boolean flag group (`-Syu`).
+			if (!valueOptions.has(arg.slice(0, 2)) && valueOptions.has(arg)) index++;
+			continue;
+		}
 		if (valueOptions.has(arg)) {
 			index++;
 			continue;
@@ -359,7 +432,11 @@ const CURL_UPLOAD_OPTIONS = new Set([
 const CURL_AUTH_OPTIONS = new Set(["-u", "--user"]);
 const CURL_METHOD_OPTIONS = new Set(["-X", "--request"]);
 const CURL_HEADER_OPTIONS = new Set(["-H", "--header"]);
-const CURL_SHORT_VALUE_OPTIONS = ["-T", "-d", "-F", "-u", "-X", "-H"];
+// Long options that take a value (skipped so the value is never read as a
+// flag). Risky `--data`/`--user`/`--request`/`--header` relatives are handled
+// by the detector below, never skipped blindly.
+const CURL_SKIP_LONG_OPTIONS = new Set(["--output", "--user-agent", "--referer", "--config", "--max-time", "--connect-timeout", "--write-out", "--proxy", "--proxy-user", "--range", "--time-cond", "--cert", "--cacert", "--key", "--ciphers", "--resolve", "--connect-to", "--limit-rate", "--retry", "--cert-type", "--key-type"]);
+const CURL_SKIP_SHORT_OPTIONS = new Set(["-o", "-A", "-B", "-b", "-c", "-C", "-D", "-e", "-E", "-K", "-m", "-P", "-Q", "-r", "-U", "-w", "-x", "-y", "-z"]);
 const CURL_MUTATING_METHODS = /^(?:POST|PUT|PATCH|DELETE)$/i;
 const WGET_AUTH_OPTIONS = new Set(["--user", "--password", "--http-user", "--http-password", "--ftp-user", "--ftp-password"]);
 
@@ -368,28 +445,53 @@ const optionName = (arg: string) => {
 	return equals < 0 ? arg : arg.slice(0, equals);
 };
 
-const curlOptionAt = (args: string[], index: number) => {
-	const arg = args[index];
-	if (arg.startsWith("--")) {
-		const name = optionName(arg);
-		return { name, value: name === arg ? args[index + 1] : arg.slice(name.length + 1) };
-	}
-
-	const name = CURL_SHORT_VALUE_OPTIONS.find((option) => arg === option || arg.startsWith(option));
-	if (!name) return { name: arg, value: undefined };
-	return { name, value: arg === name ? args[index + 1] : arg.slice(name.length) };
+// Index-based parsing misreads combined groups (`-sSX POST` hides `-X`)
+// and option values (`-o -download.txt` looks like `-d`). Scan left to
+// right, expanding short groups and consuming every option value.
+const curlSendsData = (command: Invocation) => {
+	const args = command.args;
+	for (let index = 0; index < args.length; index++) {
+		const arg = args[index];
+		if (arg === "--") break;
+		if (arg.startsWith("--")) {
+			const name = optionName(arg);
+			const inline = name === arg ? undefined : arg.slice(name.length + 1);
+			if (CURL_UPLOAD_OPTIONS.has(name) || CURL_AUTH_OPTIONS.has(name)) {
+				if (inline === undefined) index++;
+				return true;
+			}
+			if (CURL_METHOD_OPTIONS.has(name) || CURL_HEADER_OPTIONS.has(name)) {
+				const value = inline ?? args[index + 1];
+				if (inline === undefined) index++;
+				if (CURL_METHOD_OPTIONS.has(name) ? CURL_MUTATING_METHODS.test(value ?? "") : /authorization:/i.test(value ?? "")) return true;
+				continue;
+			}
+			if (inline === undefined && CURL_SKIP_LONG_OPTIONS.has(name)) index++;
+			continue;
+		}
+		if (/^-[a-zA-Z]+$/.test(arg)) {
+			for (let pos = 1; pos < arg.length; pos++) {
+				const flag = `-${arg[pos]}`;
+				const attached = arg.slice(pos + 1);
+				if (CURL_UPLOAD_OPTIONS.has(flag) || CURL_AUTH_OPTIONS.has(flag)) {
+					if (!attached) index++;
+					return true;
+				}
+				if (CURL_METHOD_OPTIONS.has(flag) || CURL_HEADER_OPTIONS.has(flag)) {
+					const value = attached || args[index + 1];
+					if (!attached) index++;
+					if (CURL_METHOD_OPTIONS.has(flag) ? CURL_MUTATING_METHODS.test(value ?? "") : /authorization:/i.test(value ?? "")) return true;
+					break;
+				}
+				if (CURL_SKIP_SHORT_OPTIONS.has(flag)) {
+					if (!attached) index++;
+					break;
+				}
+			}
+			}
+		}
+	return false;
 };
-
-const curlSendsData = (command: Invocation) =>
-	command.args.some((_, index) => {
-		const { name, value } = curlOptionAt(command.args, index);
-		return (
-			CURL_UPLOAD_OPTIONS.has(name) ||
-			CURL_AUTH_OPTIONS.has(name) ||
-			(CURL_METHOD_OPTIONS.has(name) && CURL_MUTATING_METHODS.test(value ?? "")) ||
-			(CURL_HEADER_OPTIONS.has(name) && /authorization:/i.test(value ?? ""))
-		);
-	});
 
 const isRiskyNetwork = (shell: ShellAnalysis) =>
 	usesExecutable(shell, NETWORK_EXECUTABLES) ||
@@ -486,7 +588,7 @@ const rules: Rule[] = [
 		decision: "block",
 		description: "credential/private material path accessed by structured tool",
 		guidance: GUIDANCE.credentials,
-		matches: (call) => call.kind === "path" && isCredentialPath(call.path),
+		matches: (call) => call.kind === "path" && isCredentialPath(normalizedPath(call.path, call.cwd)),
 	},
 	{
 		id: "block.credential-shell-access",
@@ -524,7 +626,7 @@ const rules: Rule[] = [
 		decision: "block",
 		description: "structured write to /dev, /proc, or /sys",
 		guidance: GUIDANCE.pseudoFs,
-		matches: (call) => call.kind === "path" && call.access === "write" && isPseudoFsPath(call.path),
+		matches: (call) => call.kind === "path" && call.access === "write" && isPseudoFsPath(call.path, call.cwd),
 	},
 	{
 		id: "block.pseudo-fs-shell-write",

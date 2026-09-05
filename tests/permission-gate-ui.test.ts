@@ -91,7 +91,10 @@ const install = () => {
 	};
 	const dispose = () => { close(); component?.dispose?.(); tui.stop(); };
 	cleanups.push(dispose);
-	return { abort, call, ctx, dialogs, dispose, frame, key: (data: string) => input(data), selectors, sent, terminal };
+	return { abort, call, ctx, dialogs, dispose, frame, key: (data: string) => input(data), selectors, sent, terminal,
+		startAgentRun: () => handlers.get("agent_start")?.({}, ctx),
+		endAgentRun: () => handlers.get("agent_end")?.({}, ctx),
+	};
 };
 
 // These commands are only assessed/rendered, never executed.
@@ -334,6 +337,71 @@ it("does not open a dialog for an already-aborted request", async () => {
 	const ui = install();
 	assert.isUndefined(await showAskDialog(ui.ctx as never, "review body", { signal: AbortSignal.abort(), timeout: 60000 }));
 	assert.isEmpty(ui.dialogs);
+});
+
+it("cancels active and queued asks when the agent signal aborts", async () => {
+	const ui = install();
+	const controller = new AbortController();
+	Object.defineProperty(ui.ctx, "signal", { value: controller.signal });
+	const first = ui.call("rm first-fixture");
+	const second = ui.call("rm second-fixture");
+	await vi.advanceTimersByTimeAsync(1);
+	controller.abort();
+	const outcomes = await Promise.all([first, second]);
+	assert.isTrue(outcomes.every((outcome) => outcome?.block));
+	assert.equal(ui.dialogs.length, 1);
+	assert.equal(ui.sent.mock.calls.length, 0, "an external abort must not be reported as a user denial");
+	assert.equal(ui.abort.mock.calls.length, 0);
+});
+
+it("declining cancels queued asks and the next agent run can ask again", async () => {
+	const ui = install();
+	const first = ui.call("rm first-fixture");
+	const second = ui.call("rm second-fixture");
+	await vi.advanceTimersByTimeAsync(1);
+	ui.frame();
+	ui.key("\x1b");
+	assert.isTrue((await first)?.block);
+	assert.isTrue((await second)?.block);
+	assert.equal(ui.dialogs.length, 1);
+	assert.equal(ui.sent.mock.calls.length, 1);
+	await vi.advanceTimersByTimeAsync(1);
+	assert.equal(ui.abort.mock.calls.length, 1);
+	ui.startAgentRun();
+	const next = ui.call("rm next-fixture");
+	await vi.advanceTimersByTimeAsync(1);
+	assert.equal(ui.dialogs.length, 2);
+	ui.frame(); ui.key("\t"); ui.key("\r");
+	assert.isUndefined(await next);
+});
+
+it("ending a run cancels its ask without aborting a subsequent run", async () => {
+	const ui = install();
+	const pending = ui.call("rm old-fixture");
+	await vi.advanceTimersByTimeAsync(1);
+	ui.endAgentRun();
+	assert.isTrue((await pending)?.block);
+	ui.startAgentRun();
+	await vi.advanceTimersByTimeAsync(1);
+	assert.equal(ui.abort.mock.calls.length, 0);
+});
+
+it("a timeout cancels queued asks instead of opening a fresh countdown", async () => {
+	const ui = install();
+	const first = ui.call("rm first-fixture");
+	const second = ui.call("rm second-fixture");
+	await vi.advanceTimersByTimeAsync(60001);
+	assert.isTrue((await first)?.block);
+	assert.isTrue((await second)?.block);
+	assert.equal(ui.dialogs.length, 1);
+});
+
+it("the backstop settles even when a custom host ignores its signal", async () => {
+	const ui = install();
+	ui.ctx.ui.custom = () => new Promise<string | undefined>(() => {});
+	const pending = ui.call("rm ignored-signal-fixture");
+	await vi.advanceTimersByTimeAsync(62001);
+	assert.isTrue((await pending)?.block);
 });
 
 it("retains RPC's native selector when custom UI is a no-op", async () => {
