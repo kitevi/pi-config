@@ -11,6 +11,7 @@
     "git/github.com/dmmulroy/skills/bro",
     "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me",
     "git/github.com/cursor/plugins/cursor-team-kit/skills/thermo-nuclear-code-quality-review",
+    "git/github.com/cursor/plugins/cursor-team-kit/skills/deslop",
     "git/github.com/anthropics/knowledge-work-plugins/engineering/skills/code-review"
   ],
   "packages": [
@@ -40,9 +41,7 @@
     {
       "source": "https://github.com/mattpocock/skills",
       "skills": [
-        "skills/productivity/grill-me",
         "skills/productivity/grilling",
-        "skills/engineering/grill-with-docs",
         "skills/engineering/implement",
         "skills/engineering/resolving-merge-conflicts",
         "skills/engineering/tdd",
