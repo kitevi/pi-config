@@ -2,7 +2,9 @@
   "configVersion": 3,
   "components": [],
   "executor": {
-    "maxOutputChars": 8192
+    "maxOutputChars": 8192,
+    "kernel": "python",
+    "pythonRuntime": "monty"
   },
   "approvals": {
     "agent": "deny"

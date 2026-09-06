@@ -1,34 +1,24 @@
 # Rules
 - Ask one short question only when plausible interpretations require different implementations. Otherwise choose the most likely interpretation and proceed.
 - Never run `pi` from bash or any shell tool. If a skill needs a subagent tool you do not have, do the work yourself or say it is unavailable.
+- Keep repository code and orchestration separate: repository files may use any language; `fabric_exec.code` uses the configured Monty Python kernel.
 
-# Web and documentation tools (MCP, inside fabric_exec)
-- Use these MCP tools for web/docs lookups — not curl/wget (shell HTTP is fallback only; say why):
-- `mcp.exa.web_search_exa({query, numResults?})` — web search. Returns `{text: string}` (a pre-rendered "Title / URL / Published / Highlights" blob, not a results array). Read `.text`; never `.results`.
-- `mcp.exa.web_fetch_exa({urls: string[], maxCharacters?})` — fetch pages; `urls` is an array, never `{url}`. Returns `{text: string}` (concatenated markdown of every page); read `.text`.
-- `mcp.synthetic_web_search.search_web({query, max_text_length?})` — Synthetic zero-data-retention web search; use for privacy-sensitive queries or when Exa's features aren't needed. Returns `{text: string}` containing a JSON array; each result has `url`, `title`, `text` (truncated at `max_text_length`, default 1000), `highlights` (string[]), and `published` (optional — omitted, not null, when the page has no date). Parse with `JSON.parse(res.text)`.
-- MCP output shapes are tool-specific. Use a documented shape when one is given; otherwise return `JSON.stringify(res).slice(0, 1500)` once before extracting fields. SDK/REST client examples do not define an MCP tool's response.
-- Probe once, then extract: after inspecting a response, use the observed fields on the next call and retain that shape for later calls to the same tool. A shape-related failure permits one inspection retry, not another guessed access.
-- `mcp.context7['resolve-library-id']({libraryName, query})` then `mcp.context7['query-docs']({libraryId: '/org/project[/version]', query})` — library/API docs before web search; one topic per query; hyphenated names need bracket access (or `tools.call({ref, args})`).
-- Any other `mcp.*` tool: `await tools.describe({ref})` first, match `inputSchema` exactly (extra/missing props get rejected). After "Invalid arguments": describe and fix — never re-guess.
-- When a web fetch falls back to curl/bash, impersonate a user-triggered AI fetcher with its full documented UA string (bare tokens are weaker — real agents send Mozilla-compatible UAs) — sites serve these full content and they're the hardest to IP-verify: `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" <url>`. If blocked, rotate tokens: `Claude-User`, `Perplexity-User`, `OAI-SearchBot`. Sites enforcing Web Bot Auth (Cloudflare, Vercel) will still fail — don't retry there.
+# Web and documentation tools
+- Prefer MCP for web/docs lookups. Use shell HTTP only as a fallback and explain why.
+- `await mcp.exa.web_search_exa(query="...", numResults=5)` returns a dict whose `text` is a rendered search summary, not a results array. Read `r["text"]`.
+- `await mcp.exa.web_fetch_exa(urls=["..."], maxCharacters=10000)` returns concatenated page markdown in `r["text"]`. The argument is `urls`, not `url`.
+- `await mcp.synthetic_web_search.search_web(query="...", max_text_length=1000)` is preferred for privacy-sensitive queries or when Exa's features aren't needed. Its `r["text"]` contains a JSON array: decode with `import json` and `json.loads(r["text"])`. Each result has `url`, `title`, `text`, `highlights`, and optional `published` (omitted when unknown).
+- For library/API docs, first use `await tools.call(ref="mcp.context7.resolve-library-id", args={"libraryName": "...", "query": "..."})`, then `await tools.call(ref="mcp.context7.query-docs", args={"libraryId": "...", "query": "..."})`. One topic per query; use web search afterward if needed.
+- For other MCP tools, use `await tools.describe(ref="...")` first and match `inputSchema`. After an argument-validation error, describe and correct the call rather than guessing again.
+- MCP response shapes differ from SDK/REST examples. If unknown, return a bounded inspection (about 1500 characters) before extracting fields. Retain the observed shape; after a shape error, inspect once and correct it. Decode JSON strings only, not already-structured dicts/lists.
+- For shell web-fetch fallback, use the documented user-triggered fetcher UA: `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" <url>`. Report access blocks rather than repeatedly retrying.
 
-# fabric_exec edge semantics
-- `print()` and `console.log()` write to the activity panel rather than the model-visible tool result.
-- Prefer canonical argument fields (`command`, `pattern`, `path`, `oldText`, `newText`, `content`) even though aliases are accepted.
-- Before executing, check bracket balance and that every referenced variable is declared or destructured. Put multiline edit/write payloads in top-level `strings` and reference them as `π.key`; on a type/parse error, fix the reported line rather than retrying unchanged.
-- Every `pi.*` call is asynchronous. Await its result before reading properties or calling methods; batch independent calls with the complete pattern below:
-  ```ts
-  const [pkg, hits] = await Promise.all([
-    pi.read("package.json"),
-    pi.grep({ pattern: "TODO", path: "src" }),
-  ]);
-  return { pkg, hits };
-  ```
-- `pi` is a lazy proxy. `Object.keys(pi)` is empty by design; do not use it for capability discovery.
-
-# fabric_exec failure recovery
-- After a `pi.grep` regex parse error, use `literal:true` for exact punctuated text; for an intentional regex, double-escape backslashes through the TypeScript string layer or pass the pattern through top-level `strings`.
-- After a `pi.edit` match error, re-read the current file and use exact, unique `oldText`; never use stale or line-number-prefixed search output as an anchor, and use `all:true` only when every occurrence should change.
-- After `pi.find`/`pi.grep` reports an invalid search path, verify the directory from an existing parent with `pi.ls` or `pi.find` before retrying; do not batch an unverified path with unrelated calls.
-- After a shell syntax error, inspect the command after TypeScript escaping; quote shell metacharacters or put an escape-heavy command in top-level `strings` and pass `π.key` to `pi.bash`.
+# Tool edge cases and recovery
+- Prefer canonical argument fields: `command`, `pattern`, `path`, `oldText`, `newText`, `content`.
+- `print()` is activity output; explicitly return evidence the model needs to inspect.
+- Discover capabilities through `tools`; `pi` is a lazy namespace, not an enumerable catalog.
+- After a syntax error, fix the reported source before retrying.
+- After a `pi.grep` regex error, use `literal=True` for exact text; pass escape-heavy regex patterns through top-level `payloads`.
+- After a `pi.edit` match error, re-read the file and use exact, unique `oldText`, without search-output line prefixes. Use `all=True` only when every occurrence should change.
+- After an invalid search path, locate the directory from an existing parent with `pi.ls` or `pi.find` before retrying.
+- After a shell syntax error, inspect the command after Python string escaping; quote shell metacharacters or pass the command through top-level `payloads`.
