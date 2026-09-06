@@ -26,7 +26,7 @@
       "themes": []
     },
     "npm:pi-fabric",
-    "https://github.com/kitevi/pide",
+    "https://github.com/kitevi/piref",
     "npm:pi-neuralwatt-provider",
     "npm:@monotykamary/pi-tps",
     "npm:@monotykamary/pi-retry",
