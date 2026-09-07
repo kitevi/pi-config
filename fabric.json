@@ -1,5 +1,5 @@
 {
-  "configVersion": 3,
+  "configVersion": 4,
   "components": [],
   "executor": {
     "maxOutputChars": 8192
@@ -8,7 +8,6 @@
     "agent": "deny"
   },
   "mcp": {
-    "configPath": "~/.pi/agent/mcp.json",
     "allowDynamicServers": false
   },
   "agents": {
