@@ -1,5 +1,4 @@
 # Rules
-- Ask one short question only when plausible interpretations require different implementations. Otherwise choose the most likely interpretation and proceed.
 - Never run `pi` from bash or any shell tool. If a skill requires an unavailable subagent tool, do the work directly or report that the tool is unavailable.
 
 # Web and documentation tools (MCP, inside fabric_exec)
