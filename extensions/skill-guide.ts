@@ -40,7 +40,7 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 		tdd: "Feature work, test-first.",
 		"tech-spec": "Feature needs a plan first.",
 		"thermo-nuclear-code-quality-review": "Structure needs a beatdown.",
-		"writing-for-agents": "Writing a new skill.",
+		"agent-wording": "Wording feels ambiguous.",
 	},
 };
 
