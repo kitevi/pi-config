@@ -167,16 +167,11 @@ void describe("footer-veil extension wiring", () => {
 		};
 	}
 
-	function setup(commands = [{ name: "openai-usage-presentation", source: "extension" }]) {
+	function setup() {
 		const ui = fakeUI();
-		const sent: Array<{ content: string; options: { expandPromptTemplates?: boolean } }> = [];
 		const shortcuts: Record<string, { handler: (ctx: never) => Promise<void> }> = {};
 		const events: Record<string, Array<(event: never, ctx: never) => Promise<void>>> = {};
 		const pi = {
-			getCommands: () => commands,
-			sendUserMessage: (content: string, options: { expandPromptTemplates?: boolean }) => {
-				sent.push({ content, options });
-			},
 			registerShortcut: (id: string, def: { handler: (ctx: never) => Promise<void> }) => {
 				shortcuts[id] = def;
 			},
@@ -189,15 +184,11 @@ void describe("footer-veil extension wiring", () => {
 		shutdowns.push(async () => {
 			for (const handler of events["session_shutdown"] ?? []) await handler(undefined as never, ctx as never);
 		});
-		return { shortcuts, events, ctx, ui, sent, commands };
+		return { shortcuts, events, ctx, ui };
 	}
 
 	async function sessionStart(s: ReturnType<typeof setup>): Promise<void> {
 		for (const handler of s.events["session_start"] ?? []) await handler(undefined as never, s.ctx as never);
-	}
-
-	async function resourcesDiscover(s: ReturnType<typeof setup>): Promise<void> {
-		for (const handler of s.events["resources_discover"] ?? []) await handler(undefined as never, s.ctx as never);
 	}
 
 	type RenderWidgetContainerFn = (
@@ -236,101 +227,27 @@ void describe("footer-veil extension wiring", () => {
 		}
 	});
 
-	void it("synchronizes hidden presentation after session startup", async () => {
+	void it("starts veiled without warnings", async () => {
 		const s = setup();
 		await sessionStart(s);
-		assert.deepStrictEqual(s.sent, []);
-		await resourcesDiscover(s);
-		assert.deepStrictEqual(s.sent, [{
-			content: "/openai-usage-presentation hide",
-			options: { expandPromptTemplates: true },
-		}]);
+		assert.deepStrictEqual(s.ui.notices, []);
 	});
 
-	void it("sends explicit show and hide on consecutive shortcut presses", async () => {
+	void it("does not notify or refresh without a UI", async () => {
 		const s = setup();
-		await sessionStart(s);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-		assert.deepStrictEqual(s.sent, [
-			{ content: "/openai-usage-presentation show", options: { expandPromptTemplates: true } },
-			{ content: "/openai-usage-presentation hide", options: { expandPromptTemplates: true } },
-		]);
-	});
-
-	void it("warns once per session for an unavailable OpenAI command without sending a prompt", async () => {
-		const s = setup([]);
-		await sessionStart(s);
-		await resourcesDiscover(s);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-		assert.deepStrictEqual(s.sent, []);
-		assert.strictEqual(s.ui.notices.filter((n) => n.includes("OpenAI presentation unavailable")).length, 1);
-		await sessionStart(s);
-		await resourcesDiscover(s);
-		assert.strictEqual(s.ui.notices.filter((n) => n.includes("OpenAI presentation unavailable")).length, 2);
-	});
-
-	void it.each(["prompt", "skill"])("does not dispatch a same-named %s as a command", async (source) => {
-		const s = setup([{ name: "openai-usage-presentation", source }]);
-		await sessionStart(s);
-		await resourcesDiscover(s);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-		assert.deepStrictEqual(s.sent, []);
-	});
-
-	void it.each(["before", "after"])("synchronizes after the fork resets, with the fork loaded %s the veil", async (order) => {
-		const s = setup();
-		let reset = false;
-		const forkStart = async () => {
-			assert.deepStrictEqual(s.sent, []);
-			reset = true;
-		};
-		if (order === "before") s.events["session_start"].unshift(forkStart);
-		else s.events["session_start"].push(forkStart);
-		await sessionStart(s);
-		assert.strictEqual(reset, true);
-		await resourcesDiscover(s);
-		assert.strictEqual(s.sent.at(-1)?.content, "/openai-usage-presentation hide");
-	});
-
-	void it.each(["reload", "new", "resume", "fork"])("resynchronizes hidden presentation after %s", async (reason) => {
-		const s = setup();
-		await sessionStart(s);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-		for (const handler of s.events["session_start"]) await handler({ reason } as never, s.ctx as never);
-		await resourcesDiscover(s);
-		assert.strictEqual(s.sent.at(-1)?.content, "/openai-usage-presentation hide");
-	});
-
-	void it("synchronizes the current state rather than a stale startup value", async () => {
-		const s = setup();
-		await sessionStart(s);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-		await resourcesDiscover(s);
-		assert.strictEqual(s.sent.at(-1)?.content, "/openai-usage-presentation show");
-	});
-
-	void it("does not dispatch commands or warnings without a UI", async () => {
-		const s = setup([]);
 		s.ctx.hasUI = false;
 		await sessionStart(s);
-		await resourcesDiscover(s);
 		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-		assert.deepStrictEqual(s.sent, []);
 		assert.deepStrictEqual(s.ui.notices, []);
 		assert.deepStrictEqual(s.ui.widgetClears, []);
 	});
 
-	void it("restores the built-in footer on shutdown without sending show", async () => {
+	void it("restores the built-in footer on shutdown", async () => {
 		const s = setup();
 		const originalRender = FooterComponent.prototype.render;
 		await sessionStart(s);
-		await resourcesDiscover(s);
-		const sent = [...s.sent];
 		for (const handler of s.events["session_shutdown"]) await handler(undefined as never, s.ctx as never);
 		assert.strictEqual(FooterComponent.prototype.render, originalRender);
-		assert.deepStrictEqual(s.sent, sent);
 	});
 
 	void it("notifies shown on first ctrl+p toggle", async () => {

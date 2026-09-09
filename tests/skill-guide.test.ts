@@ -63,7 +63,7 @@ void describe("skill guide config", () => {
 		assert.strictEqual(parsed.maxSummaryLength, 30);
 		assert.strictEqual(parsed.summaryOverrides["code-review"], "Review a diff.");
 		assert.deepStrictEqual(parsed.hiddenSkills, []);
-		assert.deepStrictEqual(parsed.pinnedSkills, ["fabric-exec"]);
+		assert.deepStrictEqual(parsed.pinnedSkills, []);
 	});
 
 	void it("keeps every configured summary within the display budget", () => {
@@ -71,7 +71,7 @@ void describe("skill guide config", () => {
 
 		assert.strictEqual(configured.maxSummaryLength, 30);
 		assert.deepStrictEqual(configured.hiddenSkills, ["fabric-*"]);
-		assert.deepStrictEqual(configured.pinnedSkills, ["fabric-exec"]);
+		assert.deepStrictEqual(configured.pinnedSkills, []);
 		for (const [skill, summary] of Object.entries(configured.summaryOverrides)) {
 			assert.ok(summary.length <= 30, `${skill} summary is ${summary.length} characters`);
 		}

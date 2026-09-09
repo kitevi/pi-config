@@ -11,7 +11,6 @@ const TOGGLE_MODEL_INFO_SHORTCUT = "ctrl+p";
 const DUMB_ZONE_TOKEN_THRESHOLD = 128_000;
 const DUMB_ZONE_LABEL = "dumb";
 const REFRESH_WIDGET_KEY = "footer-veil";
-const OPENAI_PRESENTATION_COMMAND = "openai-usage-presentation";
 
 // Hidden mode keeps built-in footer stats and explicitly allowlisted widgets.
 // Providers remain hidden by default; their source maps are never modified.
@@ -120,7 +119,6 @@ export function stripModelInfoFromFooterLine(line: string): string {
 const WARNING_MESSAGES = {
 	footer: "Footer veil: unexpected footer shape; usage statuses left visible.",
 	widget: "Footer veil: unexpected widget surface; usage widgets left visible.",
-	openai: "Footer veil: OpenAI presentation unavailable; load Better OpenAI with /openai-usage-presentation support.",
 };
 type VeilWarningKind = keyof typeof WARNING_MESSAGES;
 
@@ -237,28 +235,12 @@ export function resetFooterVeilForTests(): void {
 }
 
 export default function footerVeilExtension(pi: ExtensionAPI): void {
-	function synchronizeOpenAI(ctx: ExtensionContext): void {
-		if (!ctx.hasUI) return;
-		const available = pi.getCommands().some(
-			(command) => command.source === "extension" && command.name === OPENAI_PRESENTATION_COMMAND,
-		);
-		if (!available) {
-			veil.warn("openai");
-			return;
-		}
-		// Pi dispatches recognized extension commands before prompting, even while streaming.
-		pi.sendUserMessage(`/${OPENAI_PRESENTATION_COMMAND} ${veil.shown ? "show" : "hide"}`, {
-			expandPromptTemplates: true,
-		});
-	}
-
 	pi.registerShortcut(TOGGLE_MODEL_INFO_SHORTCUT, {
 		description: "Toggle footer details (skill guide stays visible)",
 		handler: async (ctx) => {
 			veil.shown = !veil.shown;
 			veil.refresh(ctx);
 			if (ctx.hasUI) {
-				synchronizeOpenAI(ctx);
 				ctx.ui.notify(`Model info and usage ${veil.shown ? "shown" : "hidden"}.`, "info");
 			}
 		},
@@ -273,11 +255,6 @@ export default function footerVeilExtension(pi: ExtensionAPI): void {
 		});
 		veil.install();
 		veil.refresh(ctx);
-	});
-
-	pi.on("resources_discover", (_event, ctx) => {
-		// Runs after all session_start handlers, including Better OpenAI's visibility reset.
-		synchronizeOpenAI(ctx);
 	});
 
 	pi.on("session_shutdown", async () => {

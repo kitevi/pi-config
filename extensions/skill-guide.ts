@@ -9,12 +9,11 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 const WIDGET_ID = "skill-guide";
 const DEFAULT_MAX_SUMMARY_LENGTH = 30;
 const WIDE_LAYOUT_MIN_WIDTH = 76;
-const DEFAULT_PINNED_SKILLS = ["fabric-exec"];
+const DEFAULT_PINNED_SKILLS: string[] = [];
 
 // Single source of truth for the guide: edit values here, then /reload.
 // hiddenSkills supports exact skill names or "prefix*" globs. pinnedSkills
-// (default: fabric-exec) always stays visible; set it to [] to hide everything
-// matched by hiddenSkills.
+// always stays visible even when matched by hiddenSkills (default: none).
 const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 	title: "Skill index",
 	showOnStartup: true,
