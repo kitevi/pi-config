@@ -52,8 +52,8 @@ The theme follows your terminal appearance: pi switches between the
 ## Footer veil
 
 `extensions/footer-veil.ts` starts with model information and provider usage
-veiled. Press `Ctrl+P` to show or hide them; context statistics and the inline
-`dumb` zone hint retain their existing behavior. Provider usage covers both the
+veiled. Press `Ctrl+P` to show or hide them; context statistics retain their
+existing behavior. Provider usage covers both the
 footer status slots and the below-editor widget lines used by hypercharm, zro,
 neuralwatt, and Better OpenAI (in its `status` footer mode). No per-provider
 commands are used; the veil filters at render time, so provider updates stay
@@ -146,7 +146,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide` (settings live in `DEFAULT_SKILL_GUIDE_CONFIG` at the top of the file)
   - `extensions/permission-gate.ts` — stable entry point for the rule-based `bash`/`nu` permission gate (see [Permission gate](#permission-gate))
   - `extensions/permission-gate/` — shell analysis, policy, state, presentation, and runtime modules behind the gate
-  - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets, plus context "dumb zone" hints
+  - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
   - `extensions/opencode-go-usage.ts` — shows OpenCode Go 5h/weekly/monthly used quotas and reset times in the footer while an OpenCode Go model is active

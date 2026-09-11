@@ -5,9 +5,6 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import footerVeilExtension from "../extensions/footer-veil.ts";
 import {
 	withVeiledExtensionStatuses,
-	formatFooterTokenCount,
-	injectDumbZoneIntoFooterLine,
-	shouldShowDumbZone,
 	stripModelInfoFromFooterLine,
 	resetFooterVeilForTests,
 } from "../extensions/footer-veil.ts";
@@ -28,38 +25,6 @@ void describe("footer-veil model boundary", () => {
 		assert.notInclude(result, "MODEL");
 		assert.strictEqual(visibleWidth(result), visibleWidth("↑1k 80.0%/1.0M"));
 		assert.isTrue(result.endsWith("\u001b[0m"));
-	});
-});
-
-void describe("footer-veil dumb-zone footer marker", () => {
-	void it("formats footer token counts like Pi's footer", () => {
-		assert.strictEqual(formatFooterTokenCount(999), "999");
-		assert.strictEqual(formatFooterTokenCount(1_001), "1.0k");
-		assert.strictEqual(formatFooterTokenCount(9_999), "10.0k");
-		assert.strictEqual(formatFooterTokenCount(128_000), "128k");
-		assert.strictEqual(formatFooterTokenCount(1_250_000), "1.3M");
-	});
-
-	void it("only enters the dumb zone after 128k tokens", () => {
-		assert.strictEqual(shouldShowDumbZone(undefined), false);
-		assert.strictEqual(shouldShowDumbZone({ tokens: null }), false);
-		assert.strictEqual(shouldShowDumbZone({ tokens: 128_000 }), false);
-		assert.strictEqual(shouldShowDumbZone({ tokens: 128_001 }), true);
-	});
-
-	void it("keeps the auto indicator separated from the dumb-zone marker", () => {
-		const result = injectDumbZoneIntoFooterLine("14.0%/1.0M (auto)", 1_000_000, "dumb", 80);
-		assert.strictEqual(result, "14.0%/1.0M dumb (auto)");
-	});
-
-	void it("inserts the marker inline after the context window without adding a row", () => {
-		const line = "up24k dn3k 68.2%/200k                         model";
-		const label = "dumb";
-		const result = injectDumbZoneIntoFooterLine(line, 200_000, label, 80);
-		assert.match(result, /\/200k dumb/);
-		assert.match(result, /model$/);
-		assert.strictEqual(result.split("\n").length, 1);
-		assert.ok(visibleWidth(result) <= 80);
 	});
 });
 
@@ -163,7 +128,6 @@ void describe("footer-veil extension wiring", () => {
 				assert.strictEqual(content, undefined);
 				widgetClears.push(key);
 			},
-			theme: { fg: (_color: string, text: string) => text },
 		};
 	}
 

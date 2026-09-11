@@ -1,5 +1,4 @@
 import {
-	type AgentSession,
 	type ExtensionAPI,
 	type ExtensionContext,
 	FooterComponent,
@@ -8,8 +7,6 @@ import {
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const TOGGLE_MODEL_INFO_SHORTCUT = "ctrl+p";
-const DUMB_ZONE_TOKEN_THRESHOLD = 128_000;
-const DUMB_ZONE_LABEL = "dumb";
 const REFRESH_WIDGET_KEY = "footer-veil";
 
 // Hidden mode keeps built-in footer stats and explicitly allowlisted widgets.
@@ -68,47 +65,6 @@ type RenderWidgetContainerFn = (
 	leadingSpacer: boolean,
 ) => void;
 
-interface FooterSessionHost {
-	session?: Pick<AgentSession, "getContextUsage">;
-}
-
-export function formatFooterTokenCount(count: number): string {
-	if (count < 1000) return count.toString();
-	if (count < 10000) return `${(count / 1000).toFixed(1)}k`;
-	if (count < 1000000) return `${Math.round(count / 1000)}k`;
-	if (count < 10000000) return `${(count / 1000000).toFixed(1)}M`;
-	return `${Math.round(count / 1000000)}M`;
-}
-
-export function shouldShowDumbZone(
-	usage: { tokens: number | null } | undefined,
-	threshold = DUMB_ZONE_TOKEN_THRESHOLD,
-): boolean {
-	return typeof usage?.tokens === "number" && usage.tokens > threshold;
-}
-
-export function injectDumbZoneIntoFooterLine(
-	line: string,
-	contextWindow: number | undefined,
-	label: string,
-	width: number,
-): string {
-	if (!contextWindow || width <= 0) return line;
-
-	const contextWindowMarker = `/${formatFooterTokenCount(contextWindow)}`;
-	const markerStart = line.indexOf(contextWindowMarker);
-	if (markerStart === -1) return line;
-	const insertAt = markerStart + contextWindowMarker.length;
-
-	const insertText = ` ${label}`;
-	const suffix = line.slice(insertAt);
-	const removableSpaces = suffix.match(/^ */)?.[0].length ?? 0;
-	// Consume padding, but retain the separator before an adjacent (auto) tag.
-	const spacesToRemove = Math.min(Math.max(0, removableSpaces - 1), visibleWidth(insertText));
-
-	return truncateToWidth(`${line.slice(0, insertAt)}${insertText}${suffix.slice(spacesToRemove)}`, width, "");
-}
-
 export function stripModelInfoFromFooterLine(line: string): string {
 	// Pi joins stats with single spaces, then pads the model with at least two.
 	// Cut at that boundary, not at a model name that Pi may have truncated.
@@ -123,12 +79,11 @@ const WARNING_MESSAGES = {
 type VeilWarningKind = keyof typeof WARNING_MESSAGES;
 
 interface VeilSessionBindings {
-	formatDumbZoneLabel(): string;
 	reportWarning(message: string): void;
 }
 
 function defaultSessionBindings(): VeilSessionBindings {
-	return { formatDumbZoneLabel: () => DUMB_ZONE_LABEL, reportWarning: () => {} };
+	return { reportWarning: () => {} };
 }
 
 // Own patches and current UI bindings together. Pi emits session_shutdown
@@ -164,20 +119,8 @@ const veil = {
 				);
 				if (lines.length < 2) return lines;
 
-				let footerLine = veil.shown ? lines[1] : stripModelInfoFromFooterLine(lines[1]);
-				const session = (this as unknown as FooterSessionHost).session;
-				const usage = session?.getContextUsage();
-				if (shouldShowDumbZone(usage)) {
-					footerLine = injectDumbZoneIntoFooterLine(
-						footerLine,
-						usage?.contextWindow,
-						veil.session.formatDumbZoneLabel(),
-						width,
-					);
-				}
-
 				const nextLines = [...lines];
-				nextLines[1] = footerLine;
+				nextLines[1] = veil.shown ? lines[1] : stripModelInfoFromFooterLine(lines[1]);
 				return nextLines;
 			};
 			this.originalFooterRender = original;
@@ -248,7 +191,6 @@ export default function footerVeilExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (_event, ctx) => {
 		veil.beginSession({
-			formatDumbZoneLabel: () => ctx.ui.theme.fg("warning", DUMB_ZONE_LABEL),
 			reportWarning: (message) => {
 				if (ctx.hasUI) ctx.ui.notify(message, "warning");
 			},
