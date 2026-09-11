@@ -21,7 +21,7 @@
     "showAgentToolPreview": false
   },
   "prewalk": {
-    "model": "synthetic/hf:zai-org/GLM-5.3-Flash",
+    "model": "opencode-go/deepseek-v4.1-flash",
     "thinking": "max"
   },
   "mesh": {
