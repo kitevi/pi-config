@@ -33,7 +33,6 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 		grilling: "Want your idea challenged.",
 		handoff: "Passing work to next session.",
 		implement: "Executing a written spec.",
-		"resolving-merge-conflicts": "Stuck on a merge/rebase.",
 		"review-animations": "Auditing UI motion & feel.",
 		"show-me": "Need a visual explanation.",
 		tdd: "Feature work, test-first.",
