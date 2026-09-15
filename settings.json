@@ -97,5 +97,6 @@
       "themes": []
     }
   ],
+  "hideThinkingBlock": true,
   "showCacheMissNotices": true
 }
