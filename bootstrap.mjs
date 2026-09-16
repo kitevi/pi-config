@@ -23,9 +23,7 @@ const links = [
 
 const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
 const PI_SETTINGS = join(PI_DIR, "settings.json");
-const SYNTHETIC_OVERLAY = join(REPO_DIR, "synthetic.json");
 const NEURALWATT_OVERLAY = join(REPO_DIR, "neuralwatt.json");
-const PI_SYNTHETIC = join(PI_EXTENSIONS_DIR, "synthetic.json");
 const PI_NEURALWATT = join(PI_EXTENSIONS_DIR, "neuralwatt.json");
 const BETTER_OPENAI_OVERLAY = join(REPO_DIR, "pi-better-openai.json");
 const PI_BETTER_OPENAI = join(PI_EXTENSIONS_DIR, "pi-better-openai.json");
@@ -172,7 +170,6 @@ async function main() {
   await syncDirectoryLinks(EXTENSIONS_DIR, PI_EXTENSIONS_DIR);
   await syncDirectoryLinks(THEMES_DIR, PI_THEMES_DIR);
 
-  await installJsonConfig(SYNTHETIC_OVERLAY, PI_SYNTHETIC, "pi-synthetic settings");
   await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
   await installJsonConfig(BETTER_OPENAI_OVERLAY, PI_BETTER_OPENAI, "pi-better-openai settings");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");

@@ -14,16 +14,6 @@
     "git/github.com/anthropics/knowledge-work-plugins/engineering/skills/code-review"
   ],
   "packages": [
-    {
-      "source": "npm:@aliou/pi-synthetic",
-      "extensions": [
-        "extensions/provider/index.ts",
-        "extensions/usage-status/index.ts"
-      ],
-      "skills": [],
-      "prompts": [],
-      "themes": []
-    },
     "npm:pi-fabric",
     "https://github.com/kitevi/piref",
     "npm:pi-neuralwatt-provider",

@@ -5,7 +5,6 @@
 - Prefer MCP for web/docs lookups. Use shell HTTP only as a fallback, and state why you used the fallback.
 - `mcp.exa.web_search_exa({query, numResults?})` returns `{text: string}` containing a rendered search summary, not a results array. Read `r.text`, never `r.results`.
 - `mcp.exa.web_fetch_exa({urls: string[], maxCharacters?})` returns page markdown in `r.text`. Pass `urls`, not `url`.
-- Prefer `mcp.synthetic_web_search.search_web({query, max_text_length?})` for privacy-sensitive queries or when Exa's features are unnecessary. The response's `r.text` contains a JSON array: parse it with `JSON.parse(r.text)`. Each result has `url`, `title`, `text`, `highlights`, and optional `published` (omitted when unknown).
 - For library/API docs, call `mcp.context7['resolve-library-id']({libraryName, query})`, then `mcp.context7['query-docs']({libraryId, query})`, before web search. Pass the library ID returned by `resolve-library-id` to `query-docs`. Send one topic per query.
 - Before calling any other MCP tool, run `await tools.describe({ref})` and shape the arguments to match `inputSchema`. After an argument-validation error, describe the tool again and correct the call to match its schema before retrying.
 - MCP response shapes differ from SDK/REST examples. When the response shape is unknown, first return `JSON.stringify(r).slice(0, 1500)` once, then extract fields. Reuse the observed shape. After a shape error, inspect once and correct the field access. Call `JSON.parse` only on JSON strings, never on already-structured objects.

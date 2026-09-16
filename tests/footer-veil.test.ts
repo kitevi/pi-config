@@ -67,7 +67,7 @@ void describe("footer-veil render wrapper", () => {
 	}
 
 	void it("renders the full status line when the veil is lifted", () => {
-		const host = fakeHost(statusMap(["synthetic-usage", "week:82%"], ["fabric-prewalk", "armed"]));
+		const host = fakeHost(statusMap(["example-usage", "week:82%"], ["fabric-prewalk", "armed"]));
 		const before = host.footerData.getExtensionStatuses;
 		const lines = withVeiledExtensionStatuses(host, false, () => fakePiRender(host));
 		assert.deepStrictEqual(lines[2], "week:82% armed");
@@ -75,7 +75,7 @@ void describe("footer-veil render wrapper", () => {
 	});
 
 	void it("hides all statuses from the render while veiled and restores afterwards", () => {
-		const host = fakeHost(statusMap(["synthetic-usage", "week:82%"], ["fabric-prewalk", "armed"]));
+		const host = fakeHost(statusMap(["example-usage", "week:82%"], ["fabric-prewalk", "armed"]));
 		const before = host.footerData.getExtensionStatuses;
 		const lines = withVeiledExtensionStatuses(host, true, () => fakePiRender(host));
 		assert.deepStrictEqual(lines[2], "");
@@ -83,7 +83,7 @@ void describe("footer-veil render wrapper", () => {
 	});
 
 	void it("restores the original method when the render throws", () => {
-		const host = fakeHost(statusMap(["synthetic-usage", "week:82%"]));
+		const host = fakeHost(statusMap(["example-usage", "week:82%"]));
 		const before = host.footerData.getExtensionStatuses;
 		assert.throws(() =>
 			withVeiledExtensionStatuses(host, true, () => {
