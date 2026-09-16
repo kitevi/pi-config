@@ -466,6 +466,20 @@ void describe("running scripts the session created", () => {
 		assert.deepStrictEqual((emitted[0].data as { ids: string[] }).ids, ["ask.run-generated-script"]);
 	});
 
+	void it("checks a file it wrote without asking to run it", async () => {
+		const { call, emitted } = install("Yes, allow once");
+		assert.strictEqual(await call("write", { path: "booking.js" }), undefined);
+		assert.strictEqual(await call("bash", shell("node --check booking.js && wc -l booking.js && echo SYNTAX_OK")), undefined);
+		assert.deepStrictEqual(emitted, []);
+	});
+
+	void it("still asks before running the file it just checked", async () => {
+		const { call, emitted } = install("Yes, allow once");
+		assert.strictEqual(await call("write", { path: "booking.js" }), undefined);
+		assert.strictEqual(await call("bash", shell("node booking.js")), undefined);
+		assert.deepStrictEqual((emitted[0].data as { ids: string[] }).ids, ["ask.run-generated-script"]);
+	});
+
 	void it("asks when a heredoc-created script is executed in the same command", () => {
 		const command = "cat > /tmp/s.py <<'PY'\nprint('hi')\nPY\npython3 /tmp/s.py";
 		assert.strictEqual(assessToolCall("bash", shell(command), { state }).decision, "ask");

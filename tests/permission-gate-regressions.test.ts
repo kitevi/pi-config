@@ -47,6 +47,142 @@ describe("inline interpreter syntax", () => {
 	])("keeps read-only code and script arguments allowed: %s", (command) => assert.equal(decision(command), "allow"));
 });
 
+describe("check-only invocations", () => {
+	it("allows the booking syntax-check chain after a successful session write", () => {
+		const path = "MTO/SinfoMto/src/main/webapp/resources/js/booking/booking.js";
+		const state = new PermissionGateState();
+		state.stageWrites("write", [{ path, cwd: "/tmp/gate-review" }]);
+		state.completeWrites("write", true);
+		const command = `node --check ${path} && wc -l ${path} && echo SYNTAX_OK`;
+		assert.equal(assessToolCall("bash", { command }, { state, cwd: "/tmp/gate-review" }).decision, "allow");
+	});
+
+	it.each([
+		"NODE_OPTIONS=--require=/tmp/gate-review/preload.js node --check booking.js",
+		"env NODE_OPTIONS=--require=./preload.js node --check booking.js",
+	])("asks when a preload arrives through NODE_OPTIONS: %s", (command) => {
+		const state = new PermissionGateState();
+		state.stageWrites("write", [{ path: "/tmp/gate-review/booking.js", cwd: "/tmp/gate-review" }]);
+		state.completeWrites("write", true);
+		assert.equal(assessToolCall("bash", { command }, { state, cwd: "/tmp/gate-review" }).decision, "ask");
+	});
+
+	it("does not read deno's check subcommand as a script it runs", () => {
+		const state = new PermissionGateState();
+		state.stageWrites("write", [{ path: "/tmp/gate-review/check", cwd: "/tmp/gate-review" }]);
+		state.completeWrites("write", true);
+		assert.equal(assessToolCall("bash", { command: "deno check main.ts" }, { state, cwd: "/tmp/gate-review" }).decision, "allow");
+	});
+
+	it.each(["deno run main.ts", "deno run --check main.ts", "bun run main.ts"])("still asks before %s runs a session-written script", (command) => {
+		const state = new PermissionGateState();
+		state.stageWrites("write", [{ path: "/tmp/gate-review/main.ts", cwd: "/tmp/gate-review" }]);
+		state.completeWrites("write", true);
+		assert.equal(assessToolCall("bash", { command }, { state, cwd: "/tmp/gate-review" }).decision, "ask");
+	});
+
+	// Accepted forms name exactly one plain target, with no other token.
+	it.each([
+		"node -c booking.js",
+		"nodejs --check booking.js",
+		"node --check -- booking.js",
+		'node --check "booking file.js"',
+		"node --check ../booking.js",
+		"env -u NODE_OPTIONS node --check booking.js",
+	])("allows the check-only form: %s", (command) => {
+		const state = new PermissionGateState();
+		state.stageWrites("write", [{ path: "/tmp/gate-review/booking.js", cwd: "/tmp/gate-review" }]);
+		state.completeWrites("write", true);
+		assert.equal(assessToolCall("bash", { command }, { state, cwd: "/tmp/gate-review" }).decision, "allow");
+	});
+
+	it.each([
+		"node booking.js --check",
+		"node --check booking.js extra.js",
+		"node --check --input-type=module booking.js",
+		"node -r ./preload.js --check booking.js",
+		"bun --check booking.js",
+		"node --check booking.js > out.txt",
+	])("asks when the check form is not plain: %s", (command) => {
+		const state = new PermissionGateState();
+		state.stageWrites("write", [{ path: "/tmp/gate-review/booking.js", cwd: "/tmp/gate-review" }]);
+		state.completeWrites("write", true);
+		assert.equal(assessToolCall("bash", { command }, { state, cwd: "/tmp/gate-review" }).decision, "ask");
+	});
+
+	it("still blocks credential material reached through a check", () => {
+		assert.equal(assessToolCall("bash", { command: "node --check /home/gate-review/.ssh/id_ed25519" }, { cwd: "/tmp/gate-review" }).decision, "block");
+	});
+
+	it("still asks when a check is chained with a deletion", () => {
+		const state = new PermissionGateState();
+		state.stageWrites("write", [{ path: "/tmp/gate-review/booking.js", cwd: "/tmp/gate-review" }]);
+		state.completeWrites("write", true);
+		assert.equal(assessToolCall("bash", { command: "node --check booking.js && rm -f other.js" }, { state, cwd: "/tmp/gate-review" }).decision, "ask");
+	});
+});
+
+describe("runtime subcommands", () => {
+	const writtenScripts = () => {
+		const state = new PermissionGateState();
+		state.stageWrites("write", [
+			{ path: "/tmp/gate-review/t.ts", cwd: "/tmp/gate-review" },
+			{ path: "/tmp/gate-review/b.ts", cwd: "/tmp/gate-review" },
+			{ path: "/tmp/gate-review/s.ts", cwd: "/tmp/gate-review" },
+			{ path: "/tmp/gate-review/main.ts", cwd: "/tmp/gate-review" },
+		]);
+		state.completeWrites("write", true);
+		return state;
+	};
+
+	it.each([
+		"deno run t.ts",
+		"deno test t.ts",
+		"deno bench b.ts",
+		"deno serve s.ts",
+		"deno compile t.ts",
+		"bun run t.ts",
+		"bun test t.ts",
+	])("asks before %s loads a session-written script", (command) => {
+		assert.equal(assessToolCall("bash", { command }, { state: writtenScripts(), cwd: "/tmp/gate-review" }).decision, "ask");
+	});
+
+	it.each([
+		"npx ts-node t.ts",
+		"npx tsx t.ts",
+		"bunx ts-node t.ts",
+		"yarn exec ts-node t.ts",
+		"yarn dlx ts-node t.ts",
+		"pnpm exec ts-node t.ts",
+	])("asks before %s runs a session-written script", (command) => {
+		assert.equal(assessToolCall("bash", { command }, { state: writtenScripts(), cwd: "/tmp/gate-review" }).decision, "ask");
+	});
+
+	it("does not read a runner's config operand as an executed script", () => {
+		const state = new PermissionGateState();
+		state.stageWrites("write", [{ path: "/tmp/gate-review/tsconfig.json", cwd: "/tmp/gate-review" }]);
+		state.completeWrites("write", true);
+		assert.equal(assessToolCall("bash", { command: "npx tsc -p tsconfig.json" }, { state, cwd: "/tmp/gate-review" }).decision, "allow");
+	});
+
+	it("asks for inline code passed to deno eval", () => {
+		const command = `deno eval 'writeFileSync("out.txt", "x")'`;
+		const result = assessToolCall("bash", { command }, { cwd: "/tmp/gate-review" });
+		assert.equal(result.decision, "ask");
+		assert.deepEqual(result.matches.map((match) => match.id), ["ask.inline-script"]);
+	});
+
+	it("keeps read-only inline code allowed", () => {
+		assert.equal(decision(`deno eval 'console.log(1)'`), "allow");
+	});
+
+	it("keeps package-manager subcommands on the package-manager rule", () => {
+		const result = assessToolCall("bash", { command: "bun add example-package" }, { cwd: "/tmp/gate-review" });
+		assert.equal(result.decision, "ask");
+		assert.deepEqual(result.matches.map((match) => match.id), ["ask.package-manager-mutate"]);
+	});
+});
+
 describe("generated scripts through cwd-changing wrappers", () => {
 	it.each([
 		"env -C /tmp/gate-review python3 runner.py",

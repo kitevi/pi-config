@@ -396,6 +396,62 @@ const INTERPRETERS: Interpreter[] = [
 
 const interpreterFor = (executable: string) => INTERPRETERS.find((entry) => entry.pattern.test(executable));
 
+/** Node's `--check`/`-c` parses one file without executing it. Only the plain
+ *  form qualifies; every other option or operand keeps interpreter analysis. */
+const NODE_CHECK_EXECUTABLES = new Set(["node", "nodejs"]);
+const NODE_CHECK_FLAGS = new Set(["-c", "--check"]);
+const checkOnlyTarget = (executable: string, args: string[], words: string[]): string | undefined => {
+	// An inherited NODE_OPTIONS can still preload a module, which executes code.
+	if (words.some((word) => word.startsWith("NODE_OPTIONS="))) return undefined;
+	if (!NODE_CHECK_EXECUTABLES.has(executable) || !NODE_CHECK_FLAGS.has(args[0] ?? "")) return undefined;
+	const operands = args[1] === "--" ? args.slice(2) : args.slice(1);
+	if (operands.length !== 1) return undefined;
+	const target = operands[0];
+	return target.startsWith("-") ? undefined : target;
+};
+
+/** Deno's `check` subcommand type-checks files without running them. */
+const denoCheckTargets = (executable: string, args: string[]): string[] | undefined => {
+	if (executable !== "deno" || args[0] !== "check") return undefined;
+	const operands = args[1] === "--" ? args.slice(2) : args.slice(1);
+	if (operands.length === 0 || operands.some((operand) => operand.startsWith("-"))) return undefined;
+	return operands;
+};
+
+/** Runtimes that name the scripts after a subcommand: `deno test a.ts b.ts`.
+ *  Without this the subcommand itself would be recorded as the executed path.
+ *  Every non-flag word after the subcommand is a path the runtime loads. */
+const SCRIPT_SUBCOMMANDS = new Map<string, Set<string>>([
+	["bun", new Set(["run", "test"])],
+	["deno", new Set(["run", "test", "bench", "serve", "compile"])],
+]);
+
+const subcommandScriptPaths = (executable: string, args: string[]): string[] | undefined => {
+	const subcommands = SCRIPT_SUBCOMMANDS.get(executable);
+	if (!subcommands?.has(args[0] ?? "")) return undefined;
+	return args.slice(1).filter((arg) => !arg.startsWith("-"));
+};
+
+/** `deno eval <code>` runs inline code, like `node -e`. */
+const DENO_INLINE_SUBCOMMAND = "eval";
+
+/** Package runners whose operands mix a binary, package names, and script paths:
+ *  `npx ts-node main.ts`, `pnpm exec ts-node main.ts`. Only path-shaped operands
+ *  count, so `npx tsc -p tsconfig.json` does not read a config as a script. */
+const RUNNER_EXECUTABLES = new Set(["bunx", "npx", "pnpx"]);
+const RUNNER_SUBCOMMANDS = new Map<string, Set<string>>([
+	["npm", new Set(["exec"])],
+	["pnpm", new Set(["exec", "dlx"])],
+	["yarn", new Set(["exec", "dlx"])],
+]);
+
+const runnerScriptPaths = (executable: string, args: string[]): string[] | undefined => {
+	const subcommands = RUNNER_SUBCOMMANDS.get(executable);
+	const operands = RUNNER_EXECUTABLES.has(executable) ? args : subcommands?.has(args[0] ?? "") ? args.slice(1) : undefined;
+	if (!operands) return undefined;
+	return operands.filter((arg) => !arg.startsWith("-") && looksLikePath(arg));
+};
+
 const XARGS_OPTIONS_WITH_VALUES = new Set([
 	"--arg-file",
 	"--delimiter",
@@ -658,6 +714,26 @@ function collectCommand(words: string[], analysis: ShellAnalysis, depth: number,
 	}
 	if (executable === "curl" || executable === "wget") {
 		analysis.written.push(...downloadTargets(args).map((path) => ({ path, cwd })));
+		return;
+	}
+
+	// A plain syntax check runs no code, so it carries no execution effect. The
+	// invocation and command text stay in the analysis for every other rule.
+	if (checkOnlyTarget(executable, args, invocation.words) || denoCheckTargets(executable, args)) return;
+
+	const scriptPaths = subcommandScriptPaths(executable, args);
+	if (scriptPaths) {
+		for (const path of scriptPaths) analysis.executed.push({ path, cwd });
+		return;
+	}
+	const runnerPaths = runnerScriptPaths(executable, args);
+	if (runnerPaths) {
+		for (const path of runnerPaths) analysis.executed.push({ path, cwd });
+		return;
+	}
+	if (executable === "deno" && args[0] === DENO_INLINE_SUBCOMMAND) {
+		const code = args.slice(1).find((arg) => !arg.startsWith("-"));
+		if (code) collectScript("javascript", code, analysis, depth, cwd);
 		return;
 	}
 
