@@ -19,6 +19,29 @@
         "resolve-library-id",
         "query-docs"
       ]
+    },
+    "tinyfish": {
+      "description": "Free TinyFish web search and page fetching through an auto-started stdio connection.",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@0.14.2",
+        "https://agent.tinyfish.ai/mcp",
+        "--transport",
+        "http-only",
+        "--header",
+        "X-API-Key:${TINYFISH_API_KEY}"
+      ],
+      "env": {
+        "TINYFISH_API_KEY": "$env:TINYFISH_API_KEY"
+      },
+      "allowedTools": [
+        "search",
+        "fetch_content",
+        "get_search_usage",
+        "list_fetch_usage",
+        "get_wallet"
+      ]
     }
   },
   "imports": []
