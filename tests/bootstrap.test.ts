@@ -52,3 +52,24 @@ void describe("bootstrap reconciliation", () => {
 	});
 
 });
+
+void describe("bootstrap opencode-go provider settings", () => {
+	void it("reconciles native usage off and stays idempotent", async () => {
+		const home = await mkdtemp(join(tmpdir(), "pi-config-opencode-go-"));
+
+		try {
+			await runBootstrap(home);
+
+			const configPath = join(home, ".pi", "agent", "opencode-go-provider.json");
+			const firstOutput = await readFile(configPath, "utf8");
+			const parsed = JSON.parse(firstOutput) as { usage?: { enabled?: boolean } };
+
+			assert.equal(parsed.usage?.enabled, false);
+
+			await runBootstrap(home);
+			assert.equal(await readFile(configPath, "utf8"), firstOutput);
+		} finally {
+			await rm(home, { recursive: true, force: true });
+		}
+	});
+});

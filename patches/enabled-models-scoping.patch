@@ -1,0 +1,51 @@
+--- a/settings.json
++++ b/settings.json
+@@ -1,5 +1,6 @@
+ {
+   "theme": "github-colorblind-light/github-colorblind-dark",
++  "enabledModels": ["opencode-go/*", "openai-codex/*", "github-copilot/*"],
+   "npmCommand": [
+     "npm",
+     "--ignore-scripts=false",
+--- a/tests/bootstrap.test.ts
++++ b/tests/bootstrap.test.ts
+@@ -73,3 +73,28 @@
+ 		}
+ 	});
+ });
++
++void describe("bootstrap pi settings", () => {
++	void it("scopes enabled models to the providers in use, hiding OpenCode Zen", async () => {
++		const home = await mkdtemp(join(tmpdir(), "pi-config-settings-"));
++
++		try {
++			await runBootstrap(home);
++
++			const settingsPath = join(home, ".pi", "agent", "settings.json");
++			const firstOutput = await readFile(settingsPath, "utf8");
++			const parsed = JSON.parse(firstOutput) as { enabledModels?: string[] };
++
++			assert.deepEqual(parsed.enabledModels, [
++				"opencode-go/*",
++				"openai-codex/*",
++				"github-copilot/*",
++			]);
++
++			await runBootstrap(home);
++			assert.equal(await readFile(settingsPath, "utf8"), firstOutput);
++		} finally {
++			await rm(home, { recursive: true, force: true });
++		}
++	});
++});
+--- a/README.md
++++ b/README.md
+@@ -157,7 +157,7 @@
+ - `themes/` — pi themes (`github-colorblind` light/dark variants)
+ - `reminders/` — global reminder definitions for `pi-system-reminders`
+ - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
+-- `settings.json` — repo-managed pi settings, including installed packages/extensions
++- `settings.json` — repo-managed pi settings, including installed packages/extensions; `enabledModels` scopes `/model` (and Ctrl+P cycling) to the keep-list `opencode-go/*`, `openai-codex/*`, `github-copilot/*`, hiding the separate OpenCode Zen provider. pi patterns cannot exclude (they can only add), so new providers must be appended here; models stay selectable from the picker's all view (Tab) regardless of scope
+ - `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `footer-veil` can own it
+ - `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
+ - `fabric.json` — Pi Fabric configuration installed into `~/.pi/agent/fabric.json` (see [Pi Fabric](#pi-fabric))

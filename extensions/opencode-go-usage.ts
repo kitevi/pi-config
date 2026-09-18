@@ -1,325 +1,376 @@
-import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+/**
+ * OpenCode Go usage, rendered into pi's footer status line.
+ *
+ * The installed `pi-opencode-go-provider` package owns the endpoint, polling,
+ * parsing, and formatting; reconciliation disables its native editor widget so
+ * exactly one controller polls. This adapter drives that controller onto the
+ * footer instead. Upstream modules are internal, not a published API: the
+ * consumed surface is validated at load time and failures produce one
+ * diagnostic, never a local fallback implementation.
+ */
 
-export type UsedPercent = number & { readonly __brand: "UsedPercent" };
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import {
+	getAgentDir,
+	type ExtensionAPI,
+	type ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
-export type OpenCodeGoWindowId = "rolling" | "weekly" | "monthly";
-export type OpenCodeGoWindowLabel = "5h" | "wk" | "mo";
+/** Footer slot owned exclusively by this adapter. */
+export const FOOTER_STATUS_KEY = "opencode-go-usage-footer";
 
-export interface OpenCodeGoUsageWindow {
-	id: OpenCodeGoWindowId;
-	label: OpenCodeGoWindowLabel;
-	usedPercent: UsedPercent;
-	resetsAt: Date;
-	limited: boolean;
+const PROVIDER_ID = "opencode-go";
+const PACKAGE_NAME = "pi-opencode-go-provider";
+const CONFIG_BASENAME = "opencode-go-provider.json";
+const MULTIPROVIDER_SERVICE_EVENT = "pi-multiprovider:service";
+const FOOTER_PREFIX = "Go left: ";
+
+/** Severity labels upstream tags its widget segments with. */
+export type UpstreamSeverity = "ok" | "warning" | "critical" | "muted";
+
+const SEVERITY_COLORS: Record<UpstreamSeverity, string> = {
+	ok: "success",
+	warning: "warning",
+	critical: "error",
+	muted: "dim",
+};
+
+export interface UpstreamUsageConfig {
+	enabled: boolean;
+	refreshIntervalMs: number;
+	showOnlyOnProvider: boolean;
+	showResetTimes: boolean;
+	glyphs: string;
+	placement: string;
 }
 
-export interface OpenCodeGoUsageSnapshot {
-	source: "opencode-go-server";
-	windows: readonly OpenCodeGoUsageWindow[];
+export interface UpstreamGlyphSet {
+	sep: string;
+	reset: string;
+	barFilled: string;
+	barHollow: string;
+	ellipsis: string;
 }
 
-export type OpenCodeGoUsageFailure =
-	| { kind: "config"; reason: "missing_api_key" }
-	| { kind: "http"; status: number }
-	| { kind: "timeout" }
-	| { kind: "cancelled" }
-	| { kind: "network" }
-	| { kind: "invalid_response" };
+export interface UpstreamUsageWindow {
+	key: string;
+	label: string;
+	status: string;
+	usedPercent: number;
+	remainingPercent: number;
+	resetsAt: number | null;
+}
 
-export type OpenCodeGoUsageResult =
-	| { ok: true; value: OpenCodeGoUsageSnapshot }
-	| { ok: false; error: OpenCodeGoUsageFailure };
+export interface UpstreamSnapshot {
+	capturedAt: number;
+	windows: readonly UpstreamUsageWindow[];
+	isLimited: boolean;
+	bankedResets: number | null;
+}
+
+export interface UpstreamSegment {
+	text: string;
+	severity: UpstreamSeverity;
+}
+
+export interface UpstreamController {
+	readonly snapshot: UpstreamSnapshot | undefined;
+
+	isEligible(ctx: ExtensionContext): boolean;
+	isStale(): boolean;
+	start(ctx: ExtensionContext): void;
+	refresh(ctx: ExtensionContext, options?: { force?: boolean; notify?: boolean }): Promise<void>;
+	shutdown(): void;
+}
+
+export interface UpstreamMultiproviderService {
+	onActiveAccountChanged(providerId: string, callback: () => void): () => void;
+}
 
 export interface ThemeLike {
 	fg(color: string, text: string): string;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
+/** The narrow slice of the installed provider this adapter consumes. */
+export interface ProviderBindings {
+	readConfig(): UpstreamUsageConfig;
+
+	createController(
+		getConfig: () => UpstreamUsageConfig,
+		onUpdate: (ctx: ExtensionContext) => void,
+	): UpstreamController;
+
+	/** Footer projection: upstream data, local surface and colour mapping. */
+	projectFooter(
+		snapshot: UpstreamSnapshot,
+		config: UpstreamUsageConfig,
+		stale: boolean,
+		theme: ThemeLike,
+	): string;
+
+	pooling: {
+		isService(value: unknown): value is UpstreamMultiproviderService;
+		setService(service: UpstreamMultiproviderService | undefined): void;
+	};
 }
 
-function parseUsedPercent(value: unknown): UsedPercent | undefined {
-	if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
-	if (value < 0 || value > 100) return undefined;
-	return value as UsedPercent;
+export interface FooterDependencies {
+	loadProvider(): Promise<ProviderBindings>;
 }
 
-function parseReset(value: unknown): Date | undefined {
-	if (typeof value !== "string") return undefined;
-	const parsed = new Date(value);
-	return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+function resolveProviderRoot(): string {
+	const requireFromAgentNpm = createRequire(join(getAgentDir(), "npm", "noop.js"));
+	return dirname(requireFromAgentNpm.resolve(`${PACKAGE_NAME}/package.json`));
 }
 
-const WINDOW_METADATA = [
-	["rolling", "5h"],
-	["weekly", "wk"],
-	["monthly", "mo"],
-] as const;
+function requireFunctions(
+	moduleName: string,
+	module: Record<string, unknown>,
+	names: readonly string[],
+): void {
+	for (const name of names) {
+		if (typeof module[name] !== "function") {
+			throw new Error(`${moduleName}.${name} is not a function`);
+		}
+	}
+}
 
-function parseWindow(
-	usage: Record<string, unknown>,
-	id: OpenCodeGoWindowId,
-	label: OpenCodeGoWindowLabel,
-): OpenCodeGoUsageWindow | undefined {
-	const raw = usage[id];
-	if (!isRecord(raw)) return undefined;
-	if (raw.status !== "ok" && raw.status !== "rate-limited") return undefined;
-	const usedPercent = parseUsedPercent(raw.percent);
-	const resetsAt = parseReset(raw.resetsAt);
-	if (usedPercent === undefined || !resetsAt) return undefined;
+/** Resolve and validate the provider modules this adapter drives. */
+export async function loadInstalledProvider(): Promise<ProviderBindings> {
+	const root = resolveProviderRoot();
+	const [usage, controllerModule, configModule, glyphModule, formatModule, multiproviderModule] =
+		await Promise.all([
+			import(join(root, "usage.ts")) as Promise<Record<string, unknown>>,
+			import(join(root, "usage-controller.ts")) as Promise<Record<string, unknown>>,
+			import(join(root, "config.ts")) as Promise<Record<string, unknown>>,
+			import(join(root, "glyphs.ts")) as Promise<Record<string, unknown>>,
+			import(join(root, "format.ts")) as Promise<Record<string, unknown>>,
+			import(join(root, "multiprovider.ts")) as Promise<Record<string, unknown>>,
+		]);
+	requireFunctions("usage.ts", usage, ["usageSegments"]);
+	requireFunctions("usage-controller.ts", controllerModule, ["UsageController"]);
+	requireFunctions("config.ts", configModule, ["readUsageConfig"]);
+	requireFunctions("glyphs.ts", glyphModule, ["resolveGlyphSet"]);
+	requireFunctions("format.ts", formatModule, ["sanitizeStatusText"]);
+	requireFunctions("multiprovider.ts", multiproviderModule, [
+		"isMultiproviderService",
+		"setActiveMultiproviderService",
+	]);
+
+	const UsageController = controllerModule.UsageController as new (
+		getConfig: () => UpstreamUsageConfig,
+		onUpdate: (ctx: ExtensionContext) => void,
+	) => UpstreamController;
+
 	return {
-		id,
-		label,
-		usedPercent,
-		resetsAt,
-		limited: raw.status === "rate-limited",
+		readConfig: () => (configModule.readUsageConfig as () => UpstreamUsageConfig)(),
+		createController: (getConfig, onUpdate) => new UsageController(getConfig, onUpdate),
+		projectFooter: (snapshot, config, stale, theme) => {
+			const glyphs = (glyphModule.resolveGlyphSet as (mode: string) => UpstreamGlyphSet)(config.glyphs);
+			const segments = (usage.usageSegments as (
+				snapshot: UpstreamSnapshot,
+				options: { showResetTimes: boolean; glyphs: UpstreamGlyphSet },
+			) => UpstreamSegment[])(snapshot, { showResetTimes: config.showResetTimes, glyphs });
+			// Upstream leads with its own "Usage:" label; this surface names itself.
+			const labelled =
+				segments[0]?.text.trim() === "Usage:"
+					? [{ ...segments[0], text: FOOTER_PREFIX }, ...segments.slice(1)]
+					: segments;
+			const colored = labelled
+				.map((segment) => theme.fg(SEVERITY_COLORS[segment.severity] ?? "dim", segment.text))
+				.join("");
+			const line = `${colored}${stale ? theme.fg("warning", " · stale") : ""}`;
+			return (formatModule.sanitizeStatusText as (text: string) => string)(line);
+		},
+		pooling: {
+			isService: multiproviderModule.isMultiproviderService as (
+				value: unknown,
+			) => value is UpstreamMultiproviderService,
+			setService: multiproviderModule.setActiveMultiproviderService as (
+				service: UpstreamMultiproviderService | undefined,
+			) => void,
+		},
 	};
 }
 
-export function parseOpenCodeGoUsage(raw: unknown): OpenCodeGoUsageResult {
-	if (!isRecord(raw) || !isRecord(raw.usage)) {
-		return { ok: false, error: { kind: "invalid_response" } };
-	}
+type Lifecycle =
+	| { kind: "idle" }
+	| { kind: "ready"; controller: UpstreamController }
+	| { kind: "unavailable" };
 
-	const windows = WINDOW_METADATA
-		.map(([id, label]) => parseWindow(raw.usage as Record<string, unknown>, id, label))
-		.filter((window): window is OpenCodeGoUsageWindow => window !== undefined);
-	if (windows.length === 0) {
-		return { ok: false, error: { kind: "invalid_response" } };
-	}
-
-	return { ok: true, value: { source: "opencode-go-server", windows } };
+function isEligibleContext(ctx: ExtensionContext): boolean {
+	return ctx.hasUI && ctx.model?.provider === PROVIDER_ID;
 }
 
-export interface OpenCodeGoModelRegistry {
-	getApiKeyForProvider(provider: string): Promise<string | undefined>;
-}
-
-export interface OpenCodeGoUsageRuntime {
-	fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
-	now(): number;
-}
-
-const USAGE_API_URL = "https://opencode.ai/zen/go/v1/usage";
-const REQUEST_TIMEOUT_MS = 15_000;
-
-export async function loadOpenCodeGoUsage(
-	registry: OpenCodeGoModelRegistry,
-	runtime: OpenCodeGoUsageRuntime,
-	signal: AbortSignal,
-): Promise<OpenCodeGoUsageResult> {
-	let apiKey: string | undefined;
-	try {
-		apiKey = await registry.getApiKeyForProvider("opencode-go");
-	} catch {
-		return { ok: false, error: { kind: "network" } };
-	}
-	if (!apiKey) {
-		return {
-			ok: false,
-			error: { kind: "config", reason: "missing_api_key" },
-		};
-	}
-
-	const timeoutController = new AbortController();
-	const timeout = setTimeout(() => {
-		timeoutController.abort(new DOMException("Request timed out", "TimeoutError"));
-	}, REQUEST_TIMEOUT_MS);
-	timeout.unref?.();
-	const requestSignal = AbortSignal.any([signal, timeoutController.signal]);
-	const abortFailure = (): OpenCodeGoUsageFailure => {
-		const timedOut =
-			requestSignal.reason instanceof Error && requestSignal.reason.name === "TimeoutError";
-		return { kind: timedOut ? "timeout" : signal.aborted ? "cancelled" : "network" };
-	};
-
-	try {
-		let response: Response;
-		try {
-			response = await runtime.fetch(USAGE_API_URL, {
-				method: "GET",
-				redirect: "error",
-				headers: {
-					Authorization: `Bearer ${apiKey}`,
-					Accept: "application/json",
-				},
-				signal: requestSignal,
-			});
-		} catch {
-			return { ok: false, error: abortFailure() };
-		}
-		if (!response.ok) {
-			return { ok: false, error: { kind: "http", status: response.status } };
-		}
-
-		let raw: unknown;
-		try {
-			raw = await response.json();
-		} catch {
-			return {
-				ok: false,
-				error: requestSignal.aborted ? abortFailure() : { kind: "invalid_response" },
-			};
-		}
-		return parseOpenCodeGoUsage(raw);
-	} finally {
-		clearTimeout(timeout);
-	}
-}
-
-export function formatTimeRemaining(resetsAt: Date, nowMs: number): string {
-	const ms = resetsAt.getTime() - nowMs;
-	if (ms <= 0) return "now";
-
-	const totalMinutes = Math.ceil(ms / 60_000);
-	const totalHours = Math.floor(totalMinutes / 60);
-	const days = Math.floor(totalHours / 24);
-	const hours = totalHours % 24;
-	const minutes = totalMinutes % 60;
-
-	if (days >= 1) {
-		return `${days}d${hours > 0 ? `${hours}h` : ""}${minutes > 0 ? `${minutes}m` : ""}`;
-	}
-	if (hours >= 1) return `${hours}h${minutes > 0 ? `${minutes}m` : ""}`;
-	if (totalMinutes >= 1) return `${totalMinutes}m`;
-	return `${Math.ceil(ms / 1000)}s`;
-}
-
-function usageColor(usedPercent: number, limited: boolean): "success" | "warning" | "error" {
-	if (limited || usedPercent >= 90) return "error";
-	if (usedPercent >= 80) return "warning";
-	return "success";
-}
-
-function formatUsedPercent(usedPercent: UsedPercent): string {
-	return `${String(usedPercent)}% used`;
-}
-
-export function formatOpenCodeGoUsage(
-	theme: ThemeLike,
-	snapshot: OpenCodeGoUsageSnapshot,
-	nowMs: number,
-): string | undefined {
-	if (snapshot.windows.length === 0) return undefined;
-
-	return snapshot.windows
-		.map((window) => {
-			const color = usageColor(window.usedPercent, window.limited);
-			const labelColor = color === "success" ? "dim" : color;
-			const label = theme.fg(labelColor, `${window.label}:`);
-			const value = theme.fg(color, formatUsedPercent(window.usedPercent));
-			const reset = theme.fg("dim", ` (↺in ${formatTimeRemaining(window.resetsAt, nowMs)})`);
-			return `${label}${value}${reset}`;
-		})
-		.join(" ");
-}
-
-const STATUS_ID = "opencode-go-usage";
-const REFRESH_INTERVAL_MS = 60_000;
-const FAILURE_RETRY_MS = 10_000;
-
-const defaultRuntime: OpenCodeGoUsageRuntime = {
-	fetch: (input, init) => globalThis.fetch(input, init),
-	now: () => Date.now(),
-};
-
-function isOpenCodeGoProvider(provider: string | undefined): boolean {
-	return provider === "opencode-go" || provider?.startsWith("opencode-go/") === true;
-}
-
+/**
+ * Wire the footer adapter into pi.
+ *
+ * `dependencies` exists so behavior tests can drive the lifecycle with a stub
+ * provider; production passes the installed-package loader.
+ */
 export function createOpenCodeGoUsageExtension(
-	runtime: OpenCodeGoUsageRuntime = defaultRuntime,
+	dependencies: FooterDependencies = { loadProvider: loadInstalledProvider },
 ): (pi: ExtensionAPI) => void {
 	return (pi: ExtensionAPI) => {
-		let timer: ReturnType<typeof setInterval> | undefined;
-		let controller: AbortController | undefined;
-		let inFlight: Promise<void> | undefined;
-		let cached: OpenCodeGoUsageSnapshot | undefined;
-		let nextFetchAt = 0;
+		let lifecycle: Lifecycle = { kind: "idle" };
+		/** In-flight provider load, shared by concurrent activations. */
+		let loading: Promise<void> | undefined;
+		let bindings: ProviderBindings | undefined;
+		let activeContext: ExtensionContext | undefined;
 		let generation = 0;
+		let announcedService: unknown;
+		let subscribedService: UpstreamMultiproviderService | undefined;
+		let unsubscribeAccounts: (() => void) | undefined;
+		let diagnosticsShown = 0;
 
-		const stop = (ctx?: ExtensionContext): void => {
-			if (timer) clearInterval(timer);
-			timer = undefined;
-			controller?.abort();
-			controller = undefined;
-			inFlight = undefined;
-			cached = undefined;
-			nextFetchAt = 0;
-			generation++;
-			if (ctx?.hasUI) ctx.ui.setStatus(STATUS_ID, undefined);
+		const warnOnce = (ctx: ExtensionContext, message: string): void => {
+			if (diagnosticsShown > 0) return;
+			diagnosticsShown++;
+			ctx.ui.notify(message, "warning");
 		};
 
-		const refresh = async (ctx: ExtensionContext): Promise<void> => {
-			if (!ctx.hasUI || !isOpenCodeGoProvider(ctx.model?.provider)) return;
-			const requestGeneration = generation;
-			const now = runtime.now();
-			if (now < nextFetchAt) {
-				if (cached) {
-					ctx.ui.setStatus(STATUS_ID, formatOpenCodeGoUsage(ctx.ui.theme, cached, now));
-				}
+		const clearFooter = (ctx: ExtensionContext | undefined): void => {
+			if (ctx?.hasUI) ctx.ui.setStatus(FOOTER_STATUS_KEY, undefined);
+		};
+
+		/** Repaint from the controller that is current right now. */
+		const update = (ctx: ExtensionContext): void => {
+			if (lifecycle.kind !== "ready" || bindings === undefined) return;
+			const snapshot = lifecycle.controller.snapshot;
+			if (snapshot === undefined) {
+				clearFooter(ctx);
 				return;
 			}
-			if (inFlight) return inFlight;
-
-			const requestController = new AbortController();
-			controller = requestController;
-			const request = (async () => {
-				const result = await loadOpenCodeGoUsage(
-					ctx.modelRegistry,
-					runtime,
-					requestController.signal,
-				);
-				if (requestController.signal.aborted || requestGeneration !== generation) return;
-				const completedAt = runtime.now();
-				if (!result.ok) {
-					nextFetchAt = completedAt + FAILURE_RETRY_MS;
-					ctx.ui.setStatus(STATUS_ID, undefined);
-					return;
-				}
-				cached = result.value;
-				nextFetchAt = completedAt + REFRESH_INTERVAL_MS;
-				ctx.ui.setStatus(
-					STATUS_ID,
-					formatOpenCodeGoUsage(ctx.ui.theme, result.value, completedAt),
-				);
-			})();
-			inFlight = request;
-			try {
-				await request;
-			} finally {
-				if (inFlight === request) inFlight = undefined;
-				if (controller === requestController) controller = undefined;
-			}
+			ctx.ui.setStatus(
+				FOOTER_STATUS_KEY,
+				bindings.projectFooter(snapshot, bindings.readConfig(), lifecycle.controller.isStale(), ctx.ui.theme),
+			);
 		};
 
-		const activate = async (
-			ctx: ExtensionContext,
-			provider: string | undefined,
-		): Promise<void> => {
-			stop(ctx);
-			if (!ctx.hasUI || !isOpenCodeGoProvider(provider)) return;
-			timer = setInterval(() => {
-				void refresh(ctx).catch(() => undefined);
-			}, REFRESH_INTERVAL_MS);
-			timer.unref?.();
-			await refresh(ctx);
+		const footerConfig = (source: ProviderBindings): UpstreamUsageConfig => ({
+			// Native display stays off; this adapter is the only surface.
+			...source.readConfig(),
+			enabled: true,
+			showOnlyOnProvider: true,
+		});
+
+		const unsubscribeFromAccounts = (): void => {
+			unsubscribeAccounts?.();
+			unsubscribeAccounts = undefined;
+			subscribedService = undefined;
+		};
+
+		const applyService = (loaded: ProviderBindings, service: UpstreamMultiproviderService): void => {
+			loaded.pooling.setService(service);
+			if (subscribedService === service) return;
+			unsubscribeFromAccounts();
+			subscribedService = service;
+			unsubscribeAccounts = service.onActiveAccountChanged(PROVIDER_ID, restartForActiveAccount);
+		};
+
+		/** A pooled account switch bills different budgets: replace the controller. */
+		const restartForActiveAccount = (): void => {
+			if (lifecycle.kind !== "ready" || bindings === undefined || activeContext === undefined) return;
+			const loaded = bindings;
+			clearFooter(activeContext);
+			lifecycle.controller.shutdown();
+			const controller = loaded.createController(() => footerConfig(loaded), update);
+			lifecycle = { kind: "ready", controller };
+			controller.start(activeContext);
+		};
+
+		const deactivate = (ctx?: ExtensionContext): void => {
+			generation++;
+			if (lifecycle.kind === "ready") lifecycle.controller.shutdown();
+			if (lifecycle.kind !== "unavailable") lifecycle = { kind: "idle" };
+			clearFooter(ctx ?? activeContext);
+		};
+
+		const activate = async (ctx: ExtensionContext): Promise<void> => {
+			if (!isEligibleContext(ctx)) {
+				deactivate(ctx);
+				return;
+			}
+			activeContext = ctx;
+			if (lifecycle.kind === "ready" || lifecycle.kind === "unavailable") return;
+			if (loading !== undefined) {
+				await loading;
+				return;
+			}
+
+			const requestGeneration = generation;
+			const pending = (async () => {
+				try {
+					bindings = bindings ?? (await dependencies.loadProvider());
+				} catch {
+					if (requestGeneration === generation) {
+						lifecycle = { kind: "unavailable" };
+						warnOnce(
+							ctx,
+							`OpenCode Go footer: could not load ${PACKAGE_NAME}. Repair the install and reload pi.`,
+						);
+					}
+					return;
+				}
+				if (requestGeneration !== generation) return;
+
+				const native = bindings.readConfig();
+				if (native.enabled) {
+					lifecycle = { kind: "unavailable" };
+					warnOnce(
+						ctx,
+						`OpenCode Go footer: native usage is still enabled, so the footer stays off. ` +
+							`Set usage.enabled to false in ${CONFIG_BASENAME} and reload pi.`,
+					);
+					return;
+				}
+
+				if (announcedService !== undefined && bindings.pooling.isService(announcedService)) {
+					applyService(bindings, announcedService);
+				}
+
+				const loaded = bindings;
+				const controller = loaded.createController(() => footerConfig(loaded), update);
+				lifecycle = { kind: "ready", controller };
+				controller.start(ctx);
+			})();
+			loading = pending;
+			try {
+				await pending;
+			} finally {
+				if (loading === pending) loading = undefined;
+			}
 		};
 
 		pi.on("session_start", async (_event, ctx) => {
-			await activate(ctx, ctx.model?.provider);
+			diagnosticsShown = 0;
+			generation++;
+			lifecycle = { kind: "idle" };
+			activeContext = undefined;
+			await activate(ctx);
 		});
 
-		pi.on("turn_end", async (_event, ctx) => {
-			await refresh(ctx);
+		pi.on("model_select", async (_event, ctx) => {
+			await activate(ctx);
 		});
 
-		pi.on("model_select", async (event, ctx) => {
-			await activate(ctx, event.model.provider);
+		pi.on("turn_end", (_event, ctx) => {
+			if (lifecycle.kind !== "ready") return;
+			void lifecycle.controller.refresh(ctx);
 		});
 
-		pi.on("session_shutdown", async (_event, ctx) => {
-			stop(ctx);
+		pi.on("session_shutdown", () => {
+			deactivate();
+			unsubscribeFromAccounts();
+			bindings?.pooling.setService(undefined);
+			activeContext = undefined;
+		});
+
+		pi.events.on(MULTIPROVIDER_SERVICE_EVENT, (value: unknown) => {
+			announcedService = value;
+			if (bindings === undefined || !bindings.pooling.isService(value)) return;
+			applyService(bindings, value);
 		});
 	};
 }
