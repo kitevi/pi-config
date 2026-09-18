@@ -20,8 +20,9 @@ behavioral patterns for specific tasks.
 _Avoid_: Prompt template (not the same thing—skills are behavioral guidance, not raw prompts).
 
 **Overlay**:
-An incremental JSON merge strategy where the repo owns specific leaf paths but
-preserves unrelated local mutations in the target file (e.g. `settings.json`).
+A repository-owned JSON config file that reconciliation installs over its target
+under `~/.pi/agent/` (e.g. `settings.json`). The repository file is written
+wholesale; local mutations in the target do not survive.
 _Avoid_: Patch, diff.
 
 **Symlink**:
@@ -62,9 +63,9 @@ appearance automatically through the `light/dark` pair in the `theme` setting.
 **Package Extension** (installed via npm/GitHub and tracked in `settings.json`).
 - A **Package** can bring any combination of **Extensions**, **Skills**, and
 **Themes**. This repo selectively loads only the pieces it wants through `settings.json`.
-- **Overlay** merge is used for JSON config files that pi mutates at runtime
-(`settings.json`, `verbosity.json`). The repo
-owns leaf paths; local additions survive reconciliation.
+- **Overlay** install is used for JSON config files, including ones pi mutates
+at runtime (`settings.json`). Reconciliation writes the repository file
+wholesale, so local additions do not survive; declare them in the repo instead.
 - **Symlink** is used for static assets that pi only reads (`prompts/`,
 `skills/`, `themes/`, `extensions/`).
 - **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
@@ -81,14 +82,14 @@ manages *configuration*, not *credentials*.
 > **Dev:** "I added a new extension to `extensions/`. Should I run `npm run setup`?"
 >
 > **Domain expert:** "Yes — that's **reconciliation**. The bootstrap script will
-> symlink it into `~/.pi/agent/extensions/` and merge any JSON **overlays**.
+> symlink it into `~/.pi/agent/extensions/` and install the JSON **overlays**.
 > It's idempotent, so you can run it after any change."
 >
 > **Dev:** "What about `settings.json` — doesn't pi write to that itself?"
 >
-> **Domain expert:** "Yes, which is why we use **overlay** merge rather than
-> full replacement. The repo owns only the leaf paths it declares; anything pi
-> added locally survives **reconciliation**."
+> **Domain expert:** "Yes, pi writes runtime state into that file. Reconciliation
+> still installs the repository version wholesale, so anything pi added locally
+> does not survive — declare it in the repo instead."
 >
 > **Dev:** "And if I delete `~/.pi/agent/` entirely?"
 >

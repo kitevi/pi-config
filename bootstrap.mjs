@@ -23,8 +23,6 @@ const links = [
 
 const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
 const PI_SETTINGS = join(PI_DIR, "settings.json");
-const NEURALWATT_OVERLAY = join(REPO_DIR, "neuralwatt.json");
-const PI_NEURALWATT = join(PI_EXTENSIONS_DIR, "neuralwatt.json");
 const BETTER_OPENAI_OVERLAY = join(REPO_DIR, "pi-better-openai.json");
 const PI_BETTER_OPENAI = join(PI_EXTENSIONS_DIR, "pi-better-openai.json");
 const OPENCODE_GO_OVERLAY = join(REPO_DIR, "opencode-go-provider.json");
@@ -172,7 +170,6 @@ async function main() {
   await syncDirectoryLinks(EXTENSIONS_DIR, PI_EXTENSIONS_DIR);
   await syncDirectoryLinks(THEMES_DIR, PI_THEMES_DIR);
 
-  await installJsonConfig(NEURALWATT_OVERLAY, PI_NEURALWATT, "neuralwatt settings");
   await installJsonConfig(BETTER_OPENAI_OVERLAY, PI_BETTER_OPENAI, "pi-better-openai settings");
   await installJsonConfig(OPENCODE_GO_OVERLAY, PI_OPENCODE_GO, "opencode-go provider settings");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");

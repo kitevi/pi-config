@@ -1,7 +1,7 @@
 # pi-config
 
 My personal pi agent config repo.
-It keeps prompts/extensions/skills/themes/reminders plus repo-managed pi config files (settings, models, keybindings, Neuralwatt, etc.) in version control and bootstraps them into `~/.pi/agent`.
+It keeps prompts/extensions/skills/themes/reminders plus repo-managed pi config files (settings, keybindings, etc.) in version control and bootstraps them into `~/.pi/agent`.
 
 ## Prerequisites
 
@@ -51,33 +51,32 @@ The theme follows your terminal appearance: pi switches between the
 
 ## Footer veil
 
-`extensions/footer-veil.ts` starts with model information and provider usage
-veiled. Press `Ctrl+P` to show or hide them; context statistics retain their
-existing behavior. Provider usage covers both the
+`extensions/footer-veil.ts` starts each session with model information and provider usage
+veiled. Press `Ctrl+P` to show or hide them; context statistics are never veiled. Provider usage covers both the
 footer status slots and the below-editor widget lines used by hypercharm, zro,
-neuralwatt, and Better OpenAI (in its `status` footer mode). No per-provider
+and Better OpenAI (in its `status` footer mode). No per-provider
 commands are used; the veil filters at render time, so provider updates stay
-hidden until revealed. Reloads and new/resumed/forked sessions restore the
+hidden until you reveal them with `Ctrl+P`. Reloads and new/resumed/forked sessions restore the
 initially veiled state.
 
 ## Skill index
 
-`extensions/skill-guide.ts` renders every loaded skill command and a short summary in a TUI-only widget when a session starts. The widget is not added to the conversation or sent to the model provider. It hides whenever you submit a prompt; use `/skill-guide` to reopen it until your next prompt.
+`extensions/skill-guide.ts` renders every loaded skill command with a short summary in a TUI-only widget when a session starts. The widget is not added to the conversation or sent to the model provider. It hides whenever you submit a prompt; use `/skill-guide` to reopen it until your next prompt.
 
 Configure it in `extensions/skill-guide.ts` (`DEFAULT_SKILL_GUIDE_CONFIG`, then `/reload`):
 
 - `title` — widget heading text (`"Skill index"` by default).
-- `showOnStartup` — show the index when a session starts.
-- `hideOnPrompt` — hide the index whenever an interactive prompt is submitted.
+- `showOnStartup` — whether the index is shown when a session starts.
+- `hideOnPrompt` — whether the index hides whenever an interactive prompt is submitted.
 - `placement` — `aboveEditor` or `belowEditor`.
 - `maxSummaryLength` — maximum summary length before shortening (30 characters by default).
-- `summaryOverrides` — replace unclear upstream descriptions by skill name.
-- `hiddenSkills` — hide skills by exact name or `"prefix*"` glob (`["fabric-*"]` by default).
-- `pinnedSkills` — always shown even under a glob (`[]` by default, so `fabric-*` stays fully hidden).
+- `summaryOverrides` — replacements for unclear upstream descriptions, keyed by skill name.
+- `hiddenSkills` — skills hidden by exact name or `"prefix*"` glob (`["fabric-*"]` by default).
+- `pinnedSkills` — skills always shown, even under a glob (`[]` by default, so `fabric-*` stays fully hidden).
 
 ## Permission gate
 
-`extensions/permission-gate.ts` is a rule-based guard over agent-issued `bash`/`nu` tool calls. It is behavior shaping, not a sandbox: ordinary work — including reads and writes outside the workspace and `/tmp`, tests, builds, and plain network fetches — runs unhindered, while higher-stakes calls are **blocked** outright or raised as an **ask** you confirm.
+`extensions/permission-gate.ts` is a rule-based guard over agent-issued `bash`/`nu` tool calls. It is behavior shaping, not a sandbox: ordinary work — including reads and writes, tests, builds, and plain network fetches — runs unhindered, while higher-stakes calls are **blocked** outright or raised as an **ask** you confirm.
 
 **Blocked** (never run): credential and private-material reads or writes (SSH keys, GPG, `.pem`/`.key`/`.p12`/`.pfx`, AWS/gcloud/Azure/Docker auth — `.env`, `.envrc`, `.npmrc`, `.netrc` are intentionally allowed); catastrophic disk/system commands (`mkfs`, `dd` to `/dev/*`, `sudo rm`, `chmod -R 777 /`, `curl … | sudo sh`); writes to `/dev`, `/proc`, `/sys`; git with `--no-verify`; and agent-launched nested Pi agents (below).
 
@@ -87,11 +86,11 @@ Configure it in `extensions/skill-guide.ts` (`DEFAULT_SKILL_GUIDE_CONFIG`, then 
 
 Interactive asks show the full syntax-highlighted command in a scrollable in-Pi review; no external file is needed. Use **↑/↓** (or **j/k**), **PageUp/PageDown**, and **Home/End** to scroll. Approval controls stay visible: **Tab/Shift+Tab** or **←/→** choose, **Enter** confirms, and **Esc** cancels. **No, block it** is the default; scrolling never selects approval. The selected option carries the explicit marker — **→ No, block it (Enter)** or **→ Yes, allow once (Enter)** — so there is exactly one Enter target. Selection uses pi's theme colors (`error` for block, `success` for allow); inactive choices and navigation stay muted. A warning title with countdown, a scroll-position line, and one spacer row separate the review from the controls. The review paints its own padding so background text and editor cursors cannot leak through its edges. Narrow terminals use shorter option labels to keep `(Enter)` visible. Text wraps to the terminal width and adjusts on resize. The existing countdown continues while reviewing (`PI_GATE_ASK_TIMEOUT_MS`, default 60 seconds). RPC clients retain their native selector.
 
-An **ask** you decline or dismiss blocks the call and aborts the turn, so the model cannot immediately retry another form; an ask that times out (you stepped away) also blocks the call and aborts the turn — unattended work stops there — but the model gets timeout wording rather than decline wording. Stepping away mid-ask therefore stops the run. In every blocked case the matching rule is quoted back to the model both as the tool result and again on the next turn.
+An **ask** you decline or dismiss blocks the call and aborts the turn, so the model cannot immediately retry the same work in another form; an ask that times out (you stepped away) also blocks the call and aborts the turn — unattended work stops there — but the model gets timeout wording rather than decline wording. In every blocked case the matching rule is quoted back to the model both as the tool result and again on the next turn.
 
 ### Nested Pi subprocess guard
 
-As one block rule, the gate declines agent `bash`/`nu` calls that start another Pi agent, preventing a skill from simulating an unavailable subagent with commands such as `pi --no-session -p @prompt.md`. It does **not** affect Pi started directly in a terminal or via Pi’s `!` user-shell prefix. Non-agent Pi operations — help/version, `--list-models`, `--export`, management commands (`config`, `install`, `list`, `remove`, `uninstall`, `update`), and promptless startup — remain available to the agent.
+As one of the block rules, the gate declines agent `bash`/`nu` calls that start another Pi agent, preventing a skill from simulating an unavailable subagent with commands such as `pi --no-session -p @prompt.md`. It does **not** affect Pi started directly in a terminal or via Pi’s `!` user-shell prefix. Non-agent Pi operations — help/version, `--list-models`, `--export`, management commands (`config`, `install`, `list`, `remove`, `uninstall`, `update`), and promptless startup — remain available to the agent.
 
 For deliberate nested-agent troubleshooting, opt in on the **parent** process:
 
@@ -103,17 +102,17 @@ Setting that variable inside an agent’s child command does not bypass the gate
 
 ## Desktop notifications
 
-`extensions/desktop-notifications.ts` requests terminal focus reporting and sends an attention notification only when Pi's terminal surface is known to be unfocused. It handles permission-gate asks (`Pi needs permission`) and the final `agent_settled` lifecycle event (`Pi is waiting for you`). The waiting notification is debounced by ~10s: if a new agent run starts within the window (auto-retry, compaction retry, queued follow-up), the settle was transient and nothing is sent; permission-gate asks notify immediately. Unknown focus is treated conservatively as focused, so unsupported or headless sessions stay silent.
+`extensions/desktop-notifications.ts` requests terminal focus reporting and sends an attention notification only when Pi's terminal surface is known to be unfocused. It handles permission-gate asks (`Pi needs permission`) and the final `agent_settled` lifecycle event (`Pi is waiting for you`). The waiting notification is debounced by ~10s: if a new agent run starts within the window (auto-retry, compaction retry, queued follow-up), the settle was transient, so nothing is sent; permission-gate asks notify immediately. Unknown focus is treated conservatively as focused, so unsupported or headless sessions stay silent.
 
 Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact surface focus, and OSC 777 raises the native desktop notification. The extension also supports Kitty's OSC 99 protocol. When no native notification protocol is recognized, it falls back to `notify-send` on Linux or `osascript` on macOS. If no terminal focus report has arrived, focus detection falls back to X11's active window when `DISPLAY` and `WINDOWID` are available, or the frontmost terminal application on macOS. Terminal reports take precedence over these best-effort fallbacks.
 
 
 ## Pi Fabric
 
-The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. Subagents are disabled (`approvals.agent: "deny"`, `subagents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (8,192 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
+The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. Subagents are disabled (`approvals.agent: "deny"`, `agents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch, TinyFish search/fetch, and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (8,192 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
 
 
-## What setup does
+## What `npm run setup` does
 
 `npm run setup` runs `bootstrap.mjs`, which:
 
@@ -133,7 +132,6 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 
 5. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
    - `settings.json` → `~/.pi/agent/settings.json`
-   - `neuralwatt.json` → `~/.pi/agent/extensions/neuralwatt.json`
    - `pi-better-openai.json` → `~/.pi/agent/extensions/pi-better-openai.json`
    - `fabric.json` → `~/.pi/agent/fabric.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
@@ -144,6 +142,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 ## Repo layout
 
 - `bootstrap.mjs` — setup/link/merge script
+- `AGENTS.md` — agent-facing rules for this repository, loaded automatically by pi sessions started in this repository
 - `prompts/` — prompt files
 - `extensions/` — pi extensions
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide` (settings live in `DEFAULT_SKILL_GUIDE_CONFIG` at the top of the file)
@@ -152,20 +151,19 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
   - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
-  - `extensions/opencode-go-usage.ts` — footer surface for OpenCode Go usage: lazily loads the installed `pi-opencode-go-provider`'s own controller and formatters, and keeps the 5h/7d/30d remaining budget plus reset countdowns in the footer while an OpenCode Go model is active. It never paints an editor widget, so reconciliation disables the provider's native usage display (`opencode-go-provider.json`) to keep exactly one poller
+  - `extensions/opencode-go-usage.ts` — footer surface for OpenCode Go usage: lazily loads the installed `pi-opencode-go-provider`'s own controller and formatters, and keeps the 5h/7d/30d remaining budget plus reset countdowns in the footer while an OpenCode Go model is active. It never paints an editor widget, and reconciliation disables the provider's native usage display (`opencode-go-provider.json`) so exactly one usage poller runs
 - `skills/` — pi skills
 - `themes/` — pi themes (`github-colorblind` light/dark variants)
 - `reminders/` — global reminder definitions for `pi-system-reminders`
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
-- `keybindings.json` — repo-managed keybinding overrides; unbinds built-in `Ctrl+P` users so `footer-veil` can own it
-- `neuralwatt.json` — Neuralwatt provider configuration installed into `~/.pi/agent/extensions/neuralwatt.json`
+- `keybindings.json` — repo-managed keybinding overrides; unbinds the built-in commands that use `Ctrl+P` so `footer-veil` can own `Ctrl+P`
 - `fabric.json` — Pi Fabric configuration installed into `~/.pi/agent/fabric.json` (see [Pi Fabric](#pi-fabric))
 - `mcp.json` — Pi Fabric MCP server configuration installed into `~/.pi/agent/mcp.json`
 - `opencode-go-provider.json` — disables `pi-opencode-go-provider`'s native usage widget, installed into `~/.pi/agent/opencode-go-provider.json`; the footer adapter refuses to start (with one warning) while native usage is enabled
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
-The bootstrap script is plain Node.js, but pi extensions in `extensions/` can still stay TypeScript.
+The bootstrap script is plain Node.js; the pi extensions in `extensions/` are TypeScript.
 Reminder files tracked in `reminders/` become global reminders via `~/.pi/agent/reminders`; project-specific reminders for some other repo should still live in that repo's `.pi/reminders/` directory.
 
 ## Re-run / update
@@ -176,6 +174,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `neuralwatt.json`, `fabric.json`, and `mcp.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `pi-better-openai.json`, `fabric.json`, `mcp.json`, and `opencode-go-provider.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.
