@@ -87,5 +87,6 @@
     }
   ],
   "hideThinkingBlock": true,
+  "cacheWarming": "idle",
   "showCacheMissNotices": true
 }
