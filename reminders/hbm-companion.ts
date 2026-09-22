@@ -34,7 +34,9 @@ const companionHbmPath = ({ event, ctx }: ReminderArgs): string | null => {
 	while (true) {
 		const candidate = path.join(directory, mappingName);
 		try {
-			if (fs.statSync(candidate, { throwIfNoEntry: false })?.isFile()) return candidate;
+			// Filesystem lookups alone can accept a differently cased filename.
+			if (fs.readdirSync(directory).includes(mappingName)
+				&& fs.statSync(candidate, { throwIfNoEntry: false })?.isFile()) return candidate;
 		} catch {
 			// An inaccessible mapping should not interrupt a successful Java read.
 		}

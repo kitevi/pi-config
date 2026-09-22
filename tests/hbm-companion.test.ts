@@ -127,12 +127,20 @@ void describe("hbm-companion", () => {
 		}
 	});
 
-	void it("requires exact filename case and does not treat directories as mappings", () => {
+	void it("requires exact filename case", () => {
 		const reminder = plugin({} as never);
 		const java = touch("src/main/java/Foo.java");
-		touch("src/main/resources/foo.hbm.xml");
+		const mapping = touch("src/main/resources/foo.hbm.xml");
 		assert.isFalse(reminder.when(readArgs(java)));
-		fs.mkdirSync(path.join(root, "src/main/resources/Foo.hbm.xml"));
+		fs.unlinkSync(mapping);
+		touch("src/main/resources/Foo.hbm.xml");
+		assert.isTrue(reminder.when(readArgs(java)));
+	});
+
+	void it("does not treat directories as mappings", () => {
+		const reminder = plugin({} as never);
+		const java = touch("src/main/java/Foo.java");
+		fs.mkdirSync(path.join(root, "src/main/resources/Foo.hbm.xml"), { recursive: true });
 		assert.isFalse(reminder.when(readArgs(java)));
 	});
 
