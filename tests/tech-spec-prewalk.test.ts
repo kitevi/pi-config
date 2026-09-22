@@ -112,17 +112,14 @@ void describe("requestPrewalkArm", () => {
 });
 
 void describe("techSpecPrewalk extension", () => {
-	type InputHandler = (
-		event: { type: "input"; text: string; source: "interactive" },
-		ctx: ExtensionContext,
-	) => Promise<{ action: "continue" } | undefined>;
+	type AnyHandler = (event: unknown, ctx: ExtensionContext) => Promise<unknown> | unknown;
 
 	function fakePi(listener?: (request: FabricPrewalkRequestV1) => void) {
-		const handlers = new Map<string, InputHandler>();
+		const handlers = new Map<string, AnyHandler>();
 		const notified: string[] = [];
 		const bus = fakeBus(listener);
 		const pi = {
-			on(event: string, handler: InputHandler) {
+			on(event: string, handler: AnyHandler) {
 				handlers.set(event, handler);
 			},
 			events: bus,
@@ -130,45 +127,57 @@ void describe("techSpecPrewalk extension", () => {
 		const ctx = {
 			ui: { notify: (message: string) => notified.push(message) },
 		} as unknown as ExtensionContext;
-		return { pi, ctx, bus, notified, handlers };
+		const sendInput = (text: string) =>
+			handlers.get("input")?.({ type: "input", text, source: "interactive" }, ctx);
+		const settle = () => handlers.get("agent_settled")?.({ type: "agent_settled" }, ctx);
+		return { pi, ctx, bus, notified, handlers, sendInput, settle };
 	}
 
-	void it("arms prewalk and continues when the tech-spec skill is invoked", async () => {
+	void it("defers the arm until the tech-spec turn settles", async () => {
 		const host = fakePi((request) => {
 			request.claim();
 			request.respond({ ok: true });
 		});
 		techSpecPrewalk(host.pi as never);
-		const handler = host.handlers.get("input");
-		assert.isOk(handler);
-		const result = await handler?.(
-			{ type: "input", text: "/skill:tech-spec plan the migration", source: "interactive" },
-			host.ctx,
-		);
-		assert.deepStrictEqual(result, { action: "continue" });
+
+		const inputResult = await host.sendInput("/skill:tech-spec plan the migration");
+		assert.deepStrictEqual(inputResult, { action: "continue" });
+		// The skill turn (including the spec write) runs with prewalk idle.
+		assert.strictEqual(host.bus.emitted.length, 0);
+
+		await host.settle();
 		assert.strictEqual(host.bus.emitted.length, 1);
 		assert.strictEqual(host.bus.emitted[0][0], PREWALK_REQUEST_EVENT);
 		assert.deepStrictEqual(host.notified, ["tech-spec: fabric prewalk armed."]);
 	});
 
-	void it("ignores inputs that do not invoke the skill", async () => {
+	void it("arms only once across later settles", async () => {
+		const host = fakePi((request) => {
+			request.claim();
+			request.respond({ ok: true });
+		});
+		techSpecPrewalk(host.pi as never);
+		await host.sendInput("/tech-spec");
+		await host.settle();
+		await host.settle();
+		assert.strictEqual(host.bus.emitted.length, 1);
+	});
+
+	void it("does not arm when the skill was not invoked", async () => {
 		const host = fakePi();
 		techSpecPrewalk(host.pi as never);
-		const result = await host.handlers.get("input")?.(
-			{ type: "input", text: "hello world", source: "interactive" },
-			host.ctx,
-		);
-		assert.isUndefined(result);
+		const inputResult = await host.sendInput("hello world");
+		assert.deepStrictEqual(inputResult, { action: "continue" });
+		await host.settle();
 		assert.strictEqual(host.bus.emitted.length, 0);
+		assert.deepStrictEqual(host.notified, []);
 	});
 
 	void it("warns when no Fabric runtime claims the request", async () => {
 		const host = fakePi();
 		techSpecPrewalk(host.pi as never);
-		await host.handlers.get("input")?.(
-			{ type: "input", text: "/tech-spec", source: "interactive" },
-			host.ctx,
-		);
+		await host.sendInput("/tech-spec");
+		await host.settle();
 		assert.deepStrictEqual(host.notified, [
 			"tech-spec: no Fabric runtime claimed the prewalk request; is pi-fabric installed?",
 		]);

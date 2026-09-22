@@ -1,14 +1,20 @@
 /**
  * Tech-Spec Prewalk
  *
- * Automatically arms fabric prewalk whenever the tech-spec skill is invoked
- * (`/skill:tech-spec`, or the bare `/tech-spec` alias). Uses the acknowledged
- * prewalk request protocol from pi-fabric (`pi-fabric/protocol`):
- * emit `pi-fabric:prewalk:request:v1` with `{ version: 1, context, claim, respond }`
- * on the shared extension event bus. Fabric claims the request synchronously
- * (first claimant wins), then responds `{ ok: true }` once prewalk is armed or
- * `{ ok: false, error }` after cancellation or failure. An unclaimed request
- * means no compatible Fabric runtime is installed.
+ * Automatically arms fabric prewalk after the tech-spec skill has been called
+ * (`/skill:tech-spec`, or the bare `/tech-spec` alias). The arm is deferred
+ * until that turn settles, so the tech-spec run — including the spec write
+ * (`pi.write` is a prewalk trigger ref) — completes with prewalk idle and never
+ * sits at a prewalk handoff boundary. The arm then covers the implementation
+ * work that follows.
+ *
+ * Uses the acknowledged prewalk request protocol from pi-fabric
+ * (`pi-fabric/protocol`): emit `pi-fabric:prewalk:request:v1` with
+ * `{ version: 1, context, claim, respond }` on the shared extension event bus.
+ * Fabric claims the request synchronously (first claimant wins), then responds
+ * `{ ok: true }` once prewalk is armed or `{ ok: false, error }` after
+ * cancellation or failure. An unclaimed request means no compatible Fabric
+ * runtime is installed.
  *
  * Mirrors the protocol shape structurally (like max-reasoning.ts) so this file
  * does not depend on pi-fabric's published types at build time.
@@ -22,7 +28,7 @@ export const PREWALK_REQUEST_EVENT = "pi-fabric:prewalk:request:v1";
 const TECH_SPEC_COMMAND_RE = /^\/(?:skill:)?tech-spec(?:\s|$)/i;
 
 /** Upper bound on waiting for Fabric's arm acknowledgment so a slow (or
- *  interactive, e.g. model-picker) arm cannot stall the input pipeline
+ *  interactive, e.g. model-picker) arm cannot stall settle processing
  *  indefinitely. Fabric still completes the arm after the timeout. */
 export const PREWALK_ARM_TIMEOUT_MS = 15_000;
 
@@ -97,10 +103,21 @@ export function requestPrewalkArm(
 }
 
 export default function techSpecPrewalk(pi: ExtensionAPI): void {
-	pi.on("input", async (event, ctx) => {
-		if (!isTechSpecInvocation(event.text)) return;
-		// Await the ack so prewalk is armed before the skill turn runs: the
-		// acknowledged protocol exists to serialize work after the arm.
+	// Set when the user invokes the tech-spec skill. The arm is deferred until
+	// that turn settles so the spec turn itself never sits at a prewalk boundary.
+	let pendingArm = false;
+
+	pi.on("input", (event) => {
+		if (isTechSpecInvocation(event.text)) pendingArm = true;
+		return { action: "continue" };
+	});
+
+	// agent_settled is the final boundary: Pi will not continue automatically,
+	// so the spec turn is over (including retries and queued follow-ups) and the
+	// arm can cover the implementation work that follows.
+	pi.on("agent_settled", async (_event, ctx) => {
+		if (!pendingArm) return;
+		pendingArm = false;
 		const outcome = await requestPrewalkArm(pi.events, ctx);
 		switch (outcome.status) {
 			case "armed":
@@ -122,6 +139,5 @@ export default function techSpecPrewalk(pi: ExtensionAPI): void {
 				);
 				break;
 		}
-		return { action: "continue" };
 	});
 }
