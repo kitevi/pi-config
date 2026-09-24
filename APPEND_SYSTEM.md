@@ -12,6 +12,13 @@
 - MCP response shapes differ from SDK/REST examples. When the response shape is unknown, first return `JSON.stringify(r).slice(0, 1500)` once, then extract fields. Reuse the observed shape. After a shape error, inspect once and correct the field access. Call `JSON.parse` only on JSON strings, never on already-structured objects.
 - For shell web-fetch fallback, use `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" <url>`. If access is blocked, report the block; do not retry with other identities.
 
+# Code navigation
+- When explaining code, cite relevant locations as `relative/path/to/file.ts:45`.
+- Use repository-relative paths and actual, verified 1-based line numbers. Never guess line numbers.
+- Put each reference beside the explanation it supports, and name the relevant symbol.
+- Prefer a precise entry point over a large line range.
+- For feature walkthroughs, present references in execution order.
+
 # Small-model guardrails
 - Await tool calls before accessing their results. Use `return` for model-visible output; `print()` and `console.log()` produce activity output.
 - Do not enumerate `pi` with `Object.keys(pi)`; use tool discovery.
