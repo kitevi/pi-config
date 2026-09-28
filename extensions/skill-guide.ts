@@ -29,7 +29,6 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 		deslop: "Strip AI-generated slop.",
 		"diagnosing-bugs": "Something's broken or slow.",
 		"emil-design-eng": "UI feels off/unpolished.",
-		"frontend-design": "Starting a new UI/page.",
 		grilling: "Want your idea challenged.",
 		handoff: "Passing work to next session.",
 		implement: "Executing a written spec.",

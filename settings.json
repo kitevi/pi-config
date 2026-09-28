@@ -39,15 +39,6 @@
       "themes": []
     },
     {
-      "source": "npm:@sentiolabs/pi-frontend-design",
-      "skills": [
-        "skills/frontend-design"
-      ],
-      "prompts": [],
-      "extensions": [],
-      "themes": []
-    },
-    {
       "source": "https://github.com/dmmulroy/skills",
       "skills": [],
       "extensions": [],
