@@ -36,6 +36,7 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 		"show-me": "Need a visual explanation.",
 		tdd: "Feature work, test-first.",
 		"tech-spec": "Feature needs a plan first.",
+		"test-audit": "Which tests to cut.",
 		"thermo-nuclear-code-quality-review": "Structure needs a beatdown.",
 		"agent-wording": "Wording feels ambiguous.",
 	},
