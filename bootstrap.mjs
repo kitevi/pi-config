@@ -126,6 +126,19 @@ async function installJsonConfig(sourcePath, targetPath, label) {
     throw new Error(`${label} must be a JSON object: ${sourcePath}`);
   }
 
+  // Pi's ChatGPT login uses a stable installation identity, not a preference.
+  // Keep it local while replacing every other setting from the repository.
+  if (targetPath === PI_SETTINGS && !Object.hasOwn(value, "deviceId")) {
+    try {
+      const current = await readJsonFile(targetPath);
+      if (typeof current?.deviceId === "string" && current.deviceId.trim()) {
+        value.deviceId = current.deviceId;
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) throw error;
+    }
+  }
+
   await writeManagedJsonFile(targetPath, value);
   console.log(`wrote ${label} to ${targetPath}`);
 }

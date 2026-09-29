@@ -6,14 +6,19 @@ Deterministic, git-managed configuration for the pi coding agent (the [pi-mono](
 
 1. Never edit anything under `~/.pi/` to change pi configuration. Reconciliation fully replaces, clears, or symlinks every managed path under `~/.pi/agent/`, so direct edits are silently lost on the next `npm run setup`.
 2. Make every change in this repository, in the repo-owned source file that controls it. If a pi setting is missing, add it to `settings.json` in this repo — not to `~/.pi/agent/settings.json`.
-3. Never treat `~/.pi/agent/npm/` or `.pi/fabric/mcp-cache.json` as configuration. Packages are declared in `settings.json` (`npm:` package ids) and installed during reconciliation; the cache is regenerated.
+3. Never treat `~/.pi/agent/npm/` or `.pi/fabric/mcp-cache.json` as configuration. Packages are declared in `settings.json` (`npm:` package ids) and installed by Pi; the cache is regenerated.
+4. Pi's runtime-generated `deviceId` is installation identity, not configuration. Reconciliation preserves it from the installed settings; never commit it to this repo.
 
 ## Repo-owned sources and their runtime targets
 
-- `settings.json`, `fabric.json`, `mcp.json`, `APPEND_SYSTEM.md`, `opencode-go-provider.json` → installed wholesale into `~/.pi/agent/`
+- `settings.json` → installed into `~/.pi/agent/settings.json`; replaces preferences but preserves the local runtime `deviceId`
+- `fabric.json`, `APPEND_SYSTEM.md`, `opencode-go-provider.json` → installed wholesale into `~/.pi/agent/`
+- `mcp.json` → installed wholesale into `~/.mcporter/mcporter.json` for Pi Fabric, not Pi's native MCP extension
 - `pi-better-openai.json` → installed wholesale into `~/.pi/agent/extensions/`
 - `extensions/`, `themes/`, `prompts/`, `skills/`, `reminders/`, `keybindings.json` → symlinked into `~/.pi/agent/`
 - `bootstrap.mjs` — the reconciler that performs those steps
+
+Pi Fabric owns tool orchestration and MCP. `settings.json` disables Pi's built-in `mcp`, `codemode`, and `tool-search` extensions to keep `fabric_exec` as the exclusive tool path.
 
 ## Making a change
 

@@ -1,19 +1,16 @@
 /**
- * Max Reasoning (with GPT-6 Astra exception)
+ * Max Reasoning
  *
  * Whenever a reasoning model becomes active — any model, any provider,
  * identified by the live model's `reasoning` flag rather than a name list —
  * raise pi's thinking level to the highest level that model supports.
  *
- * Exception: GPT-6 Astra (id `gpt-6-astra`) goes to the lowest level the
- * model supports instead, to keep its expensive reasoning cheap by default.
- *
- * The target is not computed here: we request "max" ("minimal" for Astra)
- * and let the runtime clamp it. pi's setThinkingLevel() routes through pi-ai's
+ * The target is not computed here: we request "max" and let the runtime
+ * clamp it. pi's setThinkingLevel() routes through pi-ai's
  * getSupportedThinkingLevels()/clampThinkingLevel(), which maps "max" to the
  * model's top supported level (lilac's GLM 5.2 keeps "max", openrouter's
  * deepseek-v4/kimi-k3 clamp to "xhigh", a reasoning model with no map clamps
- * to "high") and "minimal" up to the lowest (gpt-6-astra minimal → low).
+ * to "high").
  * pi's Shift+Tab picker treats these the same way, so this cannot request
  * a level the model would reject.
  *
@@ -44,22 +41,11 @@ export interface ThinkingModel {
  *  model.id. Empty = apply to every reasoning model. */
 const EXCLUDED_FAMILIES: readonly string[] = [];
 
-/** Model families to run at the lowest thinking level instead of the highest.
- *  Case-insensitive substring match against model.id, same as above.
- *  Covers GPT-6 Astra (`gpt-6-astra` on openai-codex). */
-const LOW_THINKING_FAMILIES: readonly string[] = ["astra"];
-
 /** True for any reasoning model not on the exclusion list. */
 export function isMatchedModel(model: ThinkingModel | undefined): boolean {
 	if (!model?.reasoning) return false;
 	const id = model.id?.toLowerCase();
 	return !id || !EXCLUDED_FAMILIES.some((family) => id.includes(family));
-}
-
-/** True for a matched model that should run at the lowest level (Astra). */
-export function isLowThinkingModel(model: ThinkingModel | undefined): boolean {
-	const id = model?.id?.toLowerCase();
-	return !!id && LOW_THINKING_FAMILIES.some((family) => id.includes(family.toLowerCase()));
 }
 
 /** Minimal slice of ExtensionAPI: just the thinking-level controls. */
@@ -75,11 +61,9 @@ export interface NotifyUi {
 
 /**
  * If `model` is a matched reasoning model, request "max" and let the runtime
- * clamp it to the model's top supported level — unless it is an Astra model,
- * which requests "minimal" and lets the runtime clamp up to the model's
- * lowest supported level. Returns the resulting level, or undefined if it
- * did nothing (unmatched/excluded model, or a model whose clamp lands on
- * "off"). The read-back of getThinkingLevel() after setThinkingLevel()
+ * clamp it to the model's top supported level. Returns the resulting level,
+ * or undefined if it did nothing (unmatched/excluded model, or a model whose
+ * clamp lands on "off"). Reading getThinkingLevel() after setThinkingLevel()
  * tells us where the clamp landed, so the notification names the effective
  * level rather than the requested one. When the level was already at the
  * model's target, the runtime's set is a no-op and we stay silent.
@@ -90,12 +74,8 @@ export function applyMaxReasoning(
 	ui: NotifyUi | undefined,
 ): ThinkingLevel | undefined {
 	if (!isMatchedModel(model)) return undefined;
-	// Astra is expensive: run it at the lowest level instead of the highest.
-	// "minimal" clamps up to the model's lowest supported level, mirroring
-	// how "max" clamps down to the top (e.g. gpt-6-astra minimal → low).
-	const target: ThinkingLevel = isLowThinkingModel(model) ? "minimal" : "max";
 	const before = api.getThinkingLevel();
-	api.setThinkingLevel(target);
+	api.setThinkingLevel("max");
 	const effective = api.getThinkingLevel();
 	// Degenerate model whose map supports no level above off.
 	if (effective === "off") return undefined;
@@ -118,7 +98,7 @@ export default function maxReasoning(pi: ExtensionAPI): void {
 
 	// model_select does not fire on a fresh startup, so cover the initial model
 	// here. Also re-runs on /new, /resume, /fork, and /reload. Idempotent: a
-	// no-op when the level is already at the model's target (top, or bottom for Astra).
+	// no-op when the level is already at the model's top supported level.
 	pi.on("session_start", async (_event, ctx) => {
 		applyMaxReasoning(pi, ctx.model, ctx.ui);
 	});

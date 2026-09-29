@@ -21,8 +21,9 @@ _Avoid_: Prompt template (not the same thing—skills are behavioral guidance, n
 
 **Overlay**:
 A repository-owned JSON config file that reconciliation installs over its target
-under `~/.pi/agent/` (e.g. `settings.json`). The repository file is written
-wholesale; local mutations in the target do not survive.
+under `~/.pi/agent/` (e.g. `settings.json`). The repository file replaces local
+preferences. The only retained runtime field is Pi's installation `deviceId`
+in `settings.json`; it is not committed.
 _Avoid_: Patch, diff.
 
 **Symlink**:
@@ -64,8 +65,10 @@ appearance automatically through the `light/dark` pair in the `theme` setting.
 - A **Package** can bring any combination of **Extensions**, **Skills**, and
 **Themes**. This repo selectively loads only the pieces it wants through `settings.json`.
 - **Overlay** install is used for JSON config files, including ones pi mutates
-at runtime (`settings.json`). Reconciliation writes the repository file
-wholesale, so local additions do not survive; declare them in the repo instead.
+at runtime (`settings.json`). Reconciliation replaces preferences with the
+repository file, so local preference changes do not survive; declare them in
+the repo instead. Pi's
+runtime-generated installation `deviceId` is preserved, not configured here.
 - **Symlink** is used for static assets that pi only reads (`prompts/`,
 `skills/`, `themes/`, `extensions/`).
 - **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
@@ -74,6 +77,10 @@ repository-owned file as-is (no network fetch). Its MCP web/docs and `fabric_exe
 done after any change to this repo or on a fresh machine.
 - **Reminders** are static assets managed via symlink, but their *semantics*
 are behavioral (they inject messages into the LLM context on session start).
+- **MCP servers** are declared in `mcp.json`, installed into
+`~/.mcporter/mcporter.json`, and connected by Pi Fabric. Pi's built-in MCP,
+codemode, and tool-search extensions are disabled in `settings.json` so
+`fabric_exec` remains the exclusive tool path.
 - **API keys** for custom providers live outside this repo (Bitwarden). This repo
 manages *configuration*, not *credentials*.
 
@@ -88,8 +95,9 @@ manages *configuration*, not *credentials*.
 > **Dev:** "What about `settings.json` — doesn't pi write to that itself?"
 >
 > **Domain expert:** "Yes, pi writes runtime state into that file. Reconciliation
-> still installs the repository version wholesale, so anything pi added locally
-> does not survive — declare it in the repo instead."
+> replaces preferences with the repository version, so local preference changes
+> do not survive — declare them in the repo instead. The installation `deviceId`
+> is runtime identity and is preserved automatically, never committed."
 >
 > **Dev:** "And if I delete `~/.pi/agent/` entirely?"
 >

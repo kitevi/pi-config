@@ -105,6 +105,15 @@ void describe("applyMaxReasoning", () => {
 		assert.deepStrictEqual(notes, ["info:moonshotai/kimi-k2.6: reasoning set to high"]);
 	});
 
+	void it("runs Astra at the highest supported level instead of forcing minimal", () => {
+		const { api, setCalls } = makeApi("low", "xhigh");
+		const { notifyUi, notes } = makeUi();
+		const astra: ThinkingModel = { id: "gpt-6-astra", reasoning: true };
+		assert.strictEqual(applyMaxReasoning(api, astra, notifyUi), "xhigh");
+		assert.deepStrictEqual(setCalls, ["max"]);
+		assert.deepStrictEqual(notes, ["info:gpt-6-astra: reasoning set to xhigh"]);
+	});
+
 	void it("applies to any reasoning model, not just a hard-coded list", () => {
 		const { api, setCalls } = makeApi("high", CLAUDE_TOP);
 		assert.strictEqual(applyMaxReasoning(api, claude, undefined), "max");
