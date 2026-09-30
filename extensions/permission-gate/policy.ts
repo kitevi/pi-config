@@ -1,5 +1,6 @@
 import {
 	analyzeShellCommand,
+	jqFilterArgumentIndex,
 	effectsForScript,
 	HOME,
 	normalize,
@@ -8,6 +9,7 @@ import {
 	PRIVILEGE_EXECUTABLES,
 	scriptEffects,
 	scriptNamesPrivateKey,
+	withoutJqFilters,
 	type AnalyzedScript,
 	type Invocation,
 	type PathEffect,
@@ -137,7 +139,7 @@ const stripGitCommitMessageArgs = (command: string) => {
 };
 
 const mentionsCredentialPath = (text: string) => {
-	const scanText = stripGitCommitMessageArgs(text);
+	const scanText = withoutJqFilters(stripGitCommitMessageArgs(text));
 	const normalized = normalize(scanText);
 	const mentions = extractPathMentions(scanText);
 	const candidates =
@@ -149,13 +151,14 @@ const mentionsCredentialPath = (text: string) => {
 };
 
 const invocationMentionsCredential = (invocation: Invocation) => {
+	const jqFilter = invocation.executable === "jq" ? jqFilterArgumentIndex(invocation.args) : undefined;
 	const isCommitMessage = (index: number) =>
 		invocation.executable === "git" && (invocation.args[index - 1] === "-m" || invocation.args[index - 1] === "--message");
 
 	// Resolve every argument against the command's effective directory: a bare
 	// `id_ed25519` inside `~/.ssh` is the same credential as the absolute path.
 	return invocation.args.some((arg, index) => {
-		if (isCommitMessage(index)) return false;
+		if (isCommitMessage(index) || index === jqFilter) return false;
 		return isCredentialPath(normalizedPath(arg, invocation.cwd));
 	});
 };

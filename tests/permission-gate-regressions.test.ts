@@ -5,6 +5,41 @@ import { analyzeShellCommand } from "../extensions/permission-gate/shell-analysi
 // All command strings are assessed, never executed. Paths are synthetic fixtures.
 const decision = (command: string) => assessToolCall("bash", { command }).decision;
 
+describe("jq filter programs", () => {
+	it.each([
+		"jq '.key' response.json",
+		"jq --arg bid fixture 'to_entries[] | .key as $id | {booking_id: $id}' response.json",
+	])("allows jq field selectors without treating them as credential files: %s", (command) => {
+		assert.equal(decision(command), "allow");
+	});
+	it("blocks deeply nested credential reads inside a jq filter substitution", () => {
+		assert.equal(decision('jq "$(echo "$(echo "$(echo "$(cat /tmp/client.key)")")")"'), "block");
+	});
+	it.each(["jq <.key '.'", "jq 0</tmp/client.key '.'"])("blocks credential input redirections before the filter: %s", (command) => {
+		assert.equal(decision(command), "block");
+	});
+	it.each([
+		["jq -nL .key '.'", "block"],
+		["jq -nLmodulesL '.' .key", "block"],
+		["jq -nLf '.key' response.json", "allow"],
+	])("keeps jq library directories separate from filter programs: %s", (command, expected) => {
+		assert.equal(decision(command), expected);
+	});
+	it.each([
+		"jq '.key' .key",
+		"jq --rawfile secret /tmp/client.key '.key'",
+		"jq --slurpfile secret /tmp/client.key '.key'",
+		"jq -f /tmp/client.key",
+		"jq .key -f filters.jq",
+		"jq '.key' > /tmp/client.key",
+		'jq "$(cat /tmp/client.key)" response.json',
+		"jq '.key'; cat /tmp/client.key",
+		"jq '.key'; node -e 'require(\"fs\").readFileSync(\"/tmp/client.key\")'",
+	])("still blocks actual credential operands and readers: %s", (command) => {
+		assert.equal(decision(command), "block");
+	});
+});
+
 describe("resolved protected paths", () => {
 	it.each([
 		["read", "/home/gate-review/.ssh/./id_ed25519", "/tmp"],

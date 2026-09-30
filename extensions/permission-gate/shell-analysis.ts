@@ -46,7 +46,8 @@ export const HOME = process.env.HOME ? resolve(process.env.HOME) : undefined;
 // process launches; it is behavior shaping, not a security sandbox. One lexer
 // handles command boundaries, words, quoting, and nested command substitutions
 // so those rules cannot drift apart.
-type LexedCommand = { kind: "command"; words: string[]; substitutions: ShellLexResult[] };
+type WordRange = { start: number; end: number };
+type LexedCommand = { kind: "command"; words: string[]; wordRanges: WordRange[]; substitutions: ShellLexResult[] };
 type LexedSubshell = { kind: "subshell"; body: ShellLexResult };
 type LexedStage = LexedCommand | LexedSubshell;
 type LexedPipeline = { stages: LexedStage[]; background: boolean };
@@ -71,6 +72,9 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 	let stages: LexedStage[] = [];
 	let substitutions: ShellLexResult[] = [];
 	let words: string[] = [];
+	let wordRanges: WordRange[] = [];
+	let wordStart = startIndex;
+	let cursor = startIndex;
 	let current = "";
 	let wordStarted = false;
 	let quote: "'" | '"' | undefined;
@@ -78,14 +82,18 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 	let afterPipe = false;
 
 	const pushWord = () => {
-		if (wordStarted) words.push(current);
+		if (wordStarted) {
+			words.push(current);
+			wordRanges.push({ start: wordStart, end: cursor });
+		}
 		current = "";
 		wordStarted = false;
 	};
 	const pushCommand = () => {
 		pushWord();
-		if (words.length > 0) stages.push({ kind: "command", words, substitutions });
+		if (words.length > 0) stages.push({ kind: "command", words, wordRanges, substitutions });
 		words = [];
+		wordRanges = [];
 		substitutions = [];
 	};
 	const finishPipeline = (background = false) => {
@@ -96,6 +104,8 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 	};
 
 	for (let index = startIndex; index < source.length; index++) {
+		cursor = index;
+		if (!wordStarted) wordStart = index;
 		const character = source[index];
 
 		if (escaped) {
@@ -213,6 +223,7 @@ const lexShellCommands = (source: string, startIndex = 0, terminator?: ")" | "`"
 		afterPipe = false;
 	}
 
+	cursor = source.length;
 	finishPipeline();
 	return { pipelines, endIndex: source.length };
 };
@@ -360,6 +371,65 @@ const resolveInvocation = (words: string[], cwd = process.cwd()): Invocation | u
 		return { executable, raw, args, words, cwd };
 	}
 	return undefined;
+};
+
+const JQ_VALUE_OPTIONS = new Map([
+	["--arg", 2], ["--argjson", 2], ["--rawfile", 2], ["--slurpfile", 2], ["--argfile", 2],
+	["-L", 1], ["--library-path", 1], ["--indent", 1],
+]);
+
+export const jqFilterArgumentIndex = (args: string[]): number | undefined => {
+	let filter: number | undefined;
+	for (let index = 0; index < args.length; index++) {
+		const arg = args[index];
+		const redirection = arg.match(/^\d*[<>]+(.*)$/);
+		if (redirection) {
+			if (!redirection[1]) index++;
+			continue;
+		}
+		if (arg === "--") return filter ?? (index + 1 < args.length ? index + 1 : undefined);
+		const values = JQ_VALUE_OPTIONS.get(arg.split("=", 1)[0]);
+		if (values !== undefined) {
+			index += values - (arg.includes("=") ? 1 : 0);
+			continue;
+		}
+		// -L consumes the rest of its short-option word as the library directory.
+		const shortFlags = /^-[^-]/.test(arg) ? arg.slice(1).split("L", 1)[0] : "";
+		// With -f, the positional argument is an input file, not an inline filter.
+		if (arg === "--from-file" || arg.startsWith("--from-file=") || arg === "--run-tests" || shortFlags.includes("f")) return undefined;
+		const library = arg.match(/^-[^-L]*L(.*)$/);
+		if (library) {
+			if (!library[1]) index++;
+			continue;
+		}
+		if (arg.startsWith("-") && arg !== "-") continue;
+		filter ??= index;
+	}
+	return filter;
+};
+
+/** Remove only jq program words; file operands and nested commands remain checked. */
+export const withoutJqFilters = (source: string): string => {
+	const ranges: WordRange[] = [];
+	const collect = (lexed: ShellLexResult) => {
+		for (const command of commandsIn(lexed)) {
+			for (const substitution of command.substitutions) collect(substitution);
+			const invocation = resolveInvocation(command.words);
+			if (invocation?.executable !== "jq") continue;
+			const index = jqFilterArgumentIndex(invocation.args);
+			if (index === undefined) continue;
+			const offset = command.words.length - invocation.args.length;
+			if (!invocation.args.every((arg, index) => command.words[offset + index] === arg)) continue;
+			const range = command.wordRanges[offset + index];
+			// Keep substitutions visible even beyond the command inventory's nesting limit.
+			if (range && !/\$\(|`/.test(source.slice(range.start, range.end))) ranges.push(range);
+		}
+	};
+	collect(lexShellCommands(source));
+	for (const { start, end } of ranges.sort((a, b) => b.start - a.start)) {
+		source = source.slice(0, start) + " ".repeat(end - start) + source.slice(end);
+	}
+	return source;
 };
 
 // ─── command model ───────────────────────────────────────────────────────────
