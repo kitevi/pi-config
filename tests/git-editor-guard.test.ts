@@ -18,6 +18,7 @@ function createMockPi() {
 					return h.handler(event);
 				}
 			}
+			return undefined;
 		},
 	};
 }

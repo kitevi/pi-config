@@ -135,18 +135,18 @@ void describe("OpenCode Go footer adapter", () => {
 		expect(h.setWidget).not.toHaveBeenCalled();
 
 		await h.emit("turn_end");
-		expect(p.controllers[0].refresh).toHaveBeenCalledTimes(1);
+		expect(p.controllers[0]?.refresh).toHaveBeenCalledTimes(1);
 
 		await h.select("other");
-		expect(p.controllers[0].shutdown).toHaveBeenCalled();
-		p.controllers[0].paint();
+		expect(p.controllers[0]?.shutdown).toHaveBeenCalled();
+		p.controllers[0]?.paint();
 		expect(h.statuses.get("opencode-go-usage-footer")).toBeUndefined();
 
 		await h.select("opencode-go");
 		expect(p.controllers).toHaveLength(2);
 
 		await h.emit("session_shutdown");
-		expect(p.controllers[1].shutdown).toHaveBeenCalled();
+		expect(p.controllers[1]?.shutdown).toHaveBeenCalled();
 	});
 
 	void it("coalesces loading and ignores completion after shutdown", async () => {
@@ -222,7 +222,7 @@ void describe("OpenCode Go footer adapter", () => {
 
 		changed?.();
 		await vi.waitFor(() => expect(p.controllers).toHaveLength(2));
-		expect(p.controllers[0].shutdown).toHaveBeenCalled();
+		expect(p.controllers[0]?.shutdown).toHaveBeenCalled();
 
 		await h.emit("session_shutdown");
 		expect(unsubscribe).toHaveBeenCalled();

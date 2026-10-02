@@ -92,23 +92,23 @@ function optionalStringArray(value: unknown, fallback: string[], path: string): 
 export function parseSkillGuideConfig(value: unknown): SkillGuideConfig {
 	if (!isRecord(value)) throw new Error("skill guide config must be an object");
 
-	const placement = value.placement ?? "aboveEditor";
+	const placement = value["placement"] ?? "aboveEditor";
 	if (placement !== "aboveEditor" && placement !== "belowEditor") {
 		throw new Error('placement must be "aboveEditor" or "belowEditor"');
 	}
 
-	const maxSummaryLength = value.maxSummaryLength ?? DEFAULT_MAX_SUMMARY_LENGTH;
+	const maxSummaryLength = value["maxSummaryLength"] ?? DEFAULT_MAX_SUMMARY_LENGTH;
 	if (!Number.isInteger(maxSummaryLength) || (maxSummaryLength as number) < 24) {
 		throw new Error("maxSummaryLength must be an integer of at least 24");
 	}
 
 	const summaryOverrides: Record<string, string> = {};
-	if (value.summaryOverrides !== undefined) {
-		if (!isRecord(value.summaryOverrides)) {
+	if (value["summaryOverrides"] !== undefined) {
+		if (!isRecord(value["summaryOverrides"])) {
 			throw new Error("summaryOverrides must be an object");
 		}
 
-		for (const [skill, summary] of Object.entries(value.summaryOverrides)) {
+		for (const [skill, summary] of Object.entries(value["summaryOverrides"])) {
 			if (typeof summary !== "string" || summary.trim() === "") {
 				throw new Error(`summaryOverrides.${skill} must be a non-empty string`);
 			}
@@ -117,14 +117,14 @@ export function parseSkillGuideConfig(value: unknown): SkillGuideConfig {
 	}
 
 	return {
-		title: optionalString(value.title, "Skill index", "title"),
-		showOnStartup: optionalBoolean(value.showOnStartup, true, "showOnStartup"),
-		hideOnPrompt: optionalBoolean(value.hideOnPrompt, true, "hideOnPrompt"),
+		title: optionalString(value["title"], "Skill index", "title"),
+		showOnStartup: optionalBoolean(value["showOnStartup"], true, "showOnStartup"),
+		hideOnPrompt: optionalBoolean(value["hideOnPrompt"], true, "hideOnPrompt"),
 		placement,
 		maxSummaryLength: maxSummaryLength as number,
 		summaryOverrides,
-		hiddenSkills: optionalStringArray(value.hiddenSkills, [], "hiddenSkills"),
-		pinnedSkills: optionalStringArray(value.pinnedSkills, DEFAULT_PINNED_SKILLS, "pinnedSkills"),
+		hiddenSkills: optionalStringArray(value["hiddenSkills"], [], "hiddenSkills"),
+		pinnedSkills: optionalStringArray(value["pinnedSkills"], DEFAULT_PINNED_SKILLS, "pinnedSkills"),
 	};
 }
 

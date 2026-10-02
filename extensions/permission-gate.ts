@@ -16,9 +16,9 @@
  * boundary, run Pi in a container instead — see docs/security.md upstream.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 
 export type Assessment =
 	| { decision: "allow" }
@@ -26,7 +26,7 @@ export type Assessment =
 
 export type AssessmentContext = { cwd?: string };
 
-type Rule = { reason: string; test: RegExp | ((text: string) => boolean) };
+type Rule = { reason: string; test: RegExp | ((text: string, cwd: string) => boolean) };
 
 // ─── rules ───────────────────────────────────────────────────────────────────
 // One entry per invariant. Keep each test readable enough to audit at a glance;
@@ -52,11 +52,23 @@ const SECRETS: RegExp[] = [
 // canonicalized (project → ./, home → ~), so in-project targets stay silent and
 // /, ~, .., the project root itself, a bare glob, or .git ask.
 const RECURSIVE_TOOLS = new Set(["rm", "chmod", "chown", "chgrp"]);
-const SAFE_ABSOLUTE = /^\/(?:tmp|var\/tmp)\/./;
-const isCriticalTarget = (arg: string) =>
-	(/^(?:\/|~|\.\.)/.test(arg) && !SAFE_ABSOLUTE.test(arg)) || /^(?:\.|\.\/|\*|\.\/\*)$/.test(arg) || /(?:^|\/)\.git\/?$/.test(arg);
+const SAFE_ROOTS = ["/tmp", "/var/tmp"];
 
-const recursiveOutsideProject = (text: string) =>
+// Normalize paths lexically before judging them: ./.., cwd/../x, and
+// /tmp/../home/x must not pass because their prefixes look harmless.
+const isCriticalTarget = (arg: string, cwd: string) => {
+	const stripped = arg.replace(/^["']+|["']+$/g, "");
+	if (/^(?:\.|\.\/|\*|\.\/\*)$/.test(stripped)) return true;
+	if (stripped.endsWith(".git") || stripped.endsWith(".git/")) return true;
+	const expanded = stripped.replace(/^~(?=\/|$)/, HOME);
+	const absolute = resolve(cwd, expanded);
+	if (absolute === resolve(cwd)) return true;
+	if (absolute === cwd) return true;
+	if (absolute.startsWith(`${cwd}${sep}`)) return false;
+	return !SAFE_ROOTS.some((root) => absolute.startsWith(`${root}${sep}`) && absolute !== resolve(root, ".."));
+};
+
+const recursiveOutsideProject = (text: string, cwd: string) =>
 	text.split(/[;&|\n()`]+/).some((segment) => {
 		const words = segment
 			.trim()
@@ -66,7 +78,7 @@ const recursiveOutsideProject = (text: string) =>
 		if (at < 0) return false;
 		const args = words.slice(at + 1);
 		const recursive = args.some((arg) => /^-[a-zA-Z]*[rR]/.test(arg) || arg === "--recursive");
-		return recursive && args.some((arg) => !arg.startsWith("-") && isCriticalTarget(arg));
+		return recursive && args.some((arg) => !arg.startsWith("-") && isCriticalTarget(arg, cwd));
 	});
 
 const RULES: Rule[] = [
@@ -78,16 +90,16 @@ const RULES: Rule[] = [
 	},
 	{
 		reason: "rewrites or deletes remote Git history",
-		test: /\bgit\b[^;&|\n]*\bpush\b[^;&|\n]*(?:\s(?:-f|--force(?:-with-lease)?|--mirror|--delete|-d)\b|\s\+\S|\s:\S)/,
+		test: /\bgit\b[^;&|\n]*\bpush\b[^;&|\n]*(?:\s(?:-[a-zA-Z]*f|--force(?:-with-lease)?|--mirror|--delete|-d)\b|\s\+\S|\s:\S)/,
 	},
 	{
 		reason: "discards uncommitted work",
-		test: /\bgit\b[^;&|\n]*\b(?:reset\b[^;&|\n]*--hard|clean\b[^;&|\n]*\s(?:-[a-z]*f|--force)|checkout\b[^;&|\n]*\s(?:--\s+)?\.(?=\s|$)|restore\b(?![^;&|\n]*--staged)[^;&|\n]*\s\.(?=\s|$)|stash\s+(?:drop|clear))/,
+		test: /\bgit\b[^;&|\n]*\b(?:reset\b[^;&|\n]*--hard|clean\b[^;&|\n]*\s(?:-[a-z]*f|--force)|checkout\b[^;&|\n]*\s(?:--\s+)?\.(?=\s|$)|restore\b(?![^;&|\n]*--staged(?!\S)\s*\.(?=\s|$)\s*$)[^;&|\n]*\s\.(?=\s|$)|stash\s+(?:drop|clear))/,
 	},
 	{ reason: "runs with elevated privileges", test: /(?:^|[\s;&|('"])(?:sudo|doas|pkexec|run0)\s/ },
 	{
 		reason: "drops database objects",
-		test: /\b(?:psql|mysql|mariadb|sqlite3|sqlcmd|mongosh|duckdb)\b[^\n]*\b(?:drop\s+(?:database|schema|table)|truncate\s+table|dropDatabase)\b/i,
+		test: /\b(?:psql|mysql|mariadb|sqlite3|sqlcmd|mongosh|duckdb)\b[^\n]*\b(?:drop\s+(?:database|schema|table)|truncate(?:\s+(?:only\s+|table\s+|restart\s+identity|continue\s+identity|cascade|restrict))*\s+\w+|dropDatabase)\b/i,
 	},
 	{
 		reason: "publishes a package or artifact",
@@ -108,7 +120,8 @@ const canonical = (text: string, cwd: string) =>
 		.replaceAll(HOME, "~")
 		.replace(/\$\{?HOME\}?/g, "~");
 
-const firstMatch = (text: string) => RULES.find(({ test }) => (typeof test === "function" ? test(text) : test.test(text)))?.reason;
+const firstMatch = (text: string, cwd: string) =>
+	RULES.find(({ test }) => (typeof test === "function" ? test(text, cwd) : test.test(text)))?.reason;
 
 const stringInput = (input: unknown, key: string) => {
 	if (typeof input !== "object" || input === null) return "";
@@ -124,7 +137,7 @@ export const assessToolCall = (toolName: string, input: unknown, context: Assess
 	if (SHELL_TOOLS.has(toolName)) {
 		const command = stringInput(input, "command");
 		if (!command) return { decision: "allow" };
-		const reason = firstMatch(canonical(command, cwd));
+		const reason = firstMatch(canonical(command, cwd), cwd);
 		return reason ? { decision: "ask", reason, target: command } : { decision: "allow" };
 	}
 	if (PATH_TOOLS.has(toolName)) {
@@ -144,7 +157,7 @@ const ASK_DENY = "Block it";
 const MAX_PREVIEW_LINES = 30;
 
 const askTimeoutMs = () => {
-	const override = Number(process.env.PI_GATE_ASK_TIMEOUT_MS);
+	const override = Number(process.env["PI_GATE_ASK_TIMEOUT_MS"]);
 	return override > 0 ? override : 60_000;
 };
 
@@ -155,6 +168,16 @@ const preview = (target: string) => {
 };
 
 export default function (pi: ExtensionAPI) {
+	// Pi can issue parallel tool calls, while its built-in selector owns one UI
+	// slot and can overwrite an unresolved ask. Keep one review active and use
+	// an epoch so a denial blocks siblings queued behind it.
+	let askSlot: Promise<void> = Promise.resolve();
+	let askEpoch = 0;
+
+	pi.on("agent_start", () => {
+		askEpoch++;
+	});
+
 	pi.on("tool_call", async (event, ctx) => {
 		const assessment = assessToolCall(event.toolName, event.input, { cwd: ctx.cwd });
 		if (assessment.decision === "allow") return undefined;
@@ -163,31 +186,54 @@ export default function (pi: ExtensionAPI) {
 		if (!ctx.hasUI) return { block: true, reason: `${reason} Confirmation needs an interactive session.` };
 
 		const timeoutMs = askTimeoutMs();
+		const signal = ctx.signal;
+		const myEpoch = askEpoch;
+		const previous = askSlot;
+		let releaseSlot: () => void = () => {};
+		askSlot = new Promise((resolve) => {
+			releaseSlot = resolve;
+		});
+
+		await previous;
+		if (askEpoch !== myEpoch || signal?.aborted) {
+			releaseSlot();
+			return { block: true, reason };
+		}
+
+		let choice: string | undefined;
+		const controller = new AbortController();
+		const cancelAsk = () => controller.abort();
+		signal?.addEventListener("abort", cancelAsk, { once: true });
 		try {
 			pi.events.emit("permission_gate:ask", { reason: assessment.reason, target: assessment.target, timeoutMs });
 		} catch {
 			// Notification listeners are advisory; the ask must still run.
 		}
+		try {
+			choice = await ctx.ui.select(
+				`⚠ Permission gate: ${assessment.reason}\n\n${preview(assessment.target)}`,
+				[ASK_DENY, ASK_ALLOW],
+				{ timeout: timeoutMs, signal: controller.signal },
+			);
+		} finally {
+			signal?.removeEventListener("abort", cancelAsk);
+			releaseSlot();
+		}
 
-		const signal = (ctx as ExtensionContext & { signal?: AbortSignal }).signal;
-		const choice = await ctx.ui.select(
-			`⚠ Permission gate: ${assessment.reason}\n\n${preview(assessment.target)}`,
-			[ASK_DENY, ASK_ALLOW],
-			{ timeout: timeoutMs, signal },
-		);
-
-		if (choice === ASK_ALLOW) return undefined;
+		if (choice === ASK_ALLOW && askEpoch === myEpoch && !signal?.aborted) return undefined;
+		if (signal?.aborted && !controller.signal.aborted) return { block: true, reason };
 
 		// Declined, dismissed, or unanswered: block the call and end the turn so
 		// the model cannot immediately retry the same work in another form.
+		askEpoch++;
 		const outcome = `${reason} The user did not approve this call and the turn was stopped. Do not retry it in another form; wait for the user.`;
-		if (!signal?.aborted) {
+		setTimeout(() => {
 			try {
 				ctx.abort();
 			} catch {
 				// The run may already have ended; nothing to abort.
 			}
-		}
+		}, 0);
 		return { block: true, reason: outcome };
 	});
 }

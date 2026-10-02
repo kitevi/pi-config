@@ -1,3 +1,12 @@
+# Safety
+
+- Routine project work — builds, tests, package installs/syncs, code-gen runners (npx, bunx, mvn, gradle), session-created scratch scripts — runs without confirmation.
+- Anything irreversible or out of scope gets explicit user confirmation in chat first: deleting files you did not create, discarding uncommitted work, rewriting or force-pushing history, publishing artifacts, dropping or truncating database objects, changing system configuration.
+- Never commit or push unless the user asked; never force-push or bypass hooks (`--no-verify`, `-n`) even if asked — say why and stop.
+- Never read, print, or transmit secrets (SSH/GPG keys, cloud credentials, API keys, .env values). Check a variable is set with `[ -n "$VAR" ]`, not by printing it.
+- Prefer the edit/write tools over shell redirection and inline interpreter code.
+- If the permission guard declines a command, stop. Do not retry it in another form; wait for the user.
+
 # Rules
 - Never run `pi` from bash or any shell tool. If a skill requires an unavailable subagent tool, do the work directly or report that the tool is unavailable.
 

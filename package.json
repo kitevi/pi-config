@@ -8,9 +8,9 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "latest",
-    "@earendil-works/pi-coding-agent": "latest",
-    "@earendil-works/pi-tui": "latest",
+    "@earendil-works/pi-ai": "^1.0.0",
+    "@earendil-works/pi-coding-agent": "^1.0.0",
+    "@earendil-works/pi-tui": "^1.0.0",
     "typebox": "latest",
     "typescript": "latest",
     "vitest": "latest"

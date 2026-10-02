@@ -119,8 +119,10 @@ const veil = {
 				);
 				if (lines.length < 2) return lines;
 
+				const modelLine = lines[1];
+				if (modelLine === undefined) return lines;
 				const nextLines = [...lines];
-				nextLines[1] = veil.shown ? lines[1] : stripModelInfoFromFooterLine(lines[1]);
+				nextLines[1] = veil.shown ? modelLine : stripModelInfoFromFooterLine(modelLine);
 				return nextLines;
 			};
 			this.originalFooterRender = original;

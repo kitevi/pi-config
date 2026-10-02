@@ -97,7 +97,7 @@ const VERBS = [
 
 function getDefaultGlyphs(): string[] {
   // Ghostty: last glyph uses * instead of ✽ (renders offset in Ghostty)
-  if (process.env.TERM === 'xterm-ghostty') {
+  if (process.env["TERM"] === 'xterm-ghostty') {
     return ['·', '✢', '✳', '✶', '✻', '*'];
   }
   // macOS renders ✳ correctly; Linux/Windows use * for the 3rd glyph

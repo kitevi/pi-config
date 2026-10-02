@@ -70,9 +70,9 @@ async function waitForStatus(statuses: Map<string, string | undefined>): Promise
 void describe("OpenCode Go footer adapter against the installed provider", () => {
 	void it("loads the real modules and projects their snapshot", async () => {
 		const extension = await createJitiLike().import(extensionPath);
-		assert.equal(typeof extension.loadInstalledProvider, "function");
+		assert.equal(typeof extension["loadInstalledProvider"], "function");
 
-		const bindings = await extension.loadInstalledProvider();
+		const bindings = await extension["loadInstalledProvider"]();
 		assert.equal(typeof bindings.createController, "function");
 		assert.equal(typeof bindings.projectFooter, "function");
 		assert.equal(typeof bindings.pooling.isService, "function");
@@ -117,7 +117,7 @@ void describe("OpenCode Go footer adapter against the installed provider", () =>
 		const extension = await createJitiLike().import(extensionPath);
 		const statuses = new Map<string, string | undefined>();
 		const { pi, handlers } = createFakePi();
-		extension.default(pi);
+		extension["default"](pi);
 
 		const ctx = createContext(statuses);
 		const originalFetch = globalThis.fetch;

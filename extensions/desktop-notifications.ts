@@ -64,7 +64,7 @@ const safeNotificationField = (value: string) =>
 		.slice(0, 200);
 
 export const createDesktopNotificationSender = (dependencies: DesktopNotificationDependencies) => {
-	const terminal = `${dependencies.env.TERM_PROGRAM ?? ""} ${dependencies.env.TERM ?? ""}`.toLowerCase();
+	const terminal = `${dependencies.env["TERM_PROGRAM"] ?? ""} ${dependencies.env["TERM"] ?? ""}`.toLowerCase();
 	const usesOsc777 = /ghostty|iterm|wezterm|rxvt/.test(terminal);
 
 	return (rawTitle: string, rawBody: string) => {
@@ -72,7 +72,7 @@ export const createDesktopNotificationSender = (dependencies: DesktopNotificatio
 		const body = safeNotificationField(rawBody);
 
 		try {
-			if (dependencies.env.KITTY_WINDOW_ID) {
+			if (dependencies.env["KITTY_WINDOW_ID"]) {
 				dependencies.writeTerminal(`\x1b]99;i=pi:d=0;${title}\x1b\\\x1b]99;i=pi:p=body;${body}\x1b\\`);
 				return;
 			}
@@ -130,17 +130,17 @@ const probeFallbackFocus = async (dependencies: DesktopNotificationDependencies)
 	if (!dependencies.readCommand) return "unknown";
 
 	try {
-		if (dependencies.platform === "linux" && dependencies.env.DISPLAY && dependencies.env.WINDOWID) {
+		if (dependencies.platform === "linux" && dependencies.env["DISPLAY"] && dependencies.env["WINDOWID"]) {
 			const output = await dependencies.readCommand("xprop", ["-root", "_NET_ACTIVE_WINDOW"]);
 			const active = output?.match(/window id #\s*(0x[0-9a-f]+|\d+)/i)?.[1];
 			const activeId = parseWindowId(active);
-			const ownId = parseWindowId(dependencies.env.WINDOWID);
+			const ownId = parseWindowId(dependencies.env["WINDOWID"]);
 			if (activeId === undefined || ownId === undefined) return "unknown";
 			return activeId === ownId ? "focused" : "unfocused";
 		}
 
 		if (dependencies.platform === "darwin") {
-			const terminal = MAC_TERMINAL_APPLICATIONS[(dependencies.env.TERM_PROGRAM ?? "").toLowerCase()];
+			const terminal = MAC_TERMINAL_APPLICATIONS[(dependencies.env["TERM_PROGRAM"] ?? "").toLowerCase()];
 			if (!terminal) return "unknown";
 			const output = await dependencies.readCommand("osascript", [
 				"-e",

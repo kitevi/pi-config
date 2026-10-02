@@ -31,6 +31,9 @@ const cases: Case[] = [
 	["rm of a single file", "bash", shell("rm file.txt"), false],
 	["rm under /tmp", "bash", shell("rm -rf /tmp/build"), false],
 	["rm of an absolute in-project path", "bash", shell(`rm -rf ${cwd}/target`), false],
+	["rm of /tmp/../home resolves outside /tmp", "bash", shell("rm -rf /tmp/../home/reviewer/important"), true],
+	["rm of ./.. resolves to the parent", "bash", shell("rm -rf ./../outside"), true],
+	["rm of cwd/../x resolves outside the project", "bash", shell(`rm -rf ${cwd}/../outside`), true],
 	["mvn clean then rm of build output", "bash", shell("mvn clean package && rm -rf target/classes/tmp"), false],
 	["git rm", "bash", shell("git rm --cached x"), false],
 	["git commit", "bash", shell("git commit -m 'fix: thing'"), false],
@@ -54,6 +57,7 @@ const cases: Case[] = [
 	["find -delete inside the project", "bash", shell("find . -name '*.tmp' -delete"), false],
 	["which sudo is a lookup", "bash", shell("which sudo"), false],
 	["git restore --staged only unstages", "bash", shell("git restore --staged ."), false],
+	["git restore staged and worktree discards work", "bash", shell("git restore --staged --worktree ."), true],
 	["git checkout of a single file", "bash", shell("git checkout -- src/Foo.java"), false],
 	["git stash is recoverable", "bash", shell("git stash"), false],
 	["git clean dry run", "bash", shell("git clean -n"), false],
@@ -78,6 +82,7 @@ const cases: Case[] = [
 	["dd to a disk device", "bash", shell("dd if=/dev/zero of=/dev/sda"), true],
 	["redirect into a disk device", "bash", shell("cat img > /dev/sdb"), true],
 	["git push --force", "bash", shell("git push --force"), true],
+	["git push -uf combines update and force", "bash", shell("git push -uf origin main"), true],
 	["git push -f", "bash", shell("git push -f origin main"), true],
 	["git push --force-with-lease", "bash", shell("git push --force-with-lease"), true],
 	["git push --delete", "bash", shell("git push origin --delete main"), true],
@@ -103,6 +108,7 @@ const cases: Case[] = [
 	["archiving the gpg home", "bash", shell("tar czf /tmp/k.tgz ~/.gnupg"), true],
 	["psql drop database", "bash", shell("psql -c 'DROP DATABASE prod'"), true],
 	["mysql truncate", "bash", shell("mysql -e 'truncate table users'"), true],
+	["psql bare truncate", "bash", shell("psql -c 'TRUNCATE users;'"), true],
 	["npm publish", "bash", shell("npm publish"), true],
 	["maven deploy", "bash", shell("./mvnw -q deploy -DskipTests"), true],
 	["cargo publish", "bash", shell("cargo publish"), true],
@@ -115,8 +121,9 @@ void describe("assessToolCall", () => {
 	for (const [name, toolName, input, ask] of cases) {
 		void it(`${ask ? "asks" : "allows"}: ${name}`, () => {
 			const assessment = assessToolCall(toolName, input, { cwd });
-			assert.strictEqual(assessment.decision, ask ? "ask" : "allow", `${name}: reason=${assessment.reason ?? "-"}`);
-			if (ask) assert.ok(assessment.reason, "an ask must say why");
+			const reason = assessment.decision === "ask" ? assessment.reason : undefined;
+			assert.strictEqual(assessment.decision, ask ? "ask" : "allow", `${name}: reason=${reason ?? "-"}`);
+			if (ask) assert.ok(reason, "an ask must say why");
 		});
 	}
 
@@ -130,7 +137,7 @@ void describe("assessToolCall", () => {
 // undefined plus a permission_gate:ask event; ask declined or unanswered →
 // block plus an aborted turn; no UI → block.
 
-const install = (choice: string | undefined) => {
+const install = (choice: string | undefined | ((title: string) => string | undefined)) => {
 	const emitted: Array<{ channel: string; data: unknown }> = [];
 	const prompts: string[] = [];
 	const optionsSeen: Array<string[]> = [];
@@ -150,7 +157,7 @@ const install = (choice: string | undefined) => {
 			select: (title: string, options: string[]) => {
 				prompts.push(title);
 				optionsSeen.push(options);
-				return Promise.resolve(choice);
+				return Promise.resolve(typeof choice === "function" ? choice(title) : choice);
 			},
 			notify: () => {},
 		},
@@ -177,16 +184,20 @@ void describe("tool_call handling", () => {
 		const { call, emitted, prompts } = install("Allow once");
 		assert.strictEqual(await call("bash", shell("git push --force")), undefined);
 		assert.strictEqual(prompts.length, 1);
-		assert.match(prompts[0], /git push --force/);
+		assert.match(prompts[0] ?? "", /git push --force/);
 		assert.strictEqual(emitted.length, 1);
-		assert.strictEqual(emitted[0].channel, "permission_gate:ask");
-		assert.ok((emitted[0].data as { timeoutMs?: number }).timeoutMs > 0);
+		const firstEvent = emitted[0];
+		assert.ok(firstEvent, "expected a permission_gate:ask event");
+		assert.strictEqual(firstEvent.channel, "permission_gate:ask");
+		assert.ok(((firstEvent.data as { timeoutMs?: number }).timeoutMs ?? 0) > 0);
 	});
 
 	void it("offers block as the first, safe default option", async () => {
 		const { call, optionsSeen } = install(undefined);
 		await call("bash", shell("rm -rf ~"));
-		assert.match(optionsSeen[0][0], /block/i);
+		const options = optionsSeen[0];
+		assert.ok(options, "expected the ask to offer options");
+		assert.match(options[0] ?? "", /block/i);
 	});
 
 	void it("blocks and aborts the turn when the user declines", async () => {
@@ -194,6 +205,20 @@ void describe("tool_call handling", () => {
 		const outcome = await call("bash", shell("git push --force"));
 		assert.strictEqual(outcome?.block, true);
 		assert.match(outcome?.reason ?? "", /did not approve/i);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		assert.strictEqual(wasAborted(), true);
+	});
+
+	void it("serializes parallel asks and blocks siblings after a denial", async () => {
+		const { call, prompts, wasAborted } = install((title) => (title.includes("git push --force") ? undefined : "Allow once"));
+		const first = call("bash", shell("git push --force"));
+		const second = call("bash", shell("sudo systemctl restart nginx"));
+		const [firstOutcome, secondOutcome] = await Promise.all([first, second]);
+		assert.strictEqual(firstOutcome?.block, true);
+		assert.strictEqual(secondOutcome?.block, true);
+		assert.strictEqual(prompts.length, 1);
+		assert.match(prompts[0] ?? "", /git push --force/);
+		await new Promise((resolve) => setTimeout(resolve, 0));
 		assert.strictEqual(wasAborted(), true);
 	});
 

@@ -158,17 +158,17 @@ export async function loadInstalledProvider(): Promise<ProviderBindings> {
 		"setActiveMultiproviderService",
 	]);
 
-	const UsageController = controllerModule.UsageController as new (
+	const UsageController = controllerModule["UsageController"] as new (
 		getConfig: () => UpstreamUsageConfig,
 		onUpdate: (ctx: ExtensionContext) => void,
 	) => UpstreamController;
 
 	return {
-		readConfig: () => (configModule.readUsageConfig as () => UpstreamUsageConfig)(),
+		readConfig: () => (configModule["readUsageConfig"] as () => UpstreamUsageConfig)(),
 		createController: (getConfig, onUpdate) => new UsageController(getConfig, onUpdate),
 		projectFooter: (snapshot, config, stale, theme) => {
-			const glyphs = (glyphModule.resolveGlyphSet as (mode: string) => UpstreamGlyphSet)(config.glyphs);
-			const segments = (usage.usageSegments as (
+			const glyphs = (glyphModule["resolveGlyphSet"] as (mode: string) => UpstreamGlyphSet)(config.glyphs);
+			const segments = (usage["usageSegments"] as (
 				snapshot: UpstreamSnapshot,
 				options: { showResetTimes: boolean; glyphs: UpstreamGlyphSet },
 			) => UpstreamSegment[])(snapshot, { showResetTimes: config.showResetTimes, glyphs });
@@ -181,13 +181,13 @@ export async function loadInstalledProvider(): Promise<ProviderBindings> {
 				.map((segment) => theme.fg(SEVERITY_COLORS[segment.severity] ?? "dim", segment.text))
 				.join("");
 			const line = `${colored}${stale ? theme.fg("warning", " · stale") : ""}`;
-			return (formatModule.sanitizeStatusText as (text: string) => string)(line);
+			return (formatModule["sanitizeStatusText"] as (text: string) => string)(line);
 		},
 		pooling: {
-			isService: multiproviderModule.isMultiproviderService as (
+			isService: multiproviderModule["isMultiproviderService"] as (
 				value: unknown,
 			) => value is UpstreamMultiproviderService,
-			setService: multiproviderModule.setActiveMultiproviderService as (
+			setService: multiproviderModule["setActiveMultiproviderService"] as (
 				service: UpstreamMultiproviderService | undefined,
 			) => void,
 		},

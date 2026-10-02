@@ -32,6 +32,12 @@ function statusMap(...entries: Array<[string, string]>): Map<string, string> {
 	return new Map(entries);
 }
 
+function toggleFooterVeil(s: { shortcuts: Record<string, { handler(ctx: unknown): unknown }>; ctx: unknown }) {
+	const shortcut = s.shortcuts["ctrl+p"];
+	assert.ok(shortcut, "footer-veil shortcut is registered");
+	return shortcut.handler(s.ctx);
+}
+
 void describe("footer-veil allowlist", () => {
 	void it("hides every status while veiled, including keys it has never seen", () => {
 		const statuses = statusMap(["hypercharm-session", "10 hc"], ["future-provider", "new"]);
@@ -201,7 +207,7 @@ void describe("footer-veil extension wiring", () => {
 		const s = setup();
 		s.ctx.hasUI = false;
 		await sessionStart(s);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+		await toggleFooterVeil(s);
 		assert.deepStrictEqual(s.ui.notices, []);
 		assert.deepStrictEqual(s.ui.widgetClears, []);
 	});
@@ -210,22 +216,22 @@ void describe("footer-veil extension wiring", () => {
 		const s = setup();
 		const originalRender = FooterComponent.prototype.render;
 		await sessionStart(s);
-		for (const handler of s.events["session_shutdown"]) await handler(undefined as never, s.ctx as never);
+		for (const handler of s.events["session_shutdown"] ?? []) await handler(undefined as never, s.ctx as never);
 		assert.strictEqual(FooterComponent.prototype.render, originalRender);
 	});
 
 	void it("notifies shown on first ctrl+p toggle", async () => {
 		const s = setup();
 		await sessionStart(s);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+		await toggleFooterVeil(s);
 		assert.ok(s.ui.notices.some((n) => n.includes("shown")));
 	});
 
 	void it("notifies hidden on second toggle", async () => {
 		const s = setup();
 		await sessionStart(s);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-		await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+		await toggleFooterVeil(s);
+		await toggleFooterVeil(s);
 		assert.ok(s.ui.notices.some((n) => n.includes("hidden")));
 	});
 
@@ -235,7 +241,7 @@ void describe("footer-veil extension wiring", () => {
 			const original = protoRenderWidgetContainer();
 			await sessionStart(s);
 			assert.notStrictEqual(protoRenderWidgetContainer(), original);
-			for (const handler of s.events["session_shutdown"]) await handler(undefined as never, s.ctx as never);
+			for (const handler of s.events["session_shutdown"] ?? []) await handler(undefined as never, s.ctx as never);
 			assert.strictEqual(protoRenderWidgetContainer(), original);
 		});
 
@@ -253,10 +259,10 @@ void describe("footer-veil extension wiring", () => {
 			const container = fakeContainer();
 			protoRenderWidgetContainer().call({}, container, widgets, false, false);
 			assert.deepStrictEqual(container.children, []);
-			await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+			await toggleFooterVeil(s);
 			protoRenderWidgetContainer().call({}, container, widgets, false, false);
 			assert.deepStrictEqual(container.children, [hypercharm, other, future]);
-			await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+			await toggleFooterVeil(s);
 			protoRenderWidgetContainer().call({}, container, widgets, false, false);
 			assert.deepStrictEqual(container.children, []);
 		});
@@ -270,10 +276,10 @@ void describe("footer-veil extension wiring", () => {
 			protoRenderWidgetContainer().call({}, container, widgets, false, false);
 			assert.deepStrictEqual(container.children, [guide]);
 			assert.strictEqual(widgets.get("unknown-provider"), usage);
-			await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+			await toggleFooterVeil(s);
 			protoRenderWidgetContainer().call({}, container, widgets, false, false);
 			assert.deepStrictEqual(container.children, [guide, usage]);
-			await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+			await toggleFooterVeil(s);
 			protoRenderWidgetContainer().call({}, container, widgets, false, false);
 			assert.deepStrictEqual(container.children, [guide]);
 		});
@@ -281,10 +287,10 @@ void describe("footer-veil extension wiring", () => {
 		void it("reinstalls the veil after shutdown and startup", async () => {
 			const first = setup();
 			await sessionStart(first);
-			for (const handler of first.events["session_shutdown"]) await handler(undefined as never, first.ctx as never);
+			for (const handler of first.events["session_shutdown"] ?? []) await handler(undefined as never, first.ctx as never);
 			const second = setup();
 			await sessionStart(second);
-			await second.shortcuts["ctrl+p"].handler(second.ctx as never);
+			await toggleFooterVeil(second);
 			const hypercharm = { tag: "hc" };
 			const container = fakeContainer();
 			protoRenderWidgetContainer().call(
@@ -301,8 +307,8 @@ void describe("footer-veil extension wiring", () => {
 			const s = setup();
 			await sessionStart(s);
 			assert.deepStrictEqual(s.ui.widgetClears, ["footer-veil"]);
-			await s.shortcuts["ctrl+p"].handler(s.ctx as never);
-			await s.shortcuts["ctrl+p"].handler(s.ctx as never);
+			await toggleFooterVeil(s);
+			await toggleFooterVeil(s);
 			assert.deepStrictEqual(s.ui.widgetClears, ["footer-veil", "footer-veil", "footer-veil"]);
 		});
 
@@ -310,7 +316,7 @@ void describe("footer-veil extension wiring", () => {
 			const s = setup();
 			await sessionStart(s);
 			s.ui.setWidget = () => { throw new Error("rebuild failed"); };
-			await expect(s.shortcuts["ctrl+p"].handler(s.ctx as never)).rejects.toThrow("rebuild failed");
+			await expect(toggleFooterVeil(s)).rejects.toThrow("rebuild failed");
 			assert.isFalse(s.ui.notices.some((notice) => notice.includes("shown")));
 		});
 

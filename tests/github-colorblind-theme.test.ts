@@ -141,7 +141,9 @@ function resolveValue(theme: ThemeJson, value: string | number, seen = new Set<s
 	}
 	assert.ok(!seen.has(value), `Circular theme variable reference: ${value}`);
 	assert.ok(value in theme.vars, `Unknown theme variable reference: ${value}`);
-	return resolveValue(theme, theme.vars[value], new Set([...seen, value]));
+	const resolved = theme.vars[value];
+	assert.ok(resolved !== undefined, `Unknown theme variable reference: ${value}`);
+	return resolveValue(theme, resolved, new Set([...seen, value]));
 }
 
 function resolveColors(theme: ThemeJson): Record<string, string | number> {
@@ -155,7 +157,7 @@ function luminance(hex: string): number {
 	const linear = channels.map((channel) =>
 		channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
 	);
-	return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+	return 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
 }
 
 function contrast(foreground: string, background: string): number {
@@ -194,9 +196,9 @@ void describe("GitHub colorblind themes", () => {
 				"thinkingXhigh",
 				"thinkingMax",
 			];
-			const contrasts = levels.map((level) => contrast(colors[level], background));
+			const contrasts = levels.map((level) => contrast(colors[level] ?? "", background));
 			assert.ok(
-				contrasts.every((value, index) => index === 0 || value > contrasts[index - 1]),
+				contrasts.every((value, index) => index === 0 || value > (contrasts[index - 1] ?? 0)),
 				`${variant} thinking contrast is not increasing: ${contrasts.join(", ")}`,
 			);
 		}
@@ -207,7 +209,7 @@ void describe("GitHub colorblind themes", () => {
 			const colors = resolveColors(loadTheme(variant)) as Record<string, string>;
 			for (const foreground of ["toolTitle", "toolOutput"] as const) {
 				for (const background of ["toolPendingBg", "toolSuccessBg", "toolErrorBg"] as const) {
-					const ratio = contrast(colors[foreground], colors[background]);
+					const ratio = contrast(colors[foreground] ?? "", colors[background] ?? "");
 					assert.ok(
 						ratio >= 4.5,
 						`${variant} ${foreground} on ${background} has ${ratio.toFixed(2)}:1 contrast`,
