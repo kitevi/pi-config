@@ -62,7 +62,6 @@ const isCriticalTarget = (arg: string, cwd: string) => {
 	if (stripped.endsWith(".git") || stripped.endsWith(".git/")) return true;
 	const expanded = stripped.replace(/^~(?=\/|$)/, HOME);
 	const absolute = resolve(cwd, expanded);
-	if (absolute === resolve(cwd)) return true;
 	if (absolute === cwd) return true;
 	if (absolute.startsWith(`${cwd}${sep}`)) return false;
 	return !SAFE_ROOTS.some((root) => absolute.startsWith(`${root}${sep}`) && absolute !== resolve(root, ".."));
