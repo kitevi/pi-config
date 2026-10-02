@@ -76,27 +76,15 @@ Configure it in `extensions/skill-guide.ts` (`DEFAULT_SKILL_GUIDE_CONFIG`, then 
 
 ## Permission gate
 
-`extensions/permission-gate.ts` is a rule-based guard over agent-issued `bash`/`nu` tool calls. It is behavior shaping, not a sandbox: ordinary work — including reads and writes, tests, builds, and plain network fetches — runs unhindered, while higher-stakes calls are **blocked** outright or raised as an **ask** you confirm.
+`extensions/permission-gate.ts` is a tripwire over agent-issued `bash`/`nu` calls and structured file tools. Judgment lives in `AGENTS.md`; this extension only asks before calls whose failure would be catastrophic or leak credentials. Routine work never prompts.
 
-**Blocked** (never run): credential and private-material reads or writes (SSH keys, GPG, `.pem`/`.key`/`.p12`/`.pfx`, AWS/gcloud/Azure/Docker auth — `.env`, `.envrc`, `.npmrc`, `.netrc` are intentionally allowed); catastrophic disk/system commands (`mkfs`, `dd` to `/dev/*`, `sudo rm`, `chmod -R 777 /`, `curl … | sudo sh`); writes to `/dev`, `/proc`, `/sys`; git with `--no-verify`; and agent-launched nested Pi agents (below).
+Each rule is one line in a small table matched against the raw command text — no lexer, no session state, no block/ask split. A match asks; no match runs. A declined, dismissed, or unanswered ask blocks the call and aborts the turn so the model cannot immediately retry the same work in another form. With no UI the ask fails closed.
 
-**Asked** (confirmed before running): file deletion; shell-side file mutation (`chmod`, `chown`, `tee`, `truncate`, `dd`, in-place `sed`/`perl`, nushell `save`); inline interpreter code that writes files, spawns processes, or sends data; running a script created this session; `sudo`/elevated commands; destructive git (`reset --hard`, `clean -f`, `checkout -- .`, `restore .`, force push); commits; mutating package-manager commands; and outbound network upload, push, or remote execution (`git push`, `ssh`, `scp`, `rsync`, `nc`, `socat`, mutating or authenticated `curl`/`wget`, `curl | sh`). Plain download-to-file is not asked.
+Asks fire for: credential-store paths (SSH private keys, GPG, cloud/CLI auth, Pi's own `auth.json` — `.env` and `.npmrc` are intentionally allowed); recursive `rm`/`chmod`/`chown` aimed outside the project (the project path is canonicalized to `./` first, so in-project targets stay silent while `/`, `~`, `..`, the project root itself, a bare glob, or `.git` ask); disk-device writes (`mkfs`, `dd of=/dev/…`); destructive git (`push --force*`, `--delete`, `+ref`, `:ref`, `--mirror`; `reset --hard`; `clean -f`; whole-tree `checkout .`/`restore .`; `stash drop`/`clear`); privilege escalation (`sudo`/`doas`/`pkexec`/`run0`); SQL drop/truncate when a database client is invoked; and publishing (`npm publish`, `mvn deploy`, `cargo publish`, `twine upload`).
 
-**Check-only exception:** a plain `node --check <file>` (or `node -c`, `nodejs`) and `deno check <file>` only parse the target, so they run without an ask even when the file was written this session. The exception is deliberately narrow: any other option, an extra operand, a redirection, or a preload (`-r`, `--require`, `--import`, or `NODE_OPTIONS=…`) falls back to the normal generated-script ask. Bun is not exempt — `bun --check` executes the file. Untrusted runner subcommands are not taken at face value: `deno run|test|bench|serve|compile <file>`, `bun run|test <file>`, and `deno eval <code>` are read as running the file or inline code they name, so a session-written script still asks. The same applies to path-shaped operands of `npx`/`bunx`/`npm exec`/`pnpm exec|dlx`/`yarn exec|dlx`; a non-path operand such as `npx tsc -p tsconfig.json` is not treated as a script.
+Static text matching cannot stop a determined bypass — an obfuscated payload defeats any matcher. This prevents the plausible accident; for a hard boundary run Pi in a container (upstream `docs/security.md`).
 
-Interactive asks show the full syntax-highlighted command in a scrollable in-Pi review; no external file is needed. Use **↑/↓** (or **j/k**), **PageUp/PageDown**, and **Home/End** to scroll. Approval controls stay visible: **Tab/Shift+Tab** or **←/→** choose, **Enter** confirms, and **Esc** cancels. **No, block it** is the default; scrolling never selects approval. The selected option carries the explicit marker — **→ No, block it (Enter)** or **→ Yes, allow once (Enter)** — so there is exactly one Enter target. Selection uses pi's theme colors (`error` for block, `success` for allow); inactive choices and navigation stay muted. A warning title with countdown, a scroll-position line, and one spacer row separate the review from the controls. The review paints its own padding so background text and editor cursors cannot leak through its edges. Narrow terminals use shorter option labels to keep `(Enter)` visible. Text wraps to the terminal width and adjusts on resize. The existing countdown continues while reviewing (`PI_GATE_ASK_TIMEOUT_MS`, default 60 seconds). RPC clients retain their native selector.
-
-An **ask** you decline or dismiss blocks the call and aborts the turn, so the model cannot immediately retry the same work in another form; an ask that times out (you stepped away) also blocks the call and aborts the turn — unattended work stops there — but the model gets timeout wording rather than decline wording. In every blocked case the matching rule is quoted back to the model both as the tool result and again on the next turn.
-
-### Nested Pi subprocess guard
-
-As one of the block rules, the gate declines agent `bash`/`nu` calls that start another Pi agent, preventing a skill from simulating an unavailable subagent with commands such as `pi --no-session -p @prompt.md`. It does **not** affect Pi started directly in a terminal or via Pi’s `!` user-shell prefix. Non-agent Pi operations — help/version, `--list-models`, `--export`, management commands (`config`, `install`, `list`, `remove`, `uninstall`, `update`), and promptless startup — remain available to the agent.
-
-For deliberate nested-agent troubleshooting, opt in on the **parent** process:
-
-```bash
-PI_PERMISSION_GATE_ALLOW_NESTED_PI=1 pi
-```
+The ask dialog uses pi's built-in selector with a countdown (`PI_GATE_ASK_TIMEOUT_MS`, default 60 s); **Block it** is the default.
 
 Setting that variable inside an agent’s child command does not bypass the gate.
 
@@ -146,8 +134,7 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 - `prompts/` — prompt files
 - `extensions/` — pi extensions
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide` (settings live in `DEFAULT_SKILL_GUIDE_CONFIG` at the top of the file)
-  - `extensions/permission-gate.ts` — stable entry point for the rule-based `bash`/`nu` permission gate (see [Permission gate](#permission-gate))
-  - `extensions/permission-gate/` — shell analysis, policy, state, presentation, and runtime modules behind the gate
+  - `extensions/permission-gate.ts` — single-file tripwire permission gate (see [Permission gate](#permission-gate))
   - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)

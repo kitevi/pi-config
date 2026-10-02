@@ -9,6 +9,15 @@ Deterministic, git-managed configuration for the pi coding agent (the [pi-mono](
 3. Never treat `~/.pi/agent/npm/` or `.pi/fabric/mcp-cache.json` as configuration. Packages are declared in `settings.json` (`npm:` package ids) and installed by Pi; the cache is regenerated.
 4. Pi's runtime-generated `deviceId` is installation identity, not configuration. Reconciliation preserves it from the installed settings; never commit it to this repo.
 
+## Safety
+
+- Routine project work — builds, tests, package installs/syncs, code-gen runners (npx, bunx, mvn, gradle), session-created scratch scripts — runs without confirmation.
+- Anything irreversible or out of scope gets explicit user confirmation in chat first: deleting files you did not create, discarding uncommitted work, rewriting or force-pushing history, publishing artifacts, dropping or truncating database objects, changing system configuration.
+- Never commit or push unless the user asked; never force-push or bypass hooks (`--no-verify`, `-n`) even if asked — say why and stop.
+- Never read, print, or transmit secrets (SSH/GPG keys, cloud credentials, API keys, .env values). Check a variable is set with `[ -n "$VAR" ]`, not by printing it.
+- Prefer the edit/write tools over shell redirection and inline interpreter code.
+- If the permission guard declines a command, stop. Do not retry it in another form; wait for the user.
+
 ## Repo-owned sources and their runtime targets
 
 - `settings.json` → installed into `~/.pi/agent/settings.json`; replaces preferences but preserves the local runtime `deviceId`

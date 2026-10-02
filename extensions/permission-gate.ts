@@ -1,101 +1,193 @@
 /**
- * Permission Gate Extension
+ * Permission gate
  *
- * Runtime note:
- * - This is the stable entry point; focused implementation modules live in permission-gate/.
- * - The extension is intentionally plain-Node-runnable, erasable TypeScript.
- * - Keep TypeScript syntax to forms Node can strip directly: `type`, `import type`,
- *   const assertions, etc.
- * - Avoid enums, namespaces, decorators, parameter properties, or other TS constructs
- *   requiring transpilation.
- * - Tests live in tests/permission-gate.test.ts and run with `npm test`.
+ * A tripwire, not a policy engine: the model-facing guidance in AGENTS.md owns
+ * judgment calls, and this extension only asks before calls whose failure would
+ * be catastrophic or leak credentials. Routine work never prompts.
  *
- * Purpose:
- * - This is a behavior-shaping guardrail, not a sandbox.
- * - It allows normal agent work, including reads/writes outside the workspace and /tmp.
- * - It interrupts dangerous shell/tool calls with explicit rule-based decisions.
- * - It does not use risk scoring. Rules either allow, ask, or block.
- * - Block rules always win over ask rules.
+ * Everything pivots on a small rule table matched against the raw command text
+ * — no lexer, no session state, no block/ask split. A rule match raises one ask;
+ * no match lets the call run. There is no block decision: with no UI the ask
+ * fails closed, and a declined ask blocks the call and aborts the turn so the
+ * model cannot immediately retry the same work in another form.
  *
- * HOW A SHELL CALL IS READ:
- * - One lexer recovers every command in the call, not just the top-level text:
- *   pipelines, command substitutions, heredocs, `sh -c` bodies, `eval`, `xargs`,
- *   `find -exec`, privilege wrappers (`sudo`), runner wrappers (`uv run`,
- *   `mise exec`), and the command strings embedded in inline interpreter code
- *   (`python -c "os.system(...)"`, `node -e "execSync(...)"`).
- * - Rules match on resolved executables and lexed words, so quoting alone cannot
- *   hide a command from them: `sh -c 'rm -rf x'` is seen as `rm`.
- * - Inline interpreter bodies are additionally scanned for file mutation, process
- *   spawning, and outbound network calls.
- * - A script is Turing-complete and this is static text matching. The gate raises
- *   the cost of an accidental bypass. It cannot stop a determined one; for that,
- *   run Pi in a container.
- *
- * BLOCKS:
- * 1. Credential/private material reads or writes:
- *    - SSH private keys and known credential files
- *    - GPG material
- *    - private key/cert files: .pem, .key, .p12, .pfx
- *    - cloud/container credential files such as AWS, gcloud, Azure, Docker auth
- *    - NOTE: .env, .envrc, .npmrc, .netrc are intentionally NOT blocked
- * 2. Catastrophic disk/system commands:
- *    - mkfs
- *    - dd writing to /dev/*
- *    - sudo rm
- *    - chmod -R 777 / or equivalent root-wide permission changes
- *    - curl/wget piped into sudo shell execution
- * 3. Writes to pseudo-filesystems:
- *    - /dev, /proc, /sys
- * 4. Agent-controlled nested Pi agent runs through bash/nu:
- *    - blocks print/JSON modes and interactive startup with an initial prompt
- *    - allows Pi management, export, diagnostics, and promptless startup for troubleshooting
- *    - does not affect Pi launched directly by the user from a terminal or with `!`
- * 5. Git commands using --no-verify to bypass hooks.
- *
- * ASKS:
- * 1. Any command that deletes files: rm, rmdir, shred, `find -delete`.
- * 2. Shell-side file mutation via chmod, chown, tee, truncate, dd, in-place
- *    `sed -i`/`perl -pi`, and nushell `save`.
- * 3. Inline interpreter code (python, node, ruby, perl, php, awk) that writes
- *    files, spawns processes, sends data, or runs a decoded payload.
- * 4. Running a script this session created (write/edit tool, redirection, tee).
- * 5. Sudo/elevated commands unless already blocked.
- * 6. Destructive Git commands: reset --hard, clean -f, checkout -- ., restore ., force push,
- *    and any `git rm` (it removes paths and stages the deletion).
- * 7. Commits.
- * 8. Mutating package manager commands across npm/pnpm/yarn/bun, pip/uv/pipx/poetry,
- *    cargo, go, gem, brew, and system package managers.
- * 9. Network upload, push, remote execution, or credentialed network calls:
- *    - git push, ssh, scp, rsync, nc, socat
- *    - curl/wget upload, data, auth-header, or mutating-method flags
- *    - curl/wget piped into a shell
- *    - NOTE: download-to-file (curl -o, wget -O) is intentionally NOT asked.
- *
- * ALLOWS:
- * 1. Normal structured reads/writes, including outside the workspace and /tmp.
- * 2. Tests, builds, lints, typechecks.
- * 3. Plain network fetches/searches.
- * 4. Reading documentation, dependencies, and generated scratch files.
- * 5. .env, .envrc, .npmrc, .netrc files (low-stakes project config).
- * 6. Basic shell operations: touch, mkdir, mv, cp, file redirections, npx, bunx.
- * 7. Inline interpreter code with no detected side effect.
- * 8. Non-agent Pi CLI operations: management, export, diagnostics, and promptless startup.
- *
- * ASK OUTCOMES:
- * - Allowed: the call runs.
- * - Declined (explicit "no" or dismissal): the call is blocked and the turn is
- *   aborted, so the model cannot immediately try another form.
- * - Timed out (nobody answered): the call is blocked and the turn is aborted
- *   too — the user stepped away, so unattended work stops there rather than
- *   continuing without permission. The model gets timeout wording, not the
- *   decline wording: "nobody answered" is not "you said no".
- * - In every blocked case the reason is delivered to the model twice: as the tool
- *   result, and as a next-turn message. The second delivery matters because pi's
- *   agent loop checks the abort signal before the block reason, so an aborted
- *   turn would otherwise show the model a bare "Operation aborted".
+ * Static text matching cannot stop a determined bypass (an obfuscated payload
+ * defeats any matcher); it prevents the plausible accident. For a hard
+ * boundary, run Pi in a container instead — see docs/security.md upstream.
  */
 
-export { default } from "./permission-gate/runtime.ts";
-export { assessToolCall, NESTED_PI_OVERRIDE_ENV } from "./permission-gate/policy.ts";
-export { PermissionGateState } from "./permission-gate/state.ts";
-export { ASK_DENY, describeAskOutcome, escalationNote } from "./permission-gate/presentation.ts";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
+
+export type Assessment =
+	| { decision: "allow" }
+	| { decision: "ask"; reason: string; target: string };
+
+export type AssessmentContext = { cwd?: string };
+
+type Rule = { reason: string; test: RegExp | ((text: string) => boolean) };
+
+// ─── rules ───────────────────────────────────────────────────────────────────
+// One entry per invariant. Keep each test readable enough to audit at a glance;
+// a false positive costs one dialog, a false negative costs nothing the user
+// cannot recover from — except here, so these stay few and deliberate.
+
+const HOME = homedir();
+
+const SECRETS: RegExp[] = [
+	/\.ssh\/id_\w+(?![\w.])/, // private SSH keys; *.pub and ssh config stay open
+	/\.gnupg(?:\/|\b)/,
+	/\.aws\/credentials\b/,
+	/\.config\/gcloud\b/,
+	/\.azure\//,
+	/\.docker\/config\.json\b/,
+	/\.kube\/config\b/,
+	/\.git-credentials\b/,
+	/\.config\/gh\/hosts\.yml\b/,
+	/\.pi\/agent\/auth\.json\b/,
+];
+
+// Recursive rm/chmod/chown aimed outside the project. The command is first
+// canonicalized (project → ./, home → ~), so in-project targets stay silent and
+// /, ~, .., the project root itself, a bare glob, or .git ask.
+const RECURSIVE_TOOLS = new Set(["rm", "chmod", "chown", "chgrp"]);
+const SAFE_ABSOLUTE = /^\/(?:tmp|var\/tmp)\/./;
+const isCriticalTarget = (arg: string) =>
+	(/^(?:\/|~|\.\.)/.test(arg) && !SAFE_ABSOLUTE.test(arg)) || /^(?:\.|\.\/|\*|\.\/\*)$/.test(arg) || /(?:^|\/)\.git\/?$/.test(arg);
+
+const recursiveOutsideProject = (text: string) =>
+	text.split(/[;&|\n()`]+/).some((segment) => {
+		const words = segment
+			.trim()
+			.split(/\s+/)
+			.map((word) => word.replace(/^["']+|["']+$/g, ""));
+		const at = words.findIndex((word) => RECURSIVE_TOOLS.has(word.replace(/^.*\//, "")));
+		if (at < 0) return false;
+		const args = words.slice(at + 1);
+		const recursive = args.some((arg) => /^-[a-zA-Z]*[rR]/.test(arg) || arg === "--recursive");
+		return recursive && args.some((arg) => !arg.startsWith("-") && isCriticalTarget(arg));
+	});
+
+const RULES: Rule[] = [
+	{ reason: "touches credential material", test: (text) => SECRETS.some((secret) => secret.test(text)) },
+	{ reason: "recursively deletes or re-permissions files outside the project", test: recursiveOutsideProject },
+	{
+		reason: "writes a disk device or filesystem",
+		test: /\b(?:mkfs(?:\.\w+)?|wipefs|fdisk|sfdisk|sgdisk|parted|blkdiscard)\b|\bof=\/dev\/(?!null\b)|>\s*\/dev\/(?:sd|nvme|hd|vd|xvd|mmcblk|disk)/,
+	},
+	{
+		reason: "rewrites or deletes remote Git history",
+		test: /\bgit\b[^;&|\n]*\bpush\b[^;&|\n]*(?:\s(?:-f|--force(?:-with-lease)?|--mirror|--delete|-d)\b|\s\+\S|\s:\S)/,
+	},
+	{
+		reason: "discards uncommitted work",
+		test: /\bgit\b[^;&|\n]*\b(?:reset\b[^;&|\n]*--hard|clean\b[^;&|\n]*\s(?:-[a-z]*f|--force)|checkout\b[^;&|\n]*\s(?:--\s+)?\.(?=\s|$)|restore\b(?![^;&|\n]*--staged)[^;&|\n]*\s\.(?=\s|$)|stash\s+(?:drop|clear))/,
+	},
+	{ reason: "runs with elevated privileges", test: /(?:^|[\s;&|('"])(?:sudo|doas|pkexec|run0)\s/ },
+	{
+		reason: "drops database objects",
+		test: /\b(?:psql|mysql|mariadb|sqlite3|sqlcmd|mongosh|duckdb)\b[^\n]*\b(?:drop\s+(?:database|schema|table)|truncate\s+table|dropDatabase)\b/i,
+	},
+	{
+		reason: "publishes a package or artifact",
+		test: /\b(?:npm|pnpm|yarn|bun|cargo|poetry|uv)\s+publish\b|\bgem\s+push\b|\btwine\s+upload\b|\b(?:mvnw?|gradlew?)\b[^;&|\n]*\s(?:deploy|publish)\b/,
+	},
+];
+
+// ─── assessment ──────────────────────────────────────────────────────────────
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// In-project absolute paths read as relative (so they stay silent), and every
+// spelling of home reads as ~ (so home targets always trip the same rules).
+const canonical = (text: string, cwd: string) =>
+	text
+		.replaceAll(`${cwd}/`, "./")
+		.replace(new RegExp(`${escapeRegExp(cwd)}(?=$|[\\s'\"])`, "g"), ".")
+		.replaceAll(HOME, "~")
+		.replace(/\$\{?HOME\}?/g, "~");
+
+const firstMatch = (text: string) => RULES.find(({ test }) => (typeof test === "function" ? test(text) : test.test(text)))?.reason;
+
+const stringInput = (input: unknown, key: string) => {
+	if (typeof input !== "object" || input === null) return "";
+	const value = Reflect.get(input, key);
+	return typeof value === "string" ? value.trim() : "";
+};
+
+const SHELL_TOOLS = new Set(["bash", "nu"]);
+const PATH_TOOLS = new Set(["read", "grep", "find", "ls", "edit", "write", "ast_search"]);
+
+export const assessToolCall = (toolName: string, input: unknown, context: AssessmentContext = {}): Assessment => {
+	const cwd = context.cwd ?? process.cwd();
+	if (SHELL_TOOLS.has(toolName)) {
+		const command = stringInput(input, "command");
+		if (!command) return { decision: "allow" };
+		const reason = firstMatch(canonical(command, cwd));
+		return reason ? { decision: "ask", reason, target: command } : { decision: "allow" };
+	}
+	if (PATH_TOOLS.has(toolName)) {
+		const path = stringInput(input, "path");
+		if (!path) return { decision: "allow" };
+		const absolute = resolve(cwd, path.replace(/^~(?=\/|$)/, HOME));
+		const reason = SECRETS.some((secret) => secret.test(absolute)) ? "touches credential material" : undefined;
+		return reason ? { decision: "ask", reason, target: `${toolName}: ${path}` } : { decision: "allow" };
+	}
+	return { decision: "allow" };
+};
+
+// ─── runtime ─────────────────────────────────────────────────────────────────
+
+const ASK_ALLOW = "Allow once";
+const ASK_DENY = "Block it";
+const MAX_PREVIEW_LINES = 30;
+
+const askTimeoutMs = () => {
+	const override = Number(process.env.PI_GATE_ASK_TIMEOUT_MS);
+	return override > 0 ? override : 60_000;
+};
+
+const preview = (target: string) => {
+	const lines = target.split("\n");
+	if (lines.length <= MAX_PREVIEW_LINES) return target;
+	return `${lines.slice(0, MAX_PREVIEW_LINES).join("\n")}\n… (${lines.length - MAX_PREVIEW_LINES} more lines)`;
+};
+
+export default function (pi: ExtensionAPI) {
+	pi.on("tool_call", async (event, ctx) => {
+		const assessment = assessToolCall(event.toolName, event.input, { cwd: ctx.cwd });
+		if (assessment.decision === "allow") return undefined;
+
+		const reason = `Permission gate: ${assessment.reason}.`;
+		if (!ctx.hasUI) return { block: true, reason: `${reason} Confirmation needs an interactive session.` };
+
+		const timeoutMs = askTimeoutMs();
+		try {
+			pi.events.emit("permission_gate:ask", { reason: assessment.reason, target: assessment.target, timeoutMs });
+		} catch {
+			// Notification listeners are advisory; the ask must still run.
+		}
+
+		const signal = (ctx as ExtensionContext & { signal?: AbortSignal }).signal;
+		const choice = await ctx.ui.select(
+			`⚠ Permission gate: ${assessment.reason}\n\n${preview(assessment.target)}`,
+			[ASK_DENY, ASK_ALLOW],
+			{ timeout: timeoutMs, signal },
+		);
+
+		if (choice === ASK_ALLOW) return undefined;
+
+		// Declined, dismissed, or unanswered: block the call and end the turn so
+		// the model cannot immediately retry the same work in another form.
+		const outcome = `${reason} The user did not approve this call and the turn was stopped. Do not retry it in another form; wait for the user.`;
+		if (!signal?.aborted) {
+			try {
+				ctx.abort();
+			} catch {
+				// The run may already have ended; nothing to abort.
+			}
+		}
+		return { block: true, reason: outcome };
+	});
+}
