@@ -1,9 +1,12 @@
 /**
  * Permission gate
  *
- * A tripwire, not a policy engine: the model-facing guidance in AGENTS.md owns
+ * A tripwire, not a policy engine: the model-facing system guidance owns
  * judgment calls, and this extension only asks before calls whose failure would
- * be catastrophic or leak credentials. Routine work never prompts.
+ * be catastrophic, leak credentials, or write Git history and working trees
+ * (commits, pushes, rebases, and whole-tree checkouts are recoverable in
+ * principle but easy to do by accident, so they ask). Routine work never
+ * prompts.
  *
  * Everything pivots on a small rule table matched against the raw command text
  * — no lexer, no session state, no block/ask split. A rule match raises one ask;
@@ -14,8 +17,8 @@
  * Known blind spots, accepted deliberately: variable-target deletions
  * (`find "$d" -delete`, `find | xargs rm`) cannot be judged statically, and the
  * POSIX-shaped patterns do not parse PowerShell idioms (`Remove-Item
- * -Recurse`). Judgment-shaped calls — publishing, truncates, whole-tree
- * checkouts — belong to AGENTS.md, not here.
+ * -Recurse`). Judgment-shaped calls — publishing, truncates — belong to the
+ * system prompt, not here.
  *
  * Static text matching cannot stop a determined bypass (an obfuscated payload
  * defeats any matcher); it prevents the plausible accident. For a hard
@@ -97,9 +100,24 @@ const RULES: Rule[] = [
 		reason: "rewrites or deletes remote Git history",
 		test: /\bgit\b[^;&|\n]*\bpush\b[^;&|\n]*(?:\s(?:-[a-zA-Z]*f|--force(?:-with-lease)?|--mirror|--delete|-d)\b|\s\+\S|\s:\S)/,
 	},
+	{ reason: "records a Git commit", test: /\bgit\b[^;&|\n]*\bcommit\b/ },
+	{ reason: "pushes to a remote Git repository", test: /\bgit\b[^;&|\n]*\bpush\b/ },
 	{
 		reason: "discards uncommitted work",
 		test: /\bgit\b[^;&|\n]*\b(?:reset\b[^;&|\n]*--hard|clean\b[^;&|\n]*\s(?:-[a-z]*f|--force))/,
+	},
+	// Whole-tree checkout/restore discards every uncommitted change at once.
+	// restore --staged . (or -S) only unstages, so staged-only restores stay
+	// silent unless --worktree (or -W) joins them.
+	{
+		reason: "discards uncommitted work",
+		test: /\bgit\b[^;&|\n]*\b(?:checkout|restore)\b(?:(?![^;&|\n]*\s(?:--staged|-S)\b)|(?=[^;&|\n]*\s(?:--worktree|-W)\b))[^;&|\n]*\s\.(?:[\s;&|]|$)/,
+	},
+	// filter-branch and filter-repo rewrite existing commits; rebase rewrites
+	// the local branch (--abort undoes one, so it stays silent).
+	{
+		reason: "rewrites local Git history",
+		test: /\bgit\b[^;&|\n]*\b(?:filter-branch|filter-repo)\b|\bgit\b[^;&|\n]*\brebase\b(?![^;&|\n]*\s--abort\b)/,
 	},
 	{ reason: "runs with elevated privileges", test: /(?:^|[\s;&|('"])(?:sudo|doas|pkexec|run0)\s/ },
 	{

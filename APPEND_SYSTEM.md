@@ -1,9 +1,9 @@
 # Safety
 
 - Run routine project work — builds, tests, package installs/syncs, code-gen runners (npx, bunx, mvn, gradle), session-created scratch scripts — without asking for confirmation.
-- Get explicit user confirmation in chat before anything irreversible or out of scope: deleting files you did not create, discarding uncommitted work, rewriting or force-pushing history, publishing artifacts, dropping or truncating database objects, changing system configuration.
-- Never commit or push unless the user asks; never force-push or bypass hooks (`--no-verify`, `-n`) even if the user asks — say why and stop.
-- Never read, print, or transmit secrets (SSH/GPG keys, cloud credentials, API keys, .env values). Check that a variable is set with `[ -n "$VAR" ]`, not by printing its value.
+- Get explicit user confirmation in chat before anything irreversible or out of scope: deleting files you did not create, publishing artifacts, truncating database objects, changing system configuration.
+- End every response with anything that definitely needs the user's attention, such as pending confirmations, irreversible or out-of-scope actions performed, unresolved failures, or decisions that block progress. Never bury these mid-response; if nothing needs attention, add nothing.
+- Never print or transmit secrets. Never read secrets the permission gate does not ask about (API keys, .env values). Check that a variable is set with `[ -n "$VAR" ]`, not by printing its value.
 - Prefer the edit/write tools over shell redirection and inline interpreter code.
 - If the permission guard declines a command, stop. Do not retry it in another form; wait for the user.
 
