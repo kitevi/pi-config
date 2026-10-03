@@ -1,9 +1,9 @@
 # Safety
 
-- Routine project work — builds, tests, package installs/syncs, code-gen runners (npx, bunx, mvn, gradle), session-created scratch scripts — runs without confirmation.
-- Anything irreversible or out of scope gets explicit user confirmation in chat first: deleting files you did not create, discarding uncommitted work, rewriting or force-pushing history, publishing artifacts, dropping or truncating database objects, changing system configuration.
-- Never commit or push unless the user asked; never force-push or bypass hooks (`--no-verify`, `-n`) even if asked — say why and stop.
-- Never read, print, or transmit secrets (SSH/GPG keys, cloud credentials, API keys, .env values). Check a variable is set with `[ -n "$VAR" ]`, not by printing it.
+- Run routine project work — builds, tests, package installs/syncs, code-gen runners (npx, bunx, mvn, gradle), session-created scratch scripts — without asking for confirmation.
+- Get explicit user confirmation in chat before anything irreversible or out of scope: deleting files you did not create, discarding uncommitted work, rewriting or force-pushing history, publishing artifacts, dropping or truncating database objects, changing system configuration.
+- Never commit or push unless the user asks; never force-push or bypass hooks (`--no-verify`, `-n`) even if the user asks — say why and stop.
+- Never read, print, or transmit secrets (SSH/GPG keys, cloud credentials, API keys, .env values). Check that a variable is set with `[ -n "$VAR" ]`, not by printing its value.
 - Prefer the edit/write tools over shell redirection and inline interpreter code.
 - If the permission guard declines a command, stop. Do not retry it in another form; wait for the user.
 
@@ -15,10 +15,10 @@
 - Discover unfamiliar tools with `await tools.search({query: "tinyfish", limit: 5})` (replace `"tinyfish"` with the server or capability needed). Results include `ref`, `description`, and `inputSchema`. Use returned refs rather than inventing tool names. If a tool's schema is missing or unclear, run `await tools.describe({ref})` before calling that tool.
 - Call known tools as `mcp.<sanitized_server>.<sanitized_tool>(args)`; replace hyphens with underscores (for example, `mcp.context7.resolve_library_id`). For a ref returned by discovery, use `await tools.call({ref, args})`. These are calls inside `fabric_exec`, not separate model tools.
 - Pass arguments that match `inputSchema`. Include every field listed in `required`, even when that field also has a default. After an argument-validation error, describe the tool again and correct the arguments before retrying. Reuse schemas already inspected in this session unless the tool changes or validation fails.
-- TinyFish: discover `mcp.tinyfish.search` and `mcp.tinyfish.fetch_content`. Search accepts `{query}`. The current fetch schema requires `{urls: [url], format: "markdown", links: false, image_links: false, page_metadata: false}`. Inspect its response before extracting fields; do not assume Exa's response shape. Usage-history and wallet tools are not search/fetch readiness checks.
+- TinyFish: discover `mcp.tinyfish.search` and `mcp.tinyfish.fetch_content`. Search accepts `{query}`. The current fetch schema requires `{urls: [url], format: "markdown", links: false, image_links: false, page_metadata: false}`. Inspect TinyFish responses before extracting fields; do not assume they match Exa's response shape. Usage-history and wallet tools are not search/fetch readiness checks.
 - Exa: `mcp.exa.web_search_exa({query, numResults?})` returns `{text: string}` containing a rendered search summary, not a results array. Read `r.text`, never `r.results`. `mcp.exa.web_fetch_exa({urls: string[], maxCharacters?})` returns page markdown in `r.text`; pass `urls`, not `url`.
 - For library/API docs, call `mcp.context7.resolve_library_id({libraryName, query})`, then `mcp.context7.query_docs({libraryId, query})`, before web search. Pass the library ID returned by `resolve_library_id` as `libraryId` to `query_docs`. Send one topic per query.
-- MCP response shapes differ from SDK/REST examples. When the response shape is unknown, first return `JSON.stringify(r).slice(0, 1500)` once, then extract fields. Reuse the observed shape. After a shape error, inspect once and correct the field access. Call `JSON.parse` only on JSON strings, never on already-structured objects.
+- MCP response shapes differ from SDK/REST examples. When the response shape is unknown, return `JSON.stringify(r).slice(0, 1500)` once, then extract fields. Reuse the observed shape. After a shape error, inspect the response once and correct the field access. Call `JSON.parse` only on JSON strings, never on already-structured objects.
 - For shell web-fetch fallback, use `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" <url>`. If access is blocked, report the block; do not retry with other identities.
 
 # Code navigation
