@@ -4,21 +4,19 @@
 - Get explicit user confirmation in chat before anything irreversible or out of scope: deleting files you did not create, publishing artifacts, truncating database objects, changing system configuration.
 - End every response with anything that definitely needs the user's attention, such as pending confirmations, irreversible or out-of-scope actions performed, unresolved failures, or decisions that block progress. Never bury these mid-response; if nothing needs attention, add nothing.
 - Never print or transmit secrets. Never read secrets the permission gate does not ask about (API keys, .env values). Check that a variable is set with `[ -n "$VAR" ]`, not by printing its value.
-- Prefer the edit/write tools over shell redirection and inline interpreter code.
 - If the permission guard declines a command, stop. Do not retry it in another form; wait for the user.
 
 # Rules
 - Never run `pi` from bash or any shell tool. If a skill requires an unavailable subagent tool, do the work directly or report that the tool is unavailable.
 
 # Web and documentation tools (MCP, inside fabric_exec)
-- Prefer MCP for web/docs lookups. Use Context7 for library/API docs; use TinyFish or Exa for general web search and page fetching. Use shell HTTP only as a fallback, and state why you used the fallback.
-- Do not call `openai_websearch`, `openai_image`, or `openai_decide`. This setup sets `websearch.enabled`, `image.enabled`, and `decisions.enabled` to `false` in `pi-better-openai.json`, and the extension registers those tools unconditionally, so they stay in the tool list and their own guidelines invite you to call them. Every call fails with "disabled in config". Use the MCP web tools above instead, and never report a disabled OpenAI tool as your path to an answer.
-- Discover unfamiliar tools with `await tools.search({query: "tinyfish", limit: 5})` (replace `"tinyfish"` with the server or capability needed). Results include `ref`, `description`, and `inputSchema`. Use returned refs rather than inventing tool names. If a tool's schema is missing or unclear, run `await tools.describe({ref})` before calling that tool.
-- Call known tools as `mcp.<sanitized_server>.<sanitized_tool>(args)`; replace hyphens with underscores (for example, `mcp.context7.resolve_library_id`). For a ref returned by discovery, use `await tools.call({ref, args})`. These are calls inside `fabric_exec`, not separate model tools.
-- Pass arguments that match `inputSchema`. Include every field listed in `required`, even when that field also has a default. After an argument-validation error, describe the tool again and correct the arguments before retrying. Reuse schemas already inspected in this session unless the tool changes or validation fails.
-- TinyFish: discover `mcp.tinyfish.search` and `mcp.tinyfish.fetch_content`. Search accepts `{query}`. The current fetch schema requires `{urls: [url], format: "markdown", links: false, image_links: false, page_metadata: false}`. Inspect TinyFish responses before extracting fields; do not assume they match Exa's response shape. Usage-history and wallet tools are not search/fetch readiness checks.
-- Exa: `mcp.exa.web_search_exa({query, numResults?})` returns `{text: string}` containing a rendered search summary, not a results array. Read `r.text`, never `r.results`. `mcp.exa.web_fetch_exa({urls: string[], maxCharacters?})` returns page markdown in `r.text`; pass `urls`, not `url`.
-- For library/API docs, call `mcp.context7.resolve_library_id({libraryName, query})`, then `mcp.context7.query_docs({libraryId, query})`, before web search. Pass the library ID returned by `resolve_library_id` as `libraryId` to `query_docs`. Send one topic per query.
+- Prefer MCP for web/docs lookups. Use Context7 for library/API docs before general web search; use TinyFish or Exa for general web search and page fetching. Use shell HTTP only as a fallback, and state why you used the fallback.
+- Do not call `openai_websearch`, `openai_image`, or `openai_decide`. `websearch.enabled` and `image.enabled` are `false` in `pi-better-openai.json`; `decisions.enabled` is omitted and defaults to `false`. The extension still registers these tools and advertises their use, but calls fail because they are disabled. Use the MCP web tools above instead, and never report a disabled OpenAI tool as your path to an answer.
+- Discover unfamiliar tools with `tools.search`; use returned refs rather than inventing names. Inspect `inputSchema` before calling; use `tools.describe` if the schema is missing or unclear.
+- Match `inputSchema` and supply every `required` field, even if it has a default. Reuse inspected schemas unless the tool changes or validation fails; after a validation error, describe the tool again and correct the arguments before retrying.
+- TinyFish: inspect responses before extracting fields; do not assume they match Exa's shape. Usage-history and wallet tools are not search/fetch readiness checks.
+- Exa: search summaries and fetched page Markdown are in `r.text`, never `r.results`; fetch takes `urls`, not `url`.
+- Context7: resolve a library ID before querying docs, pass that ID to the query, and keep each query to one topic.
 - MCP response shapes differ from SDK/REST examples. When the response shape is unknown, return `JSON.stringify(r).slice(0, 1500)` once, then extract fields. Reuse the observed shape. After a shape error, inspect the response once and correct the field access. Call `JSON.parse` only on JSON strings, never on already-structured objects.
 - For shell web-fetch fallback, use `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" <url>`. If access is blocked, report the block; do not retry with other identities.
 
