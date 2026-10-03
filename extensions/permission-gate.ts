@@ -119,6 +119,32 @@ const RULES: Rule[] = [
 		reason: "rewrites local Git history",
 		test: /\bgit\b[^;&|\n]*\b(?:filter-branch|filter-repo)\b|\bgit\b[^;&|\n]*\brebase\b(?![^;&|\n]*\s--abort\b)/,
 	},
+	// Deleting the only ref to unique commits, or the reflog that could recover
+	// them: branch -D (unlike -d) skips the merged check, tags keep no reflog,
+	// stash drop/clear discards the entry, and prune — bare or via an explicit
+	// gc --prune — destroys unreachable objects immediately. fetch/pull --prune
+	// only trims remote-tracking refs, which the next fetch restores, so those
+	// stay silent.
+	{
+		reason: "force-deletes a local branch",
+		test: /\bgit\b[^;&|\n]*\bbranch\b[^;&|\n]*\s-[a-zA-Z]*D\b/,
+	},
+	{
+		reason: "deletes a local tag",
+		test: /\bgit\b[^;&|\n]*\btag\b[^;&|\n]*\s(?:-[a-zA-Z]*d|--delete)\b/,
+	},
+	{
+		reason: "destroys stashed work",
+		test: /\bgit\b[^;&|\n]*\bstash\b[^;&|\n]*\b(?:drop|clear)\b/,
+	},
+	{
+		reason: "deletes the reflog recovery path",
+		test: /\bgit\b[^;&|\n]*\breflog\b[^;&|\n]*\b(?:delete|expire)\b/,
+	},
+	{
+		reason: "permanently prunes unreachable objects",
+		test: /\bgit\b(?![^;&|\n]*\b(?:fetch|pull)\b)[^;&|\n]*\b(?<!no-)prune\b/,
+	},
 	{ reason: "runs with elevated privileges", test: /(?:^|[\s;&|('"])(?:sudo|doas|pkexec|run0)\s/ },
 	{
 		reason: "drops database objects",
