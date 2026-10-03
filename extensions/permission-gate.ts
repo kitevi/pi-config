@@ -48,9 +48,9 @@ const SECRETS: RegExp[] = [
 	/\.pi\/agent\/auth\.json\b/,
 ];
 
-// Recursive rm/chmod/chown aimed outside the project. The command is first
-// canonicalized (project → ./, home → ~), so in-project targets stay silent and
-// /, ~, .., the project root itself, a bare glob, or .git ask.
+// Recursive rm/chmod/chown aimed outside the project. Every target is
+// resolved against the project before judging, so in-project targets stay
+// silent while /, ~, .., the project root itself, a bare glob, or .git ask.
 const RECURSIVE_TOOLS = new Set(["rm", "chmod", "chown", "chgrp"]);
 const SAFE_ROOTS = ["/tmp", "/var/tmp"];
 
@@ -60,11 +60,11 @@ const isCriticalTarget = (arg: string, cwd: string) => {
 	const stripped = arg.replace(/^["']+|["']+$/g, "");
 	if (/^(?:\.|\.\/|\*|\.\/\*)$/.test(stripped)) return true;
 	if (stripped.endsWith(".git") || stripped.endsWith(".git/")) return true;
-	const expanded = stripped.replace(/^~(?=\/|$)/, HOME);
+	const expanded = stripped.replace(/^(?:~|\$\{?HOME\}?)(?=\/|$)/, HOME);
 	const absolute = resolve(cwd, expanded);
 	if (absolute === cwd) return true;
 	if (absolute.startsWith(`${cwd}${sep}`)) return false;
-	return !SAFE_ROOTS.some((root) => absolute.startsWith(`${root}${sep}`) && absolute !== resolve(root, ".."));
+	return !SAFE_ROOTS.some((root) => absolute.startsWith(`${root}${sep}`));
 };
 
 const recursiveOutsideProject = (text: string, cwd: string) =>
@@ -85,7 +85,7 @@ const RULES: Rule[] = [
 	{ reason: "recursively deletes or re-permissions files outside the project", test: recursiveOutsideProject },
 	{
 		reason: "writes a disk device or filesystem",
-		test: /\b(?:mkfs(?:\.\w+)?|wipefs|fdisk|sfdisk|sgdisk|parted|blkdiscard)\b|\bof=\/dev\/(?!null\b)|>\s*\/dev\/(?:sd|nvme|hd|vd|xvd|mmcblk|disk)/,
+		test: /\b(?:mkfs(?:\.\w+)?|wipefs|fdisk|sfdisk|sgdisk|parted|blkdiscard)\b|\bof=\/dev\/(?!null\b)|>\s*\/dev\/(?:sd|nvme|hd|vd|xvd|mmcblk|rdisk|disk)/,
 	},
 	{
 		reason: "rewrites or deletes remote Git history",
@@ -108,17 +108,6 @@ const RULES: Rule[] = [
 
 // ─── assessment ──────────────────────────────────────────────────────────────
 
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-// In-project absolute paths read as relative (so they stay silent), and every
-// spelling of home reads as ~ (so home targets always trip the same rules).
-const canonical = (text: string, cwd: string) =>
-	text
-		.replaceAll(`${cwd}/`, "./")
-		.replace(new RegExp(`${escapeRegExp(cwd)}(?=$|[\\s'\"])`, "g"), ".")
-		.replaceAll(HOME, "~")
-		.replace(/\$\{?HOME\}?/g, "~");
-
 const firstMatch = (text: string, cwd: string) =>
 	RULES.find(({ test }) => (typeof test === "function" ? test(text, cwd) : test.test(text)))?.reason;
 
@@ -128,15 +117,15 @@ const stringInput = (input: unknown, key: string) => {
 	return typeof value === "string" ? value.trim() : "";
 };
 
-const SHELL_TOOLS = new Set(["bash", "nu"]);
-const PATH_TOOLS = new Set(["read", "grep", "find", "ls", "edit", "write", "ast_search"]);
+const SHELL_TOOLS = new Set(["bash", "powershell"]);
+const PATH_TOOLS = new Set(["read", "grep", "find", "ls", "edit", "write"]);
 
 export const assessToolCall = (toolName: string, input: unknown, context: AssessmentContext = {}): Assessment => {
 	const cwd = context.cwd ?? process.cwd();
 	if (SHELL_TOOLS.has(toolName)) {
 		const command = stringInput(input, "command");
 		if (!command) return { decision: "allow" };
-		const reason = firstMatch(canonical(command, cwd), cwd);
+		const reason = firstMatch(command, cwd);
 		return reason ? { decision: "ask", reason, target: command } : { decision: "allow" };
 	}
 	if (PATH_TOOLS.has(toolName)) {
