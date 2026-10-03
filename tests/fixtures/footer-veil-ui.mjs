@@ -23,13 +23,13 @@ const fixture = join(temp, "usage.ts");
 writeFileSync(fixture, `export default function(pi) {
 	pi.on("session_start", (_event, ctx) => {
 		ctx.ui.setWidget("hypercharm", ["HC_WIDGET"], { placement: "belowEditor" });
-		ctx.ui.setWidget("zro", ["ZRO_WIDGET"], { placement: "belowEditor" });
+		ctx.ui.setWidget("sample-provider", ["SAMPLE_WIDGET"], { placement: "belowEditor" });
 		ctx.ui.setWidget("unrelated", ["KEEP_WIDGET"]);
 		ctx.ui.setWidget("skill-guide", (_tui, theme) => ({
 			render: () => [theme.fg("dim", "SKILL_GUIDE")], invalidate() {},
 		}));
 		ctx.ui.setStatus("hypercharm-session", "HC_STATUS");
-		ctx.ui.setStatus("zro-session", "ZRO_STATUS");
+		ctx.ui.setStatus("sample-provider-session", "SAMPLE_STATUS");
 		ctx.ui.setStatus("unrelated", "KEEP_STATUS");
 	});
 }`);
@@ -67,7 +67,7 @@ try {
 	const assertVisibility = (shown, stage, guideVisible = true) => {
 		const text = lines();
 		// Provider rows represent data already published after provider activity.
-		for (const marker of ["HC_WIDGET", "ZRO_WIDGET", "HC_STATUS", "ZRO_STATUS", "KEEP_WIDGET", "KEEP_STATUS"]) {
+		for (const marker of ["HC_WIDGET", "SAMPLE_WIDGET", "HC_STATUS", "SAMPLE_STATUS", "KEEP_WIDGET", "KEEP_STATUS"]) {
 			assert.equal(text.includes(marker), shown, `${stage}: ${marker} shown=${shown}; notices=${JSON.stringify(notices)}; errors=${JSON.stringify(errors)}`);
 		}
 		assert.equal(text.includes("SKILL_GUIDE"), guideVisible, `${stage}: skill guide is independent of the veil`);
