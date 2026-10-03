@@ -11,7 +11,6 @@
 
 # Web and documentation tools (MCP, inside fabric_exec)
 - Prefer MCP for web/docs lookups. For library and API docs, use Context7 before falling back to general web search. For general web search and page fetching, prefer TinyFish. Fall back to Exa when TinyFish is unavailable or its results do not cover what you need. Use shell HTTP only as a fallback, and state why you used the fallback.
-- Do not call `openai_websearch`, `openai_image`, or `openai_decide`. `websearch.enabled` and `image.enabled` are `false` in `pi-better-openai.json`; `decisions.enabled` is omitted and defaults to `false`. The extension still registers these tools and advertises their use, but calls fail because they are disabled. Use the MCP web tools above instead, and never report a disabled OpenAI tool as your path to an answer.
 - Discover unfamiliar tools with `tools.search`; use returned refs rather than inventing names. Inspect `inputSchema` before calling; use `tools.describe` if the schema is missing or unclear.
 - Match the tool's `inputSchema` and supply every field it marks as `required`, even fields that have a default value. Reuse an inspected schema until the tool changes or a validation fails; after a validation error, describe the tool again and correct the arguments before retrying.
 - TinyFish: inspect responses before extracting fields; do not assume they match Exa's shape. Usage-history and wallet tools are not search/fetch readiness checks.
