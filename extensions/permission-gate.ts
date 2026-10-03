@@ -11,6 +11,12 @@
  * fails closed, and a declined ask blocks the call and aborts the turn so the
  * model cannot immediately retry the same work in another form.
  *
+ * Known blind spots, accepted deliberately: variable-target deletions
+ * (`find "$d" -delete`, `find | xargs rm`) cannot be judged statically, and the
+ * POSIX-shaped patterns do not parse PowerShell idioms (`Remove-Item
+ * -Recurse`). Judgment-shaped calls — publishing, truncates, whole-tree
+ * checkouts — belong to AGENTS.md, not here.
+ *
  * Static text matching cannot stop a determined bypass (an obfuscated payload
  * defeats any matcher); it prevents the plausible accident. For a hard
  * boundary, run Pi in a container instead — see docs/security.md upstream.
@@ -93,16 +99,12 @@ const RULES: Rule[] = [
 	},
 	{
 		reason: "discards uncommitted work",
-		test: /\bgit\b[^;&|\n]*\b(?:reset\b[^;&|\n]*--hard|clean\b[^;&|\n]*\s(?:-[a-z]*f|--force)|checkout\b[^;&|\n]*\s(?:--\s+)?\.(?=\s|$)|restore\b(?![^;&|\n]*--staged(?!\S)\s*\.(?=\s|$)\s*$)[^;&|\n]*\s\.(?=\s|$)|stash\s+(?:drop|clear))/,
+		test: /\bgit\b[^;&|\n]*\b(?:reset\b[^;&|\n]*--hard|clean\b[^;&|\n]*\s(?:-[a-z]*f|--force))/,
 	},
 	{ reason: "runs with elevated privileges", test: /(?:^|[\s;&|('"])(?:sudo|doas|pkexec|run0)\s/ },
 	{
 		reason: "drops database objects",
-		test: /\b(?:psql|mysql|mariadb|sqlite3|sqlcmd|mongosh|duckdb)\b[^\n]*\b(?:drop\s+(?:database|schema|table)|truncate(?:\s+(?:only\s+|table\s+|restart\s+identity|continue\s+identity|cascade|restrict))*\s+\w+|dropDatabase)\b/i,
-	},
-	{
-		reason: "publishes a package or artifact",
-		test: /\b(?:npm|pnpm|yarn|bun|cargo|poetry|uv)\s+publish\b|\bgem\s+push\b|\btwine\s+upload\b|\b(?:mvnw?|gradlew?)\b[^;&|\n]*\s(?:deploy|publish)\b/,
+		test: /\b(?:psql|mysql|mariadb|sqlite3|sqlcmd|mongosh|duckdb)\b[^\n]*\bdrop\s+(?:database|schema|table)\b/i,
 	},
 ];
 
