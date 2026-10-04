@@ -26,7 +26,7 @@ Completion criterion: the branch is chosen from actual available context; missin
 
 Inspect existing code and docs for local vocabulary, module layout, domain concepts, errors, adapters, observability, runtime patterns, and test style.
 
-Completion criterion: the spec uses project vocabulary and does not introduce a pattern, library, adapter, schema style, or test strategy before checking local precedent.
+Completion criterion: the spec uses project vocabulary — the GLOSSARY.md ubiquitous language when the repo has one — and does not introduce a pattern, library, adapter, schema style, or test strategy before checking local precedent.
 
 ### 2. Extract the design problem
 
@@ -288,7 +288,3 @@ Omit sections that truly do not apply, but do not omit typed contracts, seams, c
 - Avoid speculative abstraction; every seam earns its existence through invariants, locality, leverage, testing, or a real boundary.
 - Keep a single source of truth; do not restate the same rule in multiple sections unless one section points to the other.
 - Settle unknowns and recommend for what remains unsettled as specified in 'Settle risks and open questions' (step 8). Do not invent product requirements, domain rules, APIs, or call stacks to make the spec feel complete.
-
-## Provenance
-
-Vendored from the `tech-spec` skill in `github.com/dmmulroy/skills` at revision `8603380821fee6a77c82639f364ce8fe4f5a92be` (MIT). Local modifications: questions asked in batches instead of one at a time, Java pseudocode instead of TypeScript, open questions and risks settled with tooling or left with recommendations instead of bare listings, a tiny-spec outline, a self-check step, and pseudocode in the dominant language of the codebase under spec, defaulting to Java 21.

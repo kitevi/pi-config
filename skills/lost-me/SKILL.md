@@ -11,11 +11,11 @@ The user just said your last message did not land. Skip the preamble and repair 
 
 ## Re-pitch it
 
-For "I don't follow" or jargon overload. Restate your last message so it lands: open with a little context — where things stand, what just happened — then make the point simply and concisely, like one human talking to another. No jargon. When precision matters, use ASD-STE100 Simplified Technical English. If the repo has a GLOSSARY.md, use its ubiquitous language (GLOSSARY-MAP.md points to the right one when there are several).
+For "I don't follow" or jargon overload. Restate your last message so it lands: open with a little context — where things stand, what just happened — then make the point simply and concisely, like one human talking to another. No jargon. When precision matters, use ASD-STE100 Simplified Technical English. If the repo has a GLOSSARY.md, use its ubiquitous language (GLOSSARY-MAP.md points to the right one when there are several). Do not add new substance while re-pitching — restate what was said, and mark what was vague as vague instead of filling it in.
 
 ## Show it
 
-For "show me", or when a re-pitch already failed: make the point visually. Pick the smallest view that makes the key point clear.
+For "show me", or when a re-pitch already failed: make the point visually. Pick the smallest view that makes the key point clear. Write any pseudocode in the codebase's dominant programming language — Java 21 when Java dominates or no language does, per the tech-spec convention; the agent's own tool-call code doesn't count.
 
 - Show logic or an algorithm as pseudocode:
 
@@ -141,7 +141,3 @@ You may use one of these, you may use several, it is unlikely you will use all o
 ## Escalation
 
 One repair at a time. If you re-pitched and the user is still lost, stop restating — show it. If you showed it and they are still lost, back up a level: rebuild the context, then make the point again.
-
-## Provenance
-
-Vendored from three MIT-licensed skills: `bro` from `github.com/dmmulroy/skills` at revision `8603380821fee6a77c82639f364ce8fe4f5a92be`, `wait-what` from `github.com/mattpocock/skills` at revision `d81f3a183412e71a5b1e84ca21bc1a35eea03a60`, and `show-me` from `github.com/humanlayer/skills` at revision `ca7c8088db69e315a8b2deea43820270457f8f3c`. Local modifications: the three combined into one message-repair skill with a re-pitch default — wait-what's context, ubiquitous language, and Simplified Technical English merged with bro's plain-human rule — and show-me's visual menu kept as the "Show it" mode with Mermaid gated to cases where the diagram itself is the point, prose named as a valid smallest view, and an escalation rule added.
