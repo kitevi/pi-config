@@ -7,7 +7,7 @@ license: MIT
 
 # Tech Spec
 
-A tech spec is a **typed call-stack architecture handoff**: code-shaped contracts plus execution flows. Prefer Java pseudocode over prose wherever precision matters.
+A tech spec is a **typed call-stack architecture handoff**: code-shaped contracts plus execution flows. Prefer pseudocode in the session's dominant programming language over prose wherever precision matters.
 
 This skill is design-only. Do not implement. Save the spec to a file only when the user asks for one; otherwise return it inline.
 
@@ -280,7 +280,7 @@ Omit sections that truly do not apply, but do not omit typed contracts, seams, c
 ## Writing rules
 
 - Code first: Java pseudocode defines contracts, APIs, and data flow.
-- Write modern, minimalist Java 21: records for data, sealed interfaces for variants, pattern matching for dispatch. Avoid inheritance hierarchies, builders, and annotation ceremony in pseudocode. Java 21 is the spec notation; keep it even when the codebase uses another language.
+- Write pseudocode in the session's dominant programming language. When that language is Java, or when no single language dominates, write modern, minimalist Java 21: records for data, sealed interfaces for variants, pattern matching for dispatch. Avoid inheritance hierarchies, builders, and annotation ceremony in pseudocode.
 - Prose explains why; types and call stacks define what changes.
 - Focus on types, interfaces, APIs, inputs/outputs, seams, boundaries, adapters, domain modules, service modules, external adapters, and call stacks.
 - Prefer precise domain values over strings, booleans, nullable bags, and loosely shaped objects.
@@ -291,4 +291,4 @@ Omit sections that truly do not apply, but do not omit typed contracts, seams, c
 
 ## Provenance
 
-Vendored from the `tech-spec` skill in `github.com/dmmulroy/skills` at revision `8603380821fee6a77c82639f364ce8fe4f5a92be` (MIT). Local modifications: questions asked in batches instead of one at a time, Java pseudocode instead of TypeScript, open questions and risks settled with tooling or left with recommendations instead of bare listings, a tiny-spec outline, a self-check step, and a Java 21 baseline.
+Vendored from the `tech-spec` skill in `github.com/dmmulroy/skills` at revision `8603380821fee6a77c82639f364ce8fe4f5a92be` (MIT). Local modifications: questions asked in batches instead of one at a time, Java pseudocode instead of TypeScript, open questions and risks settled with tooling or left with recommendations instead of bare listings, a tiny-spec outline, a self-check step, and pseudocode in the session's dominant language defaulting to Java 21.
