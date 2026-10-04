@@ -126,28 +126,12 @@ void describe("desktop notifications", () => {
 		assert.deepStrictEqual(harness.writes, []);
 	});
 
-	it("notifies when the permission gate asks while Pi is unfocused", () => {
-		const harness = createHarness();
-
-		harness.run("session_start");
-		harness.input("\x1b[O");
-		harness.writes.length = 0;
-		harness.emit("permission_gate:ask", {
-			ids: ["ask.rm"],
-			target: "rm private-file",
-			timeoutMs: 60_000,
-		});
-
-		assert.deepStrictEqual(harness.writes, ["\x1b]777;notify;Pi needs permission;Approval auto-blocks in 60s.\x1b\\"]);
-	});
-
-	it("keeps both attention notifications quiet while Pi is focused", () => {
+	it("keeps the waiting notification quiet while Pi is focused", () => {
 		const harness = createHarness();
 
 		harness.run("session_start");
 		assert.deepStrictEqual(harness.input("\x1b[I"), { consume: true });
 		harness.writes.length = 0;
-		harness.emit("permission_gate:ask", { timeoutMs: 60_000 });
 		harness.run("agent_settled");
 
 		assert.deepStrictEqual(harness.writes, []);
@@ -305,7 +289,6 @@ void describe("desktop notifications", () => {
 		harness.run("session_shutdown");
 
 		assert.deepStrictEqual(harness.writes, ["\x1b[?1004l"]);
-		assert.strictEqual(harness.channelListeners("permission_gate:ask"), 0);
 		assert.throws(() => harness.input("\x1b[O"), /session_start must install/);
 	});
 

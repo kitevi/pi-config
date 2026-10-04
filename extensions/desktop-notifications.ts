@@ -249,26 +249,8 @@ export const createDesktopNotificationsExtension = (dependencies: DesktopNotific
 			}, settleDelayMs);
 		});
 
-		const stopGateAskListener = pi.events.on("permission_gate:ask", (data) => {
-			if (focus === "focused" || !data || typeof data !== "object") return;
-			const timeoutMs = (data as { timeoutMs?: unknown }).timeoutMs;
-			const body =
-				typeof timeoutMs === "number" && timeoutMs > 0
-					? `Approval auto-blocks in ${Math.round(timeoutMs / 1000)}s.`
-					: "Approval is waiting.";
-			const notifyGateAsk = () => notify("Pi needs permission", body);
-			if (focus === "unfocused") {
-				notifyGateAsk();
-				return;
-			}
-			void focusForAttention().then((current) => {
-				if (current === "unfocused") notifyGateAsk();
-			});
-		});
-
 		pi.on("session_shutdown", () => {
 			stopFocusTracking();
-			stopGateAskListener();
 			agentBusy = false;
 			cancelSettleNotification();
 		});

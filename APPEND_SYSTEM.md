@@ -1,10 +1,10 @@
 # Safety
 
 - Run routine project work — builds, tests, package installs/syncs, code-gen runners (npx, bunx, mvn, gradle), session-created scratch scripts — without asking for confirmation.
-- Get the user's explicit confirmation in chat before doing anything irreversible or out of scope. That includes deleting files you did not create, publishing artifacts, truncating database objects, and changing system configuration.
+- Stop and ask for the user's explicit confirmation in chat before doing anything irreversible or out of scope. That includes deleting files you did not create, publishing artifacts, truncating database objects, and changing system configuration.
 - End every response with anything that definitely needs the user's attention, such as pending confirmations, irreversible or out-of-scope actions performed, unresolved failures, or decisions that block progress. Never bury these items mid-response; if nothing needs the user's attention, add nothing.
-- Never print or transmit secrets. Never read secrets the permission gate does not ask about (API keys, .env values). Check that a variable is set with `[ -n "$VAR" ]`, not by printing its value.
-- If the permission guard declines a command, stop. Do not retry the command in another form; wait for the user.
+- Never print or transmit secrets. Never read secrets (API keys, .env values). Check that a variable is set with `[ -n "$VAR" ]`, not by printing its value.
+- If the user declines a command, stop. Do not retry the command in another form; wait for the user.
 
 # Rules
 - Never run `pi` from bash or any shell tool. If a skill requires an unavailable subagent tool, do the work directly or report that the tool is unavailable.

@@ -74,25 +74,9 @@ Configure it in `extensions/skill-guide.ts` (`DEFAULT_SKILL_GUIDE_CONFIG`, then 
 - `hiddenSkills` — skills hidden by exact name or `"prefix*"` glob (`["fabric-*"]` by default).
 - `pinnedSkills` — skills always shown, even under a glob (`[]` by default, so `fabric-*` stays fully hidden).
 
-## Permission gate
-
-`extensions/permission-gate.ts` is a tripwire over agent-issued `bash`/`powershell` calls and structured file tools. Judgment lives in `AGENTS.md`; this extension only asks before calls whose failure would be catastrophic or leak credentials. Routine work never prompts.
-
-Each rule is one line in a small table matched against the raw command text — no lexer, no session state, no block/ask split. A match asks; no match runs. A declined, dismissed, or unanswered ask blocks the call and aborts the turn so the model cannot immediately retry the same work in another form. With no UI the ask fails closed.
-
-Asks fire for: credential-store paths (SSH private keys, GPG, cloud/CLI auth, Pi's own `auth.json` — `.env` and `.npmrc` are intentionally allowed); recursive `rm`/`chmod`/`chown` aimed outside the project (targets are resolved against the project first, so in-project targets stay silent while `/`, `~`, `..`, the project root itself, a bare glob, or `.git` ask); disk-device writes (`mkfs`, `dd of=/dev/…`, raw `/dev/rdisk*`); destructive git (`push --force*`, `--delete`, `+ref`, `:ref`, `--mirror`; `reset --hard`; `clean -f`; whole-tree `checkout .`/`restore .`; `branch -D`; `tag -d`; `stash drop`/`clear`; `reflog delete`/`expire`; `prune` and explicit `gc --prune`); privilege escalation (`sudo`/`doas`/`pkexec`/`run0`); and SQL `drop database/schema/table` when a database client is invoked.
-
-Judgment-shaped calls — publishing, truncates — are deliberately ungated; `AGENTS.md` owns them. Known blind spots: variable-target deletions (`find "$d" -delete`, `find | xargs rm`) cannot be judged statically, and the POSIX-shaped patterns do not parse PowerShell idioms such as `Remove-Item -Recurse`.
-
-Static text matching cannot stop a determined bypass — an obfuscated payload defeats any matcher. This prevents the plausible accident; for a hard boundary run Pi in a container (upstream `docs/security.md`).
-
-The ask dialog uses pi's built-in selector with a countdown (`PI_GATE_ASK_TIMEOUT_MS`, default 60 s); **Block it** is the default.
-
-Setting that variable inside an agent’s child command does not bypass the gate.
-
 ## Desktop notifications
 
-`extensions/desktop-notifications.ts` requests terminal focus reporting and sends an attention notification only when Pi's terminal surface is known to be unfocused. It handles permission-gate asks (`Pi needs permission`) and the final `agent_settled` lifecycle event (`Pi is waiting for you`). The waiting notification is debounced by ~10s: if a new agent run starts within the window (auto-retry, compaction retry, queued follow-up), the settle was transient, so nothing is sent; permission-gate asks notify immediately. Unknown focus is treated conservatively as focused, so unsupported or headless sessions stay silent.
+`extensions/desktop-notifications.ts` requests terminal focus reporting and sends an attention notification only when Pi's terminal surface is known to be unfocused. It notifies for the final `agent_settled` lifecycle event (`Pi is waiting for you`). The waiting notification is debounced by ~10s: if a new agent run starts within the window (auto-retry, compaction retry, queued follow-up), the settle was transient, so nothing is sent. Unknown focus is treated conservatively as focused, so unsupported or headless sessions stay silent.
 
 Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact surface focus, and OSC 777 raises the native desktop notification. The extension also supports Kitty's OSC 99 protocol. When no native notification protocol is recognized, it falls back to `notify-send` on Linux or `osascript` on macOS. If no terminal focus report has arrived, focus detection falls back to X11's active window when `DISPLAY` and `WINDOWID` are available, or the frontmost terminal application on macOS. Terminal reports take precedence over these best-effort fallbacks.
 
@@ -138,7 +122,6 @@ Paths this repository does not declare are never touched, so leftovers from remo
 - `prompts/` — prompt files
 - `extensions/` — pi extensions
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide` (settings live in `DEFAULT_SKILL_GUIDE_CONFIG` at the top of the file)
-  - `extensions/permission-gate.ts` — single-file tripwire permission gate (see [Permission gate](#permission-gate))
   - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
