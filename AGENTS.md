@@ -7,7 +7,8 @@ Deterministic, git-managed configuration for the pi coding agent (the [pi-mono](
 1. Never edit anything under `~/.pi/` to change pi configuration. Reconciliation fully replaces, clears, or symlinks every managed path under `~/.pi/agent/`, so direct edits are silently lost on the next `npm run setup`.
 2. Make every change in this repository, in the repo-owned source file that controls it. If a pi setting is missing, add it to `settings.json` in this repo — not to `~/.pi/agent/settings.json`.
 3. Never treat `~/.pi/agent/npm/` or `.pi/fabric/mcp-cache.json` as configuration. Packages are declared in `settings.json` (`npm:` package ids) and installed by Pi; the cache is regenerated.
-4. Pi's runtime-generated `deviceId` is installation identity, not configuration. Reconciliation preserves it from the installed settings; never commit it to this repo.
+4. Pi’s runtime-generated `deviceId` is installation identity, not configuration. Reconciliation preserves it from the installed settings; never commit it to this repo.
+5. Treat every path this repository does not declare as user-owned. `bootstrap.mjs` reconciles only declared paths, so leftovers from removed packages, renamed configuration, or earlier bootstrap versions survive setup untouched; never add deletion logic to `bootstrap.mjs` for them. For a large configuration change, delete `~/.pi`, rerun `npm run setup`, and reload Pi.
 
 ## Repo-owned sources and their runtime targets
 

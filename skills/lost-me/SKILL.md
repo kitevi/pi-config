@@ -11,11 +11,11 @@ The user just said your last message did not land. Skip the preamble and repair 
 
 ## Re-pitch it
 
-For "I don't follow" or jargon overload. Restate your last message so it lands: open with a little context — where things stand, what just happened — then make the point simply and concisely, like one human talking to another. No jargon. When precision matters, use ASD-STE100 Simplified Technical English. If the repo has a GLOSSARY.md, use its ubiquitous language (GLOSSARY-MAP.md points to the right one when there are several). Do not add new substance while re-pitching — restate what was said, and mark what was vague as vague instead of filling it in.
+For "I don't follow" or jargon overload. Restate your last message so it lands: open with a little context — where things stand, what just happened — then make the point simply and concisely, like one human talking to another. No jargon. When precision matters, use ASD-STE100 Simplified Technical English. Do not add new substance while re-pitching — restate what was said, and mark what was vague as vague instead of filling it in.
 
 ## Show it
 
-For "show me", or when a re-pitch already failed: make the point visually. Pick the smallest view that makes the key point clear. Write any pseudocode in the codebase's dominant programming language — Java 21 when Java dominates or no language does, per the tech-spec convention; the agent's own tool-call code doesn't count.
+For "show me", or when a re-pitch already failed: make the point visually. Pick the smallest view that makes the key point clear. Write any pseudocode in the codebase's dominant programming language — Java 21 when Java dominates or no language does; the agent's own tool-call code doesn't count.
 
 - Show logic or an algorithm as pseudocode:
 

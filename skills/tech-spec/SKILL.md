@@ -26,7 +26,7 @@ Completion criterion: the branch is chosen from actual available context; missin
 
 Inspect existing code and docs for local vocabulary, module layout, domain concepts, errors, adapters, observability, runtime patterns, and test style.
 
-Completion criterion: the spec uses project vocabulary — the GLOSSARY.md ubiquitous language when the repo has one — and does not introduce a pattern, library, adapter, schema style, or test strategy before checking local precedent.
+Completion criterion: the spec uses project vocabulary from the repo's own docs and code, and does not introduce a pattern, library, adapter, schema style, or test strategy before checking local precedent.
 
 ### 2. Extract the design problem
 

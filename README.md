@@ -129,6 +129,8 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 
 6. **Links both theme variants** — `github-colorblind-light.json` and `github-colorblind-dark.json` are linked into `~/.pi/agent/themes/`; pi follows the terminal's light/dark appearance automatically.
 
+Paths this repository does not declare are never touched, so leftovers from removed packages, renamed configuration, or earlier bootstrap versions stay on disk after setup. Delete `~/.pi`, rerun setup, and reload Pi for a large configuration change (`AGENTS.md` rule 5).
+
 ## Repo layout
 
 - `bootstrap.mjs` — setup/link/merge script

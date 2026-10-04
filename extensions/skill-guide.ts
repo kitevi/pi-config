@@ -23,7 +23,6 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 	hiddenSkills: ["fabric-*"],
 	pinnedSkills: [...DEFAULT_PINNED_SKILLS],
 	summaryOverrides: {
-		bro: "Say it differently.",
 		"buku-bookmarks": "Bookmark search/add/cleanup.",
 		"code-review": "Hunting bugs/security/perf.",
 		deslop: "Strip AI-generated slop.",
@@ -31,13 +30,11 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 		"emil-design-eng": "UI feels off/unpolished.",
 		grilling: "Want your idea challenged.",
 		handoff: "Passing work to next session.",
-		implement: "Executing a written spec.",
+		"lost-me": "Didn't land. Re-pitch or show.",
 		"review-animations": "Auditing UI motion & feel.",
-		"show-me": "Need a visual explanation.",
 		tdd: "Feature work, test-first.",
 		"tech-spec": "Feature needs a plan first.",
 		"test-audit": "Which tests to cut.",
-		"thermo-nuclear-code-quality-review": "Structure needs a beatdown.",
 		"agent-wording": "Wording feels ambiguous.",
 	},
 };
