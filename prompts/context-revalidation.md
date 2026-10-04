@@ -3,23 +3,19 @@ description: Revalidate accumulated context after switching models or compacting
 argument-hint: "[specific concern or focus]"
 ---
 
-I just switched models or compacted context, so you are seeing accumulated context with fresh eyes.
-
-You are now the lead agent taking over from the prior model. The previous work is mostly trusted, but not authoritative. Do not rubber-stamp it.
-
-Read the accumulated context carefully and give me the way forward.
-
-Focus on:
-- reconstructing the actual goal and current state
-- separating what is established from what was merely assumed
-- checking whether prior decisions still hold
-- spotting context drift, conflated concepts, weak reasoning, or paths that should be reversed
-- identifying only the assumptions/files/artifacts that materially need re-checking
-- avoiding unnecessary re-reading if relevant tool/file outputs are already in context
-
-Be concise but sharp. Do not summarize the whole conversation for its own sake. Tell me what matters: whether to continue, adjust, backtrack, or clarify — and why.
-
-If the current path is good, say so. If it is wrong or shaky, call that out directly.
+Revalidate the accumulated context after a model switch or compaction. Treat prior work as mostly trusted, but not authoritative.
 
 Specific concern or focus, if provided:
 $ARGUMENTS
+
+## Assess
+
+1. Reconstruct the actual goal and current state. Separate established facts from assumptions.
+2. Check whether prior decisions still hold. Look for context drift, conflated concepts, weak reasoning, and paths that should be reversed.
+3. Identify only the assumptions, files, or artifacts that materially need rechecking. Reuse relevant tool and file outputs already in context; reread only to resolve material gaps or staleness.
+
+## Deliver
+
+Give a concise, candid recommendation: **continue**, **adjust**, **backtrack**, or **clarify**. Justify it with the decisive evidence or uncertainty, and name the next step. Include only context needed to justify the recommendation.
+
+This is a one-shot assessment: stop after the recommendation. Implementation requires a separate user request.

@@ -25,4 +25,4 @@ Pi Fabric owns tool orchestration and MCP. `settings.json` disables Pi's built-i
 
 1. Edit the repo-owned source file for the change. Never edit `~/.pi/`.
 2. Run `npm run setup` to reconcile `~/.pi/agent/`.
-3. Run `npm test`, then commit with a scoped commit message (`git log` shows examples).
+3. Run `npm test` and report the result. Stop with changes uncommitted unless the user explicitly authorizes a commit for those changes.
