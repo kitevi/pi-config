@@ -36,6 +36,7 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 		"tech-spec": "Feature needs a plan first.",
 		"test-audit": "Which tests to cut.",
 		"agent-wording": "Wording feels ambiguous.",
+		"writing-for-agents": "Writing skills/AGENTS.md.",
 	},
 };
 
