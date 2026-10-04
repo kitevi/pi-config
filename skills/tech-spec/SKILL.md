@@ -85,7 +85,7 @@ Completion criterion: the recommendation is chosen after comparing alternatives,
 For the recommended design, outline every new, changed, or deleted:
 
 - domain value;
-- record, sealed interface, or enum;
+- record, sealed interface, or enum — or the dominant language's equivalent constructs;
 - state machine variant;
 - input/output type;
 - request/response shape;
@@ -280,7 +280,7 @@ Omit sections that truly do not apply, but do not omit typed contracts, seams, c
 ## Writing rules
 
 - Code first: pseudocode defines contracts, APIs, and data flow.
-- Write pseudocode in the codebase's dominant programming language. Code the agent writes to drive its tools — harness or codemode scripts — does not count toward dominance. When the dominant language is Java, or when no single language dominates, write modern, minimalist Java 21: records for data, sealed interfaces for variants, pattern matching for dispatch. Avoid inheritance hierarchies, builders, and annotation ceremony in pseudocode.
+- Write pseudocode in the codebase's dominant programming language. Code the agent writes to drive its tools does not count toward dominance. When the dominant language is Java, or when no single language dominates, write modern, minimalist Java 21: records for data, sealed interfaces for variants, pattern matching for dispatch. Avoid inheritance hierarchies, builders, and annotation ceremony in pseudocode.
 - Prose explains why; types and call stacks define what changes.
 - Focus on types, interfaces, APIs, inputs/outputs, seams, boundaries, adapters, domain modules, service modules, external adapters, and call stacks.
 - Prefer precise domain values over strings, booleans, nullable bags, and loosely shaped objects.
