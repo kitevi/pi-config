@@ -11,11 +11,11 @@ The user just said your last message did not land. Skip the preamble and repair 
 
 ## Re-pitch it
 
-For "I don't follow" or jargon overload. Restate your last message so it lands: open with a little context — where things stand, what just happened — then make the point simply and concisely, like one human talking to another. No jargon. When precision matters, use ASD-STE100 Simplified Technical English. Do not add new substance while re-pitching — restate what was said, and mark what was vague as vague instead of filling it in.
+For "I don't follow" or jargon overload. Restate your last message so it lands: open with a little context — where things stand, what just happened — then make the point simply and concisely, like one human talking to another. Use ASD-STE100 Simplified Technical English when precision matters. Restate what was said and mark what was vague as vague; re-pitching adds no new substance.
 
 ## Show it
 
-For "show me", or when a re-pitch already failed: make the point visually. Pick the smallest view that makes the key point clear. Write any pseudocode in the codebase's dominant programming language — Java 21 when Java dominates or no language does; the agent's own tool-call code doesn't count.
+For "show me", or when a re-pitch already failed: make the point visually. Pick the smallest view that carries the point. Write any pseudocode in the codebase's dominant programming language — Java 21 when Java dominates or no language does; the agent's own tool-call code doesn't count.
 
 - Show logic or an algorithm as pseudocode:
 
@@ -132,11 +132,9 @@ function expandSkill(command: string): string {
 open path/to/lost-me-{description}.html
 ```
 
-### Guidance
+### Restraint
 
-Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to answer the user's current question or to present the options for resolving the current discussion point.
-
-You may use one of these views, you may use several, and it is unlikely you will use all of them. Use your judgement and don't overwhelm the user. Prose counts as a view: the smallest view that makes the point may be a sentence, not a diagram.
+Prose counts as a view. Use one or several, and rarely all of them. Place each view next to the short text it supports, holding only the calls, files, props, states, and boundaries needed to answer the question at hand.
 
 ## Escalation
 

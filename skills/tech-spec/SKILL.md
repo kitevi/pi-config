@@ -7,9 +7,9 @@ license: MIT
 
 # Tech Spec
 
-A tech spec is a **typed call-stack architecture handoff**: code-shaped contracts plus execution flows. Prefer pseudocode over prose wherever precision matters, and write the pseudocode in the codebase's dominant programming language.
+A tech spec is a **typed call-stack architecture handoff**: code-shaped contracts plus execution flows. Prefer pseudocode over prose wherever precision matters.
 
-This skill is design-only. Do not implement. Save the spec to a file only when the user asks for a file; otherwise return the spec inline.
+This skill is design-only: the artifact is a spec, never an implementation. Save the spec to a file only when the user asks for a file; otherwise return the spec inline.
 
 ## Branch selection
 
@@ -51,52 +51,24 @@ Completion criterion: every claimed requirement or constraint is either grounded
 
 ### 3. Explore design alternatives
 
-Produce materially different alternatives before choosing the recommended design. Alternatives should differ in interface shape, seam placement, ownership, call stack, runtime topology, or module boundaries — not just names.
+Produce materially different alternatives before choosing the recommended design. Alternatives differ in interface shape, seam placement, ownership, call stack, runtime topology, or module boundaries, not in names.
 
-For each alternative, sketch:
+For each alternative, sketch the domain types and state model, the public interfaces and input/output types, the expected failure types, the seams and adapters, the entrypoint-to-side-effect call stack, the parsing/projection strategy, the reachable authorization, observability, cancellation, idempotency, and transaction flow, the test seam, and the tradeoffs.
 
-- domain types and state model;
-- public/module interfaces and APIs;
-- input/output types;
-- expected failure types;
-- seams, boundaries, and adapters;
-- entrypoint-to-side-effect call stack;
-- parsing/projection strategy;
-- authorization, observability, cancellation, idempotency, and transaction flow when reachable;
-- test seam strategy;
-- tradeoffs.
-
-Compare alternatives on:
-
-- caller burden;
-- module depth and leverage;
-- locality of invariants and change;
-- seam placement;
-- boundary parsing and projections;
-- error and cancellation model;
-- testability through real seams;
-- operational/runtime fit;
-- implementation complexity.
+Then compare the alternatives on caller burden, module depth and leverage, locality of invariants and change, seam placement, boundary parsing and projections, error and cancellation model, testability through real seams, operational fit, and implementation complexity.
 
 Completion criterion: the recommendation is chosen after comparing alternatives, not before.
 
 ### 4. Specify the recommended typed contracts
 
-For the recommended design, outline every new, changed, or deleted:
+For the recommended design, outline every new, changed, or deleted contract in the dominant language's constructs:
 
-- domain value;
-- record, sealed interface, or enum — or the dominant language's equivalent constructs;
-- state machine variant;
-- input/output type;
-- request/response shape;
-- method signature;
-- class or module interface;
-- expected-failure/custom-error type;
-- adapter interface;
-- protocol DTO;
-- persistence DTO/projection;
-- runtime-boundary codec;
-- public API.
+- domain values and state machine variants;
+- input/output types, request/response shapes, method signatures, and module interfaces;
+- expected-failure and custom-error types;
+- adapter interfaces;
+- protocol DTOs, persistence DTOs and projections, and runtime-boundary codecs;
+- the public API.
 
 Name seams, adapters, implementations, ownership boundaries, and what crosses each boundary. State what each layer may know and what must not leak across each seam.
 
@@ -168,19 +140,15 @@ Before producing the spec, attempt to settle every open question and risk. Factu
 
 Completion criterion: no open question or risk is left bare — each is settled with a cited finding or carries a recommendation and a default.
 
-### 9. Produce the spec
+### 9. Produce and self-check the spec
 
-Return the spec inline unless the user requested a file path. If a file was requested, save it there.
+Write the spec to the outline below. Return it inline unless the user requested a file path; if they did, save it there.
+
+Before returning or saving, walk every completion criterion in order, branch selection then each Path A step, and verify it against the written spec text. A criterion the spec does not satisfy is a gap: repair it before returning.
 
 Do not implement, and by default do not ask to implement.
 
-Completion criterion: the output follows the outline below and is implementation-ready for another engineer.
-
-### 10. Self-check
-
-Before returning or saving the spec, walk every completion criterion in order — branch selection, then each Path A step — and verify it against the written spec. A criterion the spec text does not satisfy is a gap; repair the gap before returning.
-
-Completion criterion: every completion criterion is satisfied by the spec's own text, not by the agent's recollection.
+Completion criterion: every completion criterion is satisfied by the spec's own text, not by the agent's recollection, so another engineer can implement from it without asking a question.
 
 ## Path B: Grill first
 
@@ -280,11 +248,8 @@ Omit sections that truly do not apply, but do not omit typed contracts, seams, c
 ## Writing rules
 
 - Code first: pseudocode defines contracts, APIs, and data flow.
-- Write pseudocode in the codebase's dominant programming language. Code the agent writes to drive its tools does not count toward dominance. When the dominant language is Java, or when no single language dominates, write modern, minimalist Java 21: records for data, sealed interfaces for variants, pattern matching for dispatch. Avoid inheritance hierarchies, builders, and annotation ceremony in pseudocode.
+- Write pseudocode in the codebase's dominant programming language. Code the agent writes to drive its tools does not count toward dominance. When the dominant language is Java, or when no single language dominates, write Java 21: records for data, sealed interfaces for variants, pattern matching for dispatch.
 - Prose explains why; types and call stacks define what changes.
-- Focus on types, interfaces, APIs, inputs/outputs, seams, boundaries, adapters, domain modules, service modules, external adapters, and call stacks.
 - Prefer precise domain values over strings, booleans, nullable bags, and loosely shaped objects.
-- Keep seams real: adapters translate across framework, persistence, network, time, randomness, telemetry, runtime, or platform boundaries.
-- Avoid speculative abstraction; every seam earns its existence through invariants, locality, leverage, testing, or a real boundary.
-- Keep a single source of truth; do not restate the same rule in multiple sections unless one section points to the other.
-- Settle unknowns, and recommend an answer for what remains unsettled, as specified in 'Settle risks and open questions' (step 8). Do not invent product requirements, domain rules, APIs, or call stacks to make the spec feel complete.
+- Keep seams real: adapters translate across framework, persistence, network, time, randomness, telemetry, runtime, or platform boundaries, and every seam earns its existence through invariants, locality, leverage, testing, or a real boundary.
+- Settle unknowns and recommend an answer for whatever stays unsettled, per 'Settle risks and open questions' (step 8). Invent no product requirement, domain rule, API, or call stack to make the spec feel complete.
