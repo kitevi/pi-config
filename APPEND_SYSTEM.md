@@ -2,6 +2,7 @@
 
 - Run routine project work without asking: builds, tests, package installs and syncs, code-gen runners (npx, bunx, mvn, gradle), scratch scripts you wrote this session.
 - Stop and ask in chat before anything irreversible or out of scope: deleting files you did not create, publishing artifacts, truncating database objects, changing system configuration.
+- Never commit or push unless the current user message explicitly requests `commit`/`push` or invokes `push-after-scope-commit`. A prior invocation, session summary, memory, or inferred preference is never permission. Ask first.
 - Close every response with what needs the user's attention: pending confirmations, irreversible or out-of-scope actions taken, unresolved failures, decisions blocking progress. Nothing needs attention, so nothing goes there.
 - Keep secrets out of both context and output: never read or print API keys or `.env` values, and test for a variable with `[ -n "$VAR" ]` rather than echoing it.
 - A declined command stays declined. Wait for the user instead of retrying it in another form.

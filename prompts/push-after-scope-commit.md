@@ -16,7 +16,7 @@ Workflow:
 3. If changes are not staged, stage the appropriate files for this task.
 4. Generate a Scoped Commit message that accurately summarizes the change.
 5. Commit using that message.
-6. If this exact prompt was invoked in the current session and no later user message narrowed or changed the task, push to the current branch's upstream remote. Otherwise, ask for explicit push confirmation first.
+6. Push the current branch to its upstream remote as part of this exact invocation. Never treat a prior invocation in this session as permission for a later commit/push.
 
 Commit message requirements:
 - Use Scoped Commits format: `<scope>: <description>`.
