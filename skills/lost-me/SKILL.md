@@ -134,9 +134,9 @@ open path/to/lost-me-{description}.html
 
 ### Guidance
 
-Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to answer the user's current question or the options to resolve the current discussion point.
+Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to answer the user's current question or to present the options for resolving the current discussion point.
 
-You may use one of these, you may use several, it is unlikely you will use all of them. Use your judgement and don't overwhelm the user. Prose counts as a view: the smallest view that makes the point may be a sentence, not a diagram.
+You may use one of these views, you may use several, and it is unlikely you will use all of them. Use your judgement and don't overwhelm the user. Prose counts as a view: the smallest view that makes the point may be a sentence, not a diagram.
 
 ## Escalation
 

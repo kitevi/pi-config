@@ -7,14 +7,14 @@ license: MIT
 
 # Tech Spec
 
-A tech spec is a **typed call-stack architecture handoff**: code-shaped contracts plus execution flows. Prefer pseudocode in the codebase's dominant programming language over prose wherever precision matters.
+A tech spec is a **typed call-stack architecture handoff**: code-shaped contracts plus execution flows. Prefer pseudocode over prose wherever precision matters, and write the pseudocode in the codebase's dominant programming language.
 
-This skill is design-only. Do not implement. Save the spec to a file only when the user asks for one; otherwise return it inline.
+This skill is design-only. Do not implement. Save the spec to a file only when the user asks for a file; otherwise return the spec inline.
 
 ## Branch selection
 
 1. Use **Path A: Convert context to spec** when the conversation, docs, or codebase already contain enough background to describe the change.
-2. Use **Path B: Grill first** when the user wants a new spec but has not provided enough of the problem, constraints, design direction, affected code, or acceptance criteria.
+2. Use **Path B: Grill first** when the user wants a new spec but has not provided enough information about the problem, constraints, design direction, affected code, or acceptance criteria.
 
 If a question can be answered by exploring the codebase, inspect the codebase instead of asking.
 
@@ -47,7 +47,7 @@ Capture:
 
 Mark unknowns as open questions instead of filling gaps with plausible design.
 
-Completion criterion: every claimed requirement or constraint is grounded in conversation, code, docs, or an explicit open question.
+Completion criterion: every claimed requirement or constraint is either grounded in conversation, code, or docs, or recorded as an explicit open question.
 
 ### 3. Explore design alternatives
 
@@ -120,7 +120,7 @@ raw input
   -> serialized output
 ```
 
-Include current vs proposed flow when changing existing behavior. Include failure, retry, cancellation, transactionality, idempotency, observability, authorization, and runtime-hop flow when reachable.
+Include current vs proposed flow when changing existing behavior. Include each failure, retry, cancellation, transactionality, idempotency, observability, authorization, and runtime-hop flow that the call stack can reach.
 
 Completion criterion: every affected behavior has an end-to-end call stack and type/data-flow trace.
 
@@ -140,9 +140,9 @@ Completion criterion: every contract and call-stack step maps to a file/module o
 
 ### 7. Write the RGR TDD test plan
 
-Use the available TDD skill and its testing standards; when no TDD skill is available, follow standard Red-Green-Refactor practice. Plan vertical Red-Green-Refactor (RGR) slices: one failing behavior test, minimal implementation, repeat. Do not write a horizontal "all tests first, all code later" plan.
+When a TDD skill is available, use it and its testing standards; otherwise, follow standard Red-Green-Refactor practice. Plan vertical Red-Green-Refactor (RGR) slices: one failing behavior test, minimal implementation, repeat. Do not write a horizontal "all tests first, all code later" plan.
 
-Favor behavior through public interfaces and real seams over implementation-coupled mocks.
+Favor testing behavior through public interfaces and real seams over implementation-coupled mocks.
 
 Cover proportionately:
 
@@ -160,11 +160,11 @@ Completion criterion: every public behavior, invariant, important failure path, 
 
 ### 8. Settle risks and open questions
 
-Before producing the spec, attempt to settle every open question and risk. Facts are the agent's job: settle them with tooling instead of leaving them to the reader.
+Before producing the spec, attempt to settle every open question and risk. Factual questions are the agent's job: settle them with tooling instead of leaving them to the reader.
 
 - Search the codebase first: existing behavior, precedent, types, tests, and config answer most questions that look open.
 - Use available tooling for factual questions outside the repo — web search, documentation lookups, MCP tools — for library behavior, API limits, platform constraints, and version compatibility. Record each finding in the spec with its source; a question settled by tooling is no longer open.
-- For what remains unsettled, recommend instead of listing. Every remaining open question carries your recommended answer and the default the implementation assumes if no decision arrives. Every risk carries a recommended mitigation or an explicit acceptance.
+- For what remains unsettled, give a recommendation instead of only listing the item. Every remaining open question carries your recommended answer and the default the implementation assumes if no decision arrives. Every risk carries a recommended mitigation or an explicit acceptance.
 
 Completion criterion: no open question or risk is left bare — each is settled with a cited finding or carries a recommendation and a default.
 
@@ -172,13 +172,13 @@ Completion criterion: no open question or risk is left bare — each is settled 
 
 Return the spec inline unless the user requested a file path. If a file was requested, save it there.
 
-Do not implement and do not ask to implement by default.
+Do not implement, and by default do not ask to implement.
 
 Completion criterion: the output follows the outline below and is implementation-ready for another engineer.
 
 ### 10. Self-check
 
-Before returning or saving the spec, walk every completion criterion in order — branch selection, then each Path A step — and verify it against the written spec. A criterion the spec text does not satisfy is a gap; repair it before returning.
+Before returning or saving the spec, walk every completion criterion in order — branch selection, then each Path A step — and verify it against the written spec. A criterion the spec text does not satisfy is a gap; repair the gap before returning.
 
 Completion criterion: every completion criterion is satisfied by the spec's own text, not by the agent's recollection.
 
@@ -190,7 +190,7 @@ Completion criterion: every completion criterion is satisfied by the spec's own 
 2. Start a grilling interview.
    - Ask questions in batches: put every question whose prerequisites are settled into one numbered batch, give your recommended answer under each question, and send the whole batch in one message. Wait for the user's answers before asking the next batch. A question whose answer depends on a question still open in the current batch belongs to a later batch.
    - If a question can be answered by exploring the codebase or with available tooling (web search, documentation lookups, MCP tools), settle it yourself instead of asking.
-   - Completion criterion: the interview has enough context for Path A: problem, users/callers, constraints, affected systems, desired behavior, boundaries, likely APIs, invariants, risks, and acceptance tests.
+   - Completion criterion: the interview has gathered enough context for Path A: problem, users/callers, constraints, affected systems, desired behavior, boundaries, likely APIs, invariants, risks, and acceptance tests.
 3. Convert to the spec.
    - Once grilling context is sufficient, run Path A.
    - Completion criterion: the final artifact is a typed call-stack architecture handoff, not interview notes.
@@ -284,7 +284,7 @@ Omit sections that truly do not apply, but do not omit typed contracts, seams, c
 - Prose explains why; types and call stacks define what changes.
 - Focus on types, interfaces, APIs, inputs/outputs, seams, boundaries, adapters, domain modules, service modules, external adapters, and call stacks.
 - Prefer precise domain values over strings, booleans, nullable bags, and loosely shaped objects.
-- Keep seams real: adapters translate framework, persistence, network, time, randomness, telemetry, runtime, or platform boundaries.
+- Keep seams real: adapters translate across framework, persistence, network, time, randomness, telemetry, runtime, or platform boundaries.
 - Avoid speculative abstraction; every seam earns its existence through invariants, locality, leverage, testing, or a real boundary.
 - Keep a single source of truth; do not restate the same rule in multiple sections unless one section points to the other.
-- Settle unknowns and recommend for what remains unsettled as specified in 'Settle risks and open questions' (step 8). Do not invent product requirements, domain rules, APIs, or call stacks to make the spec feel complete.
+- Settle unknowns, and recommend an answer for what remains unsettled, as specified in 'Settle risks and open questions' (step 8). Do not invent product requirements, domain rules, APIs, or call stacks to make the spec feel complete.
