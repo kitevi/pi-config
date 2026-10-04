@@ -9,12 +9,12 @@ license: MIT
 
 A tech spec is a **typed call-stack architecture handoff**: code-shaped contracts plus execution flows. Prefer Java pseudocode over prose wherever precision matters.
 
-This skill is design-only. Do not implement. Save a file only when the user asks for a file; otherwise return the spec inline.
+This skill is design-only. Do not implement. Save the spec to a file only when the user asks for one; otherwise return it inline.
 
 ## Branch selection
 
 1. Use **Path A: Convert context to spec** when the conversation, docs, or codebase already contain enough background to describe the change.
-2. Use **Path B: Grill first** when the user wants a new spec but has not provided enough problem, constraints, design direction, affected code, or acceptance criteria.
+2. Use **Path B: Grill first** when the user wants a new spec but has not provided enough of the problem, constraints, design direction, affected code, or acceptance criteria.
 
 If a question can be answered by exploring the codebase, inspect the codebase instead of asking.
 
@@ -98,7 +98,7 @@ For the recommended design, outline every new, changed, or deleted:
 - runtime-boundary codec;
 - public API.
 
-Name seams, adapters, implementations, ownership boundaries, and what crosses each boundary. State what each layer may know and what must not leak across the seam.
+Name seams, adapters, implementations, ownership boundaries, and what crosses each boundary. State what each layer may know and what must not leak across each seam.
 
 Completion criterion: every new or changed boundary has a concrete type/interface/API sketch, or an explicit reason no new contract is needed.
 
@@ -140,7 +140,7 @@ Completion criterion: every contract and call-stack step maps to a file/module o
 
 ### 7. Write the RGR TDD test plan
 
-Use the sibling TDD workflow and testing standards. Plan vertical Red-Green-Refactor slices: one failing behavior test, minimal implementation, repeat. Do not write a horizontal "all tests first, all code later" plan.
+Use the available TDD skill and its testing standards; when no TDD skill is available, follow standard Red-Green-Refactor practice. Plan vertical Red-Green-Refactor (RGR) slices: one failing behavior test, minimal implementation, repeat. Do not write a horizontal "all tests first, all code later" plan.
 
 Favor behavior through public interfaces and real seams over implementation-coupled mocks.
 
@@ -158,7 +158,17 @@ Cover proportionately:
 
 Completion criterion: every public behavior, invariant, important failure path, changed boundary, and changed seam has a red test slice or an explicit reason not to test it.
 
-### 8. Produce the spec
+### 8. Settle risks and open questions
+
+Before producing the spec, attempt to settle every open question and risk. Facts are the agent's job: settle them with tooling instead of leaving them to the reader.
+
+- Search the codebase first: existing behavior, precedent, types, tests, and config answer most questions that look open.
+- Use available tooling for factual questions outside the repo — web search, documentation lookups, MCP tools — for library behavior, API limits, platform constraints, and version compatibility. Record each finding in the spec with its source; a question settled by tooling is no longer open.
+- For what remains unsettled, recommend instead of listing. Every remaining open question carries your recommended answer and the default the implementation assumes if no decision arrives. Every risk carries a recommended mitigation or an explicit acceptance.
+
+Completion criterion: no open question or risk is left bare — each is settled with a cited finding or carries a recommendation and a default.
+
+### 9. Produce the spec
 
 Return the spec inline unless the user requested a file path. If a file was requested, save it there.
 
@@ -173,7 +183,7 @@ Completion criterion: the output follows the outline below and is implementation
    - Completion criterion: the agent has not invented requirements, APIs, files, or call stacks.
 2. Start a grilling interview.
    - Ask questions in batches: put every question whose prerequisites are settled into one numbered batch, give your recommended answer under each question, and send the whole batch in one message. Wait for the user's answers before asking the next batch. A question whose answer depends on a question still open in the current batch belongs to a later batch.
-   - If a question can be answered by exploring the codebase, inspect the codebase instead of asking.
+   - If a question can be answered by exploring the codebase or with available tooling (web search, documentation lookups, MCP tools), settle it yourself instead of asking.
    - Completion criterion: the interview has enough context for Path A: problem, users/callers, constraints, affected systems, desired behavior, boundaries, likely APIs, invariants, risks, and acceptance tests.
 3. Convert to the spec.
    - Once grilling context is sufficient, run Path A.
@@ -232,7 +242,9 @@ Use this shape unless the task is tiny enough to compress without losing contrac
 
 ## RGR TDD Test Plan
 
-## Risks and Open Questions
+## Risks and Mitigations
+
+## Open Questions
 ```
 
 Omit sections that truly do not apply, but do not omit typed contracts, seams, call stacks, or tests merely because they are hard to specify.
@@ -240,15 +252,15 @@ Omit sections that truly do not apply, but do not omit typed contracts, seams, c
 ## Writing rules
 
 - Code first: Java pseudocode defines contracts, APIs, and data flow.
-- Write modern, minimalist Java: records for data, sealed interfaces for variants, pattern matching for dispatch. Avoid inheritance, builders, and annotation ceremony in pseudocode.
+- Write modern, minimalist Java: records for data, sealed interfaces for variants, pattern matching for dispatch. Avoid inheritance hierarchies, builders, and annotation ceremony in pseudocode.
 - Prose explains why; types and call stacks define what changes.
 - Focus on types, interfaces, APIs, inputs/outputs, seams, boundaries, adapters, domain modules, service modules, external adapters, and call stacks.
 - Prefer precise domain values over strings, booleans, nullable bags, and loosely shaped objects.
 - Keep seams real: adapters translate framework, persistence, network, time, randomness, telemetry, runtime, or platform boundaries.
 - Avoid speculative abstraction; every seam earns its existence through invariants, locality, leverage, testing, or a real boundary.
 - Keep a single source of truth; do not restate the same rule in multiple sections unless one section points to the other.
-- Unknowns stay open questions. Do not invent product requirements, domain rules, APIs, or call stacks to make the spec feel complete.
+- Settle unknowns and recommend for what remains unsettled as specified in 'Settle risks and open questions' (step 8). Do not invent product requirements, domain rules, APIs, or call stacks to make the spec feel complete.
 
 ## Provenance
 
-Vendored from the `tech-spec` skill in `github.com/dmmulroy/skills` at revision `8603380821fee6a77c82639f364ce8fe4f5a92be` (MIT). Local modifications: questions asked in batches instead of one at a time, and Java pseudocode instead of TypeScript.
+Vendored from the `tech-spec` skill in `github.com/dmmulroy/skills` at revision `8603380821fee6a77c82639f364ce8fe4f5a92be` (MIT). Local modifications: questions asked in batches instead of one at a time, Java pseudocode instead of TypeScript, and open questions and risks settled with tooling or left with recommendations instead of bare listings.
