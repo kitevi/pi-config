@@ -176,6 +176,12 @@ Do not implement and do not ask to implement by default.
 
 Completion criterion: the output follows the outline below and is implementation-ready for another engineer.
 
+### 10. Self-check
+
+Before returning or saving the spec, walk every completion criterion in order — branch selection, then each Path A step — and verify it against the written spec. A criterion the spec text does not satisfy is a gap; repair it before returning.
+
+Completion criterion: every completion criterion is satisfied by the spec's own text, not by the agent's recollection.
+
 ## Path B: Grill first
 
 1. Do not write a full spec yet.
@@ -247,12 +253,34 @@ Use this shape unless the task is tiny enough to compress without losing contrac
 ## Open Questions
 ```
 
+A task is tiny when it adds or changes one behavior, touches at most two files, and introduces no new seam or boundary. For a tiny task, use this outline instead:
+
+```md
+# <Title>
+
+## Summary and Context
+
+## Goals / Non-Goals
+
+## Proposed Design
+
+## RGR TDD Test Plan
+
+## Files to Change
+
+## Risks and Mitigations
+
+## Open Questions
+```
+
+Compress the surrounding prose, never the contracts: the tiny spec still names typed contracts, one call stack, and red test slices.
+
 Omit sections that truly do not apply, but do not omit typed contracts, seams, call stacks, or tests merely because they are hard to specify.
 
 ## Writing rules
 
 - Code first: Java pseudocode defines contracts, APIs, and data flow.
-- Write modern, minimalist Java: records for data, sealed interfaces for variants, pattern matching for dispatch. Avoid inheritance hierarchies, builders, and annotation ceremony in pseudocode.
+- Write modern, minimalist Java 21: records for data, sealed interfaces for variants, pattern matching for dispatch. Avoid inheritance hierarchies, builders, and annotation ceremony in pseudocode. Java 21 is the spec notation; keep it even when the codebase uses another language.
 - Prose explains why; types and call stacks define what changes.
 - Focus on types, interfaces, APIs, inputs/outputs, seams, boundaries, adapters, domain modules, service modules, external adapters, and call stacks.
 - Prefer precise domain values over strings, booleans, nullable bags, and loosely shaped objects.
@@ -263,4 +291,4 @@ Omit sections that truly do not apply, but do not omit typed contracts, seams, c
 
 ## Provenance
 
-Vendored from the `tech-spec` skill in `github.com/dmmulroy/skills` at revision `8603380821fee6a77c82639f364ce8fe4f5a92be` (MIT). Local modifications: questions asked in batches instead of one at a time, Java pseudocode instead of TypeScript, and open questions and risks settled with tooling or left with recommendations instead of bare listings.
+Vendored from the `tech-spec` skill in `github.com/dmmulroy/skills` at revision `8603380821fee6a77c82639f364ce8fe4f5a92be` (MIT). Local modifications: questions asked in batches instead of one at a time, Java pseudocode instead of TypeScript, open questions and risks settled with tooling or left with recommendations instead of bare listings, a tiny-spec outline, a self-check step, and a Java 21 baseline.
