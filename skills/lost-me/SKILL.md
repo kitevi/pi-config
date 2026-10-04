@@ -7,15 +7,24 @@ license: MIT
 
 # Lost Me
 
-The user just said your last message did not land. Skip the preamble and repair it. Match the repair to the signal they gave; re-pitch is the default.
+The user just said your last message did not land. Skip the preamble and repair it.
+
+## Choose the repair
+
+Infer the likely source of confusion from your last answer, the user's follow-up, and earlier repair attempts. Choose the mode yourself:
+
+- **Re-pitch it** when the barrier is jargon, missing context, or an unclear point that plain language can resolve.
+- **Show it** when seeing structure, sequence, relationships, state, layout, or a change would make the point clearer than more prose.
+
+Either mode can come first. Honor an explicit format request; otherwise use the smallest explanation likely to resolve the confusion. Deliver it directly, without asking the user to pick a mode or announcing your choice.
 
 ## Re-pitch it
 
-For "I don't follow" or jargon overload. Restate your last message so it lands: open with a little context — where things stand, what just happened — then make the point simply and concisely, like one human talking to another. Use ASD-STE100 Simplified Technical English when precision matters. Restate what was said and mark what was vague as vague; re-pitching adds no new substance.
+Restate your last message so it lands: open with a little context — where things stand, what just happened — then make the point simply and concisely, like one human talking to another. Use ASD-STE100 Simplified Technical English when precision matters. Restate what was said and mark what was vague as vague; re-pitching adds no new substance.
 
 ## Show it
 
-For "show me", or when a re-pitch already failed: make the point visually. Pick the smallest view that carries the point. Write any pseudocode in the codebase's dominant programming language — Java 21 when Java dominates or no language does; the agent's own tool-call code doesn't count.
+Make the point visually. Pick the smallest view that carries the point. Write any pseudocode in the codebase's dominant programming language — Java 21 when Java dominates or no language does; the agent's own tool-call code doesn't count.
 
 - Show logic or an algorithm as pseudocode:
 
@@ -138,4 +147,4 @@ Prose counts as a view. Use one or several, and rarely all of them. Place each v
 
 ## Escalation
 
-One repair at a time. If you re-pitched and the user is still lost, stop restating — show it. If you showed it and they are still lost, back up a level: rebuild the context, then make the point again.
+One repair at a time. If the user is still lost, reassess the gap and choose again. Change the representation or back up a level to rebuild missing context; do not repeat an approach that already failed.
