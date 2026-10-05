@@ -10,7 +10,7 @@
 
 # Web and documentation tools (MCP, inside `fabric_exec`)
 
-Use Context7 first for library/API documentation. Use TinyFish for general web search and page fetching; use Exa when TinyFish is unavailable or its results miss. Use shell HTTP only after MCP cannot satisfy the lookup, and state why you fell back.
+Use Context7 first for library/API documentation. Use TinyFish for general web search and page fetching; use Exa if TinyFish is unavailable, a call fails, search results are empty or irrelevant, or fetched pages contain no usable content. Use shell HTTP only after MCP cannot satisfy the lookup, and state why you fell back.
 
 ## Known calls: use these templates directly
 
@@ -72,11 +72,37 @@ return (await mcp.exa.web_fetch_exa({
 })).text;
 ```
 
+**Multiple calls in one program:** the examples above show one call each, but a single `fabric_exec` program can run several calls together. Use `Promise.all` for independent lookups and return their `.text` values together:
+
+```ts
+const [libraries, news] = await Promise.all([
+  mcp.context7.resolve_library_id({
+    libraryName: "React", query: "useEffect cleanup function"
+  }),
+  mcp.tinyfish.search({query: "latest Model Context Protocol news"})
+]);
+return {libraries: libraries.text, news: news.text};
+```
+
+Keep dependent and fallback calls sequential: resolve a Context7 library ID before querying its docs, and try Exa only after TinyFish fails to satisfy that lookup.
+
 ## Discovery and recovery
 
 - For unfamiliar tools or options not covered above, run `await tools.search({query: "server or capability", limit: 5})`. Inspect `inputSchema` and use the exact returned full ref with `await tools.call({ref, args})`. Direct MCP calls use `mcp.<sanitized_server>.<sanitized_tool>(args)`; hyphens become underscores, as in `mcp.context7.query_docs`.
 - After an argument-validation error, describe the failing tool with its full ref and return only its schema: `return (await tools.describe({ref: "mcp.tinyfish.fetch_content"})).inputSchema;` (replace the ref for other tools). This keeps long descriptions from hiding the schema. Include every field in `required`, even fields with defaults, then retry with corrected arguments. Reuse the inspected schema until the tool changes or validation fails again.
-- If machine-readable extraction is actually needed, inspect the response once with `return JSON.stringify(r).slice(0, 1500);`, then use the observed shape. Inspect again after a shape error; reuse the observed shape otherwise. Call `JSON.parse` only on JSON strings, never already-structured objects. MCP envelopes are not SDK/REST response objects.
+- If machine-readable extraction is actually needed, inspect the response once by returning every top-level key, its value type, and a bounded preview of that value. Bound each preview separately so a long value cannot hide later keys:
+
+  ```ts
+  return Object.fromEntries(Object.entries(r).map(([key, value]) => [
+    key,
+    {
+      type: value === null ? "null" : Array.isArray(value) ? "array" : typeof value,
+      preview: JSON.stringify(value)?.slice(0, 300)
+    }
+  ]));
+  ```
+
+  Inspect relevant nested fields with bounded previews if the summary is insufficient. Inspect again after a shape error; reuse the observed shape otherwise. Call `JSON.parse` only on JSON strings, never already-structured objects. MCP envelopes are not SDK/REST response objects.
 - For shell web-fetch fallback, use `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" <url>`. If access is blocked, report the block; do not retry with other identities.
 
 # Code navigation
