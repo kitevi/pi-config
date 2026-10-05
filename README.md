@@ -109,7 +109,6 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
    - `pi-better-openai.json` → `~/.pi/agent/extensions/pi-better-openai.json`
    - `fabric.json` → `~/.pi/agent/fabric.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
-   - `opencode-go-provider.json` → `~/.pi/agent/opencode-go-provider.json`
 
 6. **Links both theme variants** — `github-colorblind-light.json` and `github-colorblind-dark.json` are linked into `~/.pi/agent/themes/`; pi follows the terminal's light/dark appearance automatically.
 
@@ -125,7 +124,6 @@ Paths this repository does not declare are never touched, so leftovers from remo
   - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
-  - `extensions/opencode-go-usage.ts` — footer surface for OpenCode Go usage: lazily loads the installed `pi-opencode-go-provider`'s own controller and formatters, and keeps the 5h/7d/30d remaining budget plus reset countdowns in the footer while an OpenCode Go model is active. It never paints an editor widget, and reconciliation disables the provider's native usage display (`opencode-go-provider.json`) so exactly one usage poller runs
 - `skills/` — pi skills
 - `themes/` — pi themes (`github-colorblind` light/dark variants)
 - `reminders/` — global reminder definitions for `pi-system-reminders`
@@ -134,7 +132,6 @@ Paths this repository does not declare are never touched, so leftovers from remo
 - `keybindings.json` — repo-managed keybinding overrides; unbinds the built-in commands that use `Ctrl+P` so `footer-veil` can own `Ctrl+P`
 - `fabric.json` — Pi Fabric configuration installed into `~/.pi/agent/fabric.json` (see [Pi Fabric](#pi-fabric))
 - `mcp.json` — Pi Fabric MCP server configuration installed into `~/.pi/agent/mcp.json`
-- `opencode-go-provider.json` — disables `pi-opencode-go-provider`'s native usage widget, installed into `~/.pi/agent/opencode-go-provider.json`; the footer adapter refuses to start (with one warning) while native usage is enabled
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
 The bootstrap script is plain Node.js; the pi extensions in `extensions/` are TypeScript.
@@ -148,6 +145,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `pi-better-openai.json`, `fabric.json`, `mcp.json`, and `opencode-go-provider.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `pi-better-openai.json`, `fabric.json`, and `mcp.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.

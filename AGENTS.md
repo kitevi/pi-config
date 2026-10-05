@@ -13,7 +13,7 @@ Deterministic, git-managed configuration for the pi coding agent (the [pi-mono](
 ## Repo-owned sources and their runtime targets
 
 - `settings.json` → installed into `~/.pi/agent/settings.json`; replaces preferences but preserves the local runtime `deviceId`
-- `fabric.json`, `APPEND_SYSTEM.md`, `opencode-go-provider.json` → installed wholesale into `~/.pi/agent/`
+- `fabric.json`, `APPEND_SYSTEM.md` → installed wholesale into `~/.pi/agent/`
 - `mcp.json` → installed wholesale into `~/.mcporter/mcporter.json` for Pi Fabric, not Pi's native MCP extension
 - `pi-better-openai.json` → installed wholesale into `~/.pi/agent/extensions/`
 - `extensions/`, `themes/`, `prompts/`, `skills/`, `reminders/`, `keybindings.json` → symlinked into `~/.pi/agent/`
