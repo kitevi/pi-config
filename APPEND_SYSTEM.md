@@ -125,3 +125,5 @@ Pi renders mermaid as terminal box art through `grok-mermaid`, which draws only 
 - Stay under 80 columns: `flowchart TD` with short labels over `flowchart LR` with long ones. A wide diagram parses cleanly yet falls back to framed source, flashing as art during streaming before it breaks, which means too wide rather than a syntax error.
 - Quote any label holding `()`, `<>`, `/`, `.`, or `<br>`: `A["foo(bar)<br>baz"]`, written `<br>` and never `<br/>`.
 - Labels wrap at 24 columns over up to 4 lines, edge labels truncate at 28, so shorten labels instead of trusting the wrap.
+- Emit every mermaid fence at column 0, never indented inside a list item or blockquote: pi renders only top-level mermaid blocks, so a nested one stays plain fenced source even when the diagram is valid.
+- `sequenceDiagram` width tracks its longest message text, not participant names — keep messages short or the laid-out width exceeds the terminal and falls back to source.
