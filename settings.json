@@ -12,8 +12,9 @@
     "--dangerously-allow-all-scripts"
   ],
   "skills": [
+    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me",
     "git/github.com/cursor/plugins/cursor-team-kit/skills/deslop",
-    "git/github.com/anthropics/knowledge-work-plugins/engineering/skills/code-review"
+    "git/github.com/cursor/plugins/pstack/skills/principle-fix-root-causes"
   ],
   "packages": [
     "npm:pi-fabric",
@@ -29,10 +30,27 @@
       "source": "https://github.com/mattpocock/skills",
       "skills": [
         "skills/productivity/grilling",
-        "skills/engineering/tdd",
-        "skills/engineering/diagnosing-bugs",
         "skills/productivity/writing-for-agents",
         "skills/productivity/handoff"
+      ],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
+    },
+    {
+      "source": "https://github.com/celec7/beyond-code",
+      "skills": [
+        "skills/code-review",
+        "skills/tdd"
+      ],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
+    },
+    {
+      "source": "https://github.com/petekp/claude-code-setup",
+      "skills": [
+        "skills/plain"
       ],
       "extensions": [],
       "prompts": [],

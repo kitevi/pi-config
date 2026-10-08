@@ -88,6 +88,33 @@ void describe("skill guide config", () => {
 });
 
 void describe("skill guide entries", () => {
+	void it.each([
+		{ skill: "plain", summary: "Say that plainly." },
+		{ skill: "principle-fix-root-causes", summary: "Fix causes, not symptoms." },
+		{ skill: "show-me", summary: "Explain with visuals." },
+		{ skill: "tdd", summary: "Feature work, test-first." },
+	])("shows $skill with the default guide summary", ({ skill, summary }) => {
+		const entries = collectSkillGuideEntries(
+			[
+				{
+					name: `skill:${skill}`,
+					description: "Upstream skill description.",
+					source: "skill",
+					sourceInfo: {},
+				},
+			] as never[],
+			loadSkillGuideConfig(),
+		);
+
+		assert.deepStrictEqual(entries, [
+			{
+				command: `/skill:${skill}`,
+				skill,
+				summary,
+			},
+		]);
+	});
+
 	void it("includes every skill command, sorts it, and uses configured overrides", () => {
 		const entries = collectSkillGuideEntries(commands, config);
 
