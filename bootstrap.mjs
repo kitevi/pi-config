@@ -25,6 +25,8 @@ const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
 const PI_SETTINGS = join(PI_DIR, "settings.json");
 const BETTER_OPENAI_OVERLAY = join(REPO_DIR, "pi-better-openai.json");
 const PI_BETTER_OPENAI = join(PI_EXTENSIONS_DIR, "pi-better-openai.json");
+const OPENCODE_GO_OVERLAY = join(REPO_DIR, "opencode-go-provider.json");
+const PI_OPENCODE_GO = join(PI_DIR, "opencode-go-provider.json");
 const FABRIC_CONFIG_OVERLAY = join(REPO_DIR, "fabric.json");
 const PI_FABRIC_CONFIG = join(PI_DIR, "fabric.json");
 const MCP_CONFIG_OVERLAY = join(REPO_DIR, "mcp.json");
@@ -182,6 +184,7 @@ async function main() {
   await syncDirectoryLinks(THEMES_DIR, PI_THEMES_DIR);
 
   await installJsonConfig(BETTER_OPENAI_OVERLAY, PI_BETTER_OPENAI, "pi-better-openai settings");
+  await installJsonConfig(OPENCODE_GO_OVERLAY, PI_OPENCODE_GO, "opencode-go provider settings");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
   await installJsonConfig(FABRIC_CONFIG_OVERLAY, PI_FABRIC_CONFIG, "Pi Fabric config");
   await installJsonConfig(MCP_CONFIG_OVERLAY, PI_MCP_CONFIG, "MCP config");
