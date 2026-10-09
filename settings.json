@@ -1,5 +1,4 @@
 {
-  "theme": "github-colorblind-light/github-colorblind-dark",
   "extensions": [
     "-builtin:mcp",
     "-builtin:codemode",

@@ -10,8 +10,6 @@ const REPO_DIR = dirname(fileURLToPath(import.meta.url));
 const PI_DIR = join(HOME, ".pi", "agent");
 const EXTENSIONS_DIR = join(REPO_DIR, "extensions");
 const PI_EXTENSIONS_DIR = join(PI_DIR, "extensions");
-const THEMES_DIR = join(REPO_DIR, "themes");
-const PI_THEMES_DIR = join(PI_DIR, "themes");
 const APPEND_SYSTEM_SOURCE = join(REPO_DIR, "APPEND_SYSTEM.md");
 const PI_APPEND_SYSTEM = join(PI_DIR, "APPEND_SYSTEM.md");
 const links = [
@@ -36,7 +34,6 @@ const RESETTABLE_PI_PATHS = [
   ...links.map(({link}) => link),
   PI_APPEND_SYSTEM,
   PI_EXTENSIONS_DIR,
-  PI_THEMES_DIR,
 ];
 
 function pathIsInside(root, targetPath) {
@@ -181,7 +178,6 @@ async function main() {
   console.log(`wrote APPEND_SYSTEM.md to ${PI_APPEND_SYSTEM}`);
 
   await syncDirectoryLinks(EXTENSIONS_DIR, PI_EXTENSIONS_DIR);
-  await syncDirectoryLinks(THEMES_DIR, PI_THEMES_DIR);
 
   await installJsonConfig(BETTER_OPENAI_OVERLAY, PI_BETTER_OPENAI, "pi-better-openai settings");
   await installJsonConfig(OPENCODE_GO_OVERLAY, PI_OPENCODE_GO, "opencode-go provider settings");

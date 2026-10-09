@@ -44,9 +44,6 @@ npm install
 npm run setup
 ```
 
-The theme follows your terminal appearance: pi switches between the
-`github-colorblind-light` and `github-colorblind-dark` variants automatically.
-
 `npm install` provides the pinned dependencies used by the extensions and their tests. The reconciliation script itself still uses only Node.js built-ins.
 
 ## Footer veil
@@ -100,9 +97,8 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 
 3. **Installs** the repository-owned `APPEND_SYSTEM.md` as `~/.pi/agent/APPEND_SYSTEM.md`.
 
-4. **Symlinks** extension and theme directories from the repo into `~/.pi/agent`:
+4. **Symlinks** the extension directory from the repo into `~/.pi/agent`:
    - `extensions/` → `~/.pi/agent/extensions/`
-   - `themes/` → `~/.pi/agent/themes/`
 
 5. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
    - `settings.json` → `~/.pi/agent/settings.json`
@@ -110,8 +106,6 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
    - `fabric.json` → `~/.pi/agent/fabric.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
    - `opencode-go-provider.json` → `~/.pi/agent/opencode-go-provider.json`
-
-6. **Links both theme variants** — `github-colorblind-light.json` and `github-colorblind-dark.json` are linked into `~/.pi/agent/themes/`; pi follows the terminal's light/dark appearance automatically.
 
 Paths this repository does not declare are never touched, so leftovers from removed packages, renamed configuration, or earlier bootstrap versions stay on disk after setup. Delete `~/.pi`, rerun setup, and reload Pi for a large configuration change (`AGENTS.md` rule 5).
 
@@ -127,7 +121,6 @@ Paths this repository does not declare are never touched, so leftovers from remo
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
   - `extensions/opencode-go-usage.ts` — single-account OpenCode Go footer: uses the installed provider's `UsageController.line()` for 5h/7d/30d remaining budgets, reset countdowns, and stale warnings. Only `config.ts` and `usage-controller.ts` are imported; auth, polling, parsing, and countdown formatting stay upstream. The adapter places each reset countdown beside its percentage. `opencode-go-provider.json` disables the native widget to avoid a second poller. Run `npm test -- tests/opencode-go-usage.integration.test.ts` when updating the provider.
 - `skills/` — pi skills
-- `themes/` — pi themes (`github-colorblind` light/dark variants)
 - `reminders/` — global reminder definitions for `pi-system-reminders`
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions

@@ -16,7 +16,7 @@ Deterministic, git-managed configuration for the pi coding agent (the [pi-mono](
 - `fabric.json`, `APPEND_SYSTEM.md`, `opencode-go-provider.json` → installed wholesale into `~/.pi/agent/`
 - `mcp.json` → installed wholesale into `~/.mcporter/mcporter.json` for Pi Fabric, not Pi's native MCP extension
 - `pi-better-openai.json` → installed wholesale into `~/.pi/agent/extensions/`
-- `extensions/`, `themes/`, `prompts/`, `skills/`, `reminders/`, `keybindings.json` → symlinked into `~/.pi/agent/`
+- `extensions/`, `prompts/`, `skills/`, `reminders/`, `keybindings.json` → symlinked into `~/.pi/agent/`
 - `bootstrap.mjs` — the reconciler that performs those steps
 
 Pi Fabric owns tool orchestration and MCP. `settings.json` disables Pi's built-in `mcp`, `codemode`, and `tool-search` extensions to keep `fabric_exec` as the exclusive tool path.
