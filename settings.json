@@ -16,7 +16,7 @@
     "git/github.com/cursor/plugins/pstack/skills/principle-fix-root-causes"
   ],
   "packages": [
-    "npm:pi-fabric",
+    "npm:pi-fabric@0.111.0",
     "https://github.com/kitevi/piref",
     "npm:@monotykamary/pi-tps",
     "npm:@monotykamary/pi-retry",
