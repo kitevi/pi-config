@@ -21,6 +21,7 @@
     "https://github.com/kitevi/piref",
     "npm:@monotykamary/pi-vcc",
     "npm:@monotykamary/pi-tps",
+    "npm:pi-quiet-spinner",
     "npm:@monotykamary/pi-retry",
     "npm:@monotykamary/pi-better-openai",
     "npm:pi-hypercharm-provider",
@@ -97,6 +98,9 @@
       "themes": []
     }
   ],
+  "quiet-spinner": {
+    "preset": "still"
+  },
   "hideThinkingBlock": true,
   "cacheWarming": "idle",
   "showCacheMissNotices": true
