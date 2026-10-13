@@ -1,13 +1,13 @@
 /**
  * Caps the model-facing codemode return at 10,000 characters.
  *
- * Nested tool results stay as Pi delivered them. When the return is longer,
- * the complete text is one private temp file and the model sees a middle cut
- * with that path and the read instruction in the omission hole. An existing
- * Pi spill is reused.
+ * Nested tool results and smaller previews stay as Pi delivered them. Longer
+ * returns get a middle cut with the full-text path and read instruction in
+ * the omission hole. Pi spills are reused for text-only returns; image returns
+ * get a private spill that includes Pi's image-path annotations.
  */
 import { randomBytes } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { JsonValue } from "@earendil-works/pi-ai";
@@ -43,7 +43,6 @@ export interface CapResult {
 }
 
 export interface CapIo {
-	readFile(path: string): Promise<string>;
 	writeFile(text: string): Promise<string>;
 }
 
@@ -128,28 +127,11 @@ export async function writeCapFile(text: string): Promise<string> {
 export async function applyCodemodeOutputCap(event: CapEvent, io: CapIo): Promise<CapResult | undefined> {
 	if (event.toolName !== "codemode" || event.parentToolCallId !== undefined) return undefined;
 
-	const joined = joinedText(event.content);
-	const existingPath = fullOutputPathOf(event.details);
-	let full = joined;
-	if (existingPath) {
-		try {
-			full = await io.readFile(existingPath);
-		} catch {
-			full = joined;
-		}
-	}
+	const full = joinedText(event.content);
+	if (full.length <= CODEMODE_OUTPUT_MAX_CHARS) return undefined;
 
-	if (full.length <= CODEMODE_OUTPUT_MAX_CHARS && joined.length <= CODEMODE_OUTPUT_MAX_CHARS) return undefined;
-
-	if (full.length <= CODEMODE_OUTPUT_MAX_CHARS) {
-		return {
-			content: [{ type: "text", text: full }, ...otherBlocks(event.content)],
-			...(event.structuredContent !== undefined ? { structuredContent: event.structuredContent } : {}),
-		};
-	}
-
-	const reused = existingPath !== undefined && full !== joined;
-	let path = reused ? existingPath : undefined;
+	// Pi writes its text spill before adding image-path annotations.
+	let path = otherBlocks(event.content).length === 0 ? fullOutputPathOf(event.details) : undefined;
 	let wroteFile = false;
 	if (!path) {
 		try {
@@ -181,7 +163,6 @@ export default function (pi: ExtensionAPI) {
 			...(event.parentToolCallId !== undefined ? { parentToolCallId: event.parentToolCallId } : {}),
 			...(event.structuredContent !== undefined ? { structuredContent: event.structuredContent } : {}),
 		}, {
-			readFile: (path) => readFile(path, "utf8"),
 			writeFile: writeCapFile,
 		});
 		if (!result) return undefined;

@@ -1,4 +1,7 @@
 import { strict as assert } from "node:assert";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "vitest";
 import plugin, {
 	applyCodemodeOutputCap,
@@ -6,6 +9,7 @@ import plugin, {
 	CODEMODE_OUTPUT_MAX_CHARS,
 	type CapEvent,
 	type CapIo,
+	type CapResult,
 } from "../extensions/codemode-output-cap.ts";
 
 function textEvent(text: string, extra: Partial<CapEvent> = {}): CapEvent {
@@ -36,17 +40,33 @@ function assertOmissionMarker(text: string, path: string, full: string): void {
 	assert.ok(full.endsWith(tail));
 }
 
-function io(overrides: Partial<CapIo> = {}): CapIo & { writes: string[]; reads: string[] } {
+function codemodeResultHandler(): (event: CapEvent) => Promise<CapResult | undefined> {
+	const handlers: Array<(event: CapEvent) => Promise<CapResult | undefined>> = [];
+	plugin({
+		on: (_event: string, handler: (event: CapEvent) => Promise<CapResult | undefined>) => {
+			handlers.push(handler);
+		},
+	} as never);
+	const handler = handlers[0];
+	assert.ok(handler);
+	return handler;
+}
+
+async function withNativeSpill(fullText: string, test: (path: string) => Promise<void>): Promise<void> {
+	const directory = await mkdtemp(join(tmpdir(), "pi-codemode-cap-test-"));
+	try {
+		const path = join(directory, "native-spill.txt");
+		await writeFile(path, fullText, { mode: 0o600 });
+		await test(path);
+	} finally {
+		await rm(directory, { recursive: true });
+	}
+}
+
+function io(overrides: Partial<CapIo> = {}): CapIo & { writes: string[] } {
 	const writes: string[] = [];
-	const reads: string[] = [];
 	return {
 		writes,
-		reads,
-		readFile: async (path) => {
-			reads.push(path);
-			if (overrides.readFile) return overrides.readFile(path);
-			throw new Error(`unexpected read ${path}`);
-		},
 		writeFile: async (text) => {
 			writes.push(text);
 			if (overrides.writeFile) return overrides.writeFile(text);
@@ -93,18 +113,14 @@ void describe("applyCodemodeOutputCap", () => {
 		assert.deepEqual(result.details, { fullOutputPath: "/tmp/pi-codemode-cap-test.txt" });
 	});
 
-	void it("reuses an existing full-output path", async () => {
-		const preview = "truncated preview";
-		const full = `HEAD${"q".repeat(15_000)}TAIL`;
+	void it("caps the delivered preview while reusing its existing full-output path", async () => {
+		const preview = `HEAD${"q".repeat(15_000)}TAIL`;
 		const path = "/tmp/pi-codemode-existing.txt";
-		const files = io({
-			readFile: async () => full,
-		});
+		const files = io();
 		const result = await applyCodemodeOutputCap(textEvent(preview, {
 			details: { fullOutputPath: path, calls: [] },
 		}), files);
 
-		assert.deepEqual(files.reads, [path]);
 		assert.deepEqual(files.writes, []);
 		assert.ok(result);
 		const text = result.content.find((block) => block.type === "text");
@@ -112,8 +128,7 @@ void describe("applyCodemodeOutputCap", () => {
 		if (text?.type !== "text") return;
 		assert.ok(text.text.startsWith("HEAD"));
 		assert.ok(text.text.includes("TAIL"));
-		assertOmissionMarker(text.text, path, full);
-		assert.equal(text.text.includes(preview), false);
+		assertOmissionMarker(text.text, path, preview);
 		assert.equal(result.details, undefined);
 	});
 
@@ -162,16 +177,64 @@ void describe("applyCodemodeOutputCap", () => {
 });
 
 void describe("codemode-output-cap extension", () => {
-	void it("caps a codemode tool result", async () => {
-		const handlers: Array<(event: CapEvent) => Promise<unknown>> = [];
-		plugin({
-			on: (_event: string, handler: (event: CapEvent) => Promise<unknown>) => {
-				handlers.push(handler);
-			},
-		} as never);
+	void it("does not expand a preview produced by a smaller per-script budget", async () => {
+		await withNativeSpill("x".repeat(20_000), async (path) => {
+			const preview = `Script completed\nWall time 0.1 seconds\nOutput:\nWarning: truncated output\n${"x".repeat(400)}\n[Full output: ${path} (read with offset/limit)]`;
+			const result = await codemodeResultHandler()(textEvent(preview, {
+				details: { fullOutputPath: path, calls: [] },
+			}));
 
-		const event = textEvent("e".repeat(11_000));
-		const result = await handlers[0]?.(event);
+			assert.equal(result, undefined);
+		});
+	});
+
+	void it("preserves image paths added after Pi writes its text spill", async () => {
+		await withNativeSpill(`HEAD${"x".repeat(50_000)}TAIL`, async (nativePath) => {
+			const firstPath = "/tmp/pi-codemode-first.png";
+			const secondPath = "/tmp/pi-codemode-second.png";
+			const firstImage = { type: "image" as const, data: "first", mimeType: "image/png" };
+			const secondImage = { type: "image" as const, data: "second", mimeType: "image/png" };
+			const event: CapEvent = {
+				toolName: "codemode",
+				content: [
+					{ type: "text", text: "Script completed\nWall time 0.1 seconds\nOutput:\n" },
+					{ type: "text", text: `HEAD${"x".repeat(20_000)}TAIL\n\n[Full output: ${nativePath} (read with offset/limit)]\n[Image saved to ${firstPath} (image/png, 1 B)]` },
+					firstImage,
+					{ type: "text", text: `[Image saved to ${secondPath} (image/png, 1 B)]` },
+					secondImage,
+				],
+				details: { fullOutputPath: nativePath, calls: [] },
+			};
+			const fullReturn = event.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+			const result = await codemodeResultHandler()(event);
+			assert.ok(result);
+			const savedPath = ((result.details ?? event.details) as { fullOutputPath: string }).fullOutputPath;
+			try {
+				const text = result.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+				assert.ok(text.includes(firstPath), "first image path must remain visible");
+				assert.ok(text.includes(secondPath), "second image path must remain visible");
+				assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
+				assert.deepEqual(result.content.filter((block) => block.type === "image"), [firstImage, secondImage]);
+				assert.equal(await readFile(savedPath, "utf8"), fullReturn);
+				assert.equal(await readFile(nativePath, "utf8"), `HEAD${"x".repeat(50_000)}TAIL`);
+			} finally {
+				if (savedPath !== nativePath) await rm(savedPath);
+			}
+		});
+	});
+
+	void it("caps a codemode tool result", async () => {
+		const full = "e".repeat(11_000);
+		const event = textEvent(full);
+		const result = await codemodeResultHandler()(event);
 		assert.ok(result);
+		const path = (result.details as { fullOutputPath: string }).fullOutputPath;
+		try {
+			assert.equal(await readFile(path, "utf8"), full);
+			assert.equal(result.content[0]?.type, "text");
+			if (result.content[0]?.type === "text") assert.ok(result.content[0].text.length <= CODEMODE_OUTPUT_MAX_CHARS);
+		} finally {
+			await rm(path);
+		}
 	});
 });
