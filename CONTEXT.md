@@ -72,15 +72,18 @@ runtime-generated installation `deviceId` is preserved, not configured here.
 - **Symlink** is used for static assets that pi only reads (`prompts/`,
 `skills/`, `themes/`, `extensions/`).
 - **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
-repository-owned file as-is (no network fetch). Its MCP web/docs and `fabric_exec` guidance applies to every model.
+repository-owned file as-is (no network fetch). Its web and documentation provider order applies to every model.
 - **Reconciliation** is idempotent — re-running it is safe and intended to be
 done after any change to this repo or on a fresh machine.
 - **Reminders** are static assets managed via symlink, but their *semantics*
 are behavioral (they inject messages into the LLM context on session start).
 - **MCP servers** are declared in `mcp.json`, installed into
-`~/.mcporter/mcporter.json`, and connected by Pi Fabric. Pi's built-in MCP,
-codemode, and tool-search extensions are disabled in `settings.json` so
-`fabric_exec` remains the exclusive tool path.
+`~/.pi/agent/mcp.json`, and connected by Pi's built-in MCP. Codemode is the
+model-facing tool (`codemode.mode` is `only` in `settings.json`). Pi's
+tool-search extension stays disabled. `extensions/codemode-output-cap.ts`
+caps that codemode return at 10,000 characters. `pi-vcc-config.json` is installed
+into `~/.pi/agent/pi-vcc-config.json` and compacts the session after context use
+passes 90% of the model context window.
 - **API keys** for custom providers live outside this repo (Bitwarden). This repo
 manages *configuration*, not *credentials*.
 

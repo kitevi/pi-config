@@ -1,9 +1,11 @@
 {
   "extensions": [
-    "-builtin:mcp",
-    "-builtin:codemode",
     "-builtin:tool-search"
   ],
+  "defaultTools": ["+codemode", "+grep", "+find", "+ls"],
+  "codemode": {
+    "mode": "only"
+  },
   "npmCommand": [
     "npm",
     "--ignore-scripts=false",
@@ -16,8 +18,8 @@
     "git/github.com/cursor/plugins/pstack/skills/principle-fix-root-causes"
   ],
   "packages": [
-    "npm:pi-fabric",
     "https://github.com/kitevi/piref",
+    "npm:@monotykamary/pi-vcc",
     "npm:@monotykamary/pi-tps",
     "npm:@monotykamary/pi-retry",
     "npm:@monotykamary/pi-better-openai",

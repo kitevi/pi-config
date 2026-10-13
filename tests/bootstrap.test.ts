@@ -1,6 +1,5 @@
 import { strict as assert } from "node:assert";
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, lstat, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -92,6 +91,50 @@ void describe("bootstrap Pi settings", () => {
 				JSON.parse(await readFile(settingsPath, "utf8")),
 				JSON.parse(await readFile(join(repoRoot, "settings.json"), "utf8")),
 			);
+		} finally {
+			await rm(home, { recursive: true, force: true });
+		}
+	});
+});
+
+void describe("bootstrap MCP and Fabric config", () => {
+	void it("installs native mcp.json and leaves an undeclared mcporter file", async () => {
+		const home = await mkdtemp(join(tmpdir(), "pi-config-mcp-"));
+		const agentDir = join(home, ".pi", "agent");
+		const mcporterPath = join(home, ".mcporter", "mcporter.json");
+
+		try {
+			await mkdir(dirname(mcporterPath), { recursive: true });
+			await writeFile(mcporterPath, "{\"kept\":true}\n");
+
+			await runBootstrap(home);
+
+			const installed = JSON.parse(await readFile(join(agentDir, "mcp.json"), "utf8")) as {
+				mcpServers?: { context7?: { url?: string } };
+			};
+			assert.equal(installed.mcpServers?.context7?.url, "https://mcp.context7.com/mcp");
+			assert.equal(await readFile(mcporterPath, "utf8"), "{\"kept\":true}\n");
+		} finally {
+			await rm(home, { recursive: true, force: true });
+		}
+	});
+});
+
+void describe("bootstrap pi-vcc settings", () => {
+	void it("compacts after 90 percent of the context window", async () => {
+		const home = await mkdtemp(join(tmpdir(), "pi-config-vcc-"));
+
+		try {
+			await runBootstrap(home);
+
+			const configPath = join(home, ".pi", "agent", "pi-vcc-config.json");
+			const parsed = JSON.parse(await readFile(configPath, "utf8")) as {
+				overrideDefaultCompaction?: boolean;
+				globalThreshold?: { compactPercent?: number };
+			};
+
+			assert.equal(parsed.overrideDefaultCompaction, true);
+			assert.equal(parsed.globalThreshold?.compactPercent, 90);
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}

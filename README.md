@@ -78,9 +78,9 @@ Configure it in `extensions/skill-guide.ts` (`DEFAULT_SKILL_GUIDE_CONFIG`, then 
 Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact surface focus, and OSC 777 raises the native desktop notification. The extension also supports Kitty's OSC 99 protocol. When no native notification protocol is recognized, it falls back to `notify-send` on Linux or `osascript` on macOS. If no terminal focus report has arrived, focus detection falls back to X11's active window when `DISPLAY` and `WINDOWID` are available, or the frontmost terminal application on macOS. Terminal reports take precedence over these best-effort fallbacks.
 
 
-## Pi Fabric
+## Codemode
 
-The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs in full code mode (`fabric.json`): the model writes one awaited code block against the `pi.*`/`tools.*` APIs instead of chaining many small tool calls. Subagents are disabled (`approvals.agent: "deny"`, `agents.enabled: false`); mesh, memory, and the Fabric UI widget are off. MCP is enabled through `mcp.json`, with allowlisted Exa web-search/fetch, TinyFish search/fetch, and Context7 documentation tools. Oversized results are spilled to disk artifacts once output passes `executor.maxOutputChars` (8,192 chars), keeping context lean; `maxNestedResultChars` stays at 2M since nested results never reach the model.
+`settings.json` sets `codemode.mode` to `only` and enables `codemode`, `grep`, `find`, and `ls` beside the default `read`, `bash`, `edit`, and `write` tools. The model reaches those tools through one codemode script. Pi's `tool-search` extension stays disabled. MCP servers in `mcp.json` are hidden except the Context7, TinyFish, and Exa tools scripts call. `extensions/codemode-output-cap.ts` keeps the model-facing codemode return to 10,000 characters: a longer return is written once to a private temp file, or Pi's existing spill is reused, and the visible text keeps the start and the end with that path inside the budget. `npm:@monotykamary/pi-vcc` replaces Pi's summarizer: `pi-vcc-config.json` compacts when context use passes 90% of the model context window.
 
 
 ## What `npm run setup` does
@@ -103,9 +103,9 @@ The `npm:pi-fabric` package is installed with its `fabric-exec` skill and runs i
 5. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
    - `settings.json` → `~/.pi/agent/settings.json`
    - `pi-better-openai.json` → `~/.pi/agent/extensions/pi-better-openai.json`
-   - `fabric.json` → `~/.pi/agent/fabric.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
    - `opencode-go-provider.json` → `~/.pi/agent/opencode-go-provider.json`
+   - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
 
 Paths this repository does not declare are never touched, so leftovers from removed packages, renamed configuration, or earlier bootstrap versions stay on disk after setup. Delete `~/.pi`, rerun setup, and reload Pi for a large configuration change (`AGENTS.md` rule 5).
 
@@ -118,6 +118,7 @@ Paths this repository does not declare are never touched, so leftovers from remo
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide` (settings live in `DEFAULT_SKILL_GUIDE_CONFIG` at the top of the file)
   - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
+  - `extensions/codemode-output-cap.ts` — caps the model-facing codemode return at 10,000 characters and spills the complete return to one temp file
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
   - `extensions/opencode-go-usage.ts` — single-account OpenCode Go footer: uses the installed provider's `UsageController.line()` for 5h/7d/30d remaining budgets, reset countdowns, and stale warnings. Only `config.ts` and `usage-controller.ts` are imported; auth, polling, parsing, and countdown formatting stay upstream. The adapter places each reset countdown beside its percentage. `opencode-go-provider.json` disables the native widget to avoid a second poller. Run `npm test -- tests/opencode-go-usage.integration.test.ts` when updating the provider.
 - `skills/` — pi skills
@@ -125,9 +126,9 @@ Paths this repository does not declare are never touched, so leftovers from remo
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
 - `keybindings.json` — repo-managed keybinding overrides; unbinds the built-in commands that use `Ctrl+P` so `footer-veil` can own `Ctrl+P`
-- `fabric.json` — Pi Fabric configuration installed into `~/.pi/agent/fabric.json` (see [Pi Fabric](#pi-fabric))
-- `mcp.json` — Pi Fabric MCP server configuration installed into `~/.pi/agent/mcp.json`
+- `mcp.json` — Pi MCP server configuration installed into `~/.pi/agent/mcp.json` (see [Codemode](#codemode))
 - `opencode-go-provider.json` — disables `pi-opencode-go-provider`'s native usage widget, installed into `~/.pi/agent/opencode-go-provider.json`; the footer adapter refuses to start (with one warning) while native usage is enabled
+- `pi-vcc-config.json` — pi-vcc compaction settings installed into `~/.pi/agent/pi-vcc-config.json`; compacts after 90% of the context window
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
 The bootstrap script is plain Node.js; the pi extensions in `extensions/` are TypeScript.
@@ -141,6 +142,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `pi-better-openai.json`, `fabric.json`, `mcp.json`, and `opencode-go-provider.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `pi-better-openai.json`, `mcp.json`, `opencode-go-provider.json`, and `pi-vcc-config.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.

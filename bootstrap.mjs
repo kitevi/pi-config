@@ -25,10 +25,10 @@ const BETTER_OPENAI_OVERLAY = join(REPO_DIR, "pi-better-openai.json");
 const PI_BETTER_OPENAI = join(PI_EXTENSIONS_DIR, "pi-better-openai.json");
 const OPENCODE_GO_OVERLAY = join(REPO_DIR, "opencode-go-provider.json");
 const PI_OPENCODE_GO = join(PI_DIR, "opencode-go-provider.json");
-const FABRIC_CONFIG_OVERLAY = join(REPO_DIR, "fabric.json");
-const PI_FABRIC_CONFIG = join(PI_DIR, "fabric.json");
+const PI_VCC_OVERLAY = join(REPO_DIR, "pi-vcc-config.json");
+const PI_VCC_CONFIG = join(PI_DIR, "pi-vcc-config.json");
 const MCP_CONFIG_OVERLAY = join(REPO_DIR, "mcp.json");
-const PI_MCP_CONFIG = join(HOME, ".mcporter", "mcporter.json");
+const PI_MCP_CONFIG = join(PI_DIR, "mcp.json");
 const RESETTABLE_PI_PATHS = [
   // Fully managed by this repo.
   ...links.map(({link}) => link),
@@ -181,8 +181,8 @@ async function main() {
 
   await installJsonConfig(BETTER_OPENAI_OVERLAY, PI_BETTER_OPENAI, "pi-better-openai settings");
   await installJsonConfig(OPENCODE_GO_OVERLAY, PI_OPENCODE_GO, "opencode-go provider settings");
+  await installJsonConfig(PI_VCC_OVERLAY, PI_VCC_CONFIG, "pi-vcc settings");
   await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
-  await installJsonConfig(FABRIC_CONFIG_OVERLAY, PI_FABRIC_CONFIG, "Pi Fabric config");
   await installJsonConfig(MCP_CONFIG_OVERLAY, PI_MCP_CONFIG, "MCP config");
   console.log("bootstrap complete");
 }

@@ -15,7 +15,7 @@ import { describe, it } from "vitest";
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 void describe("Pi runtime compatibility", () => {
-	void it("loads every local extension while leaving tool orchestration to Fabric", async () => {
+	void it("loads local extensions with native MCP and codemode, and leaves tool search off", async () => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-runtime-"));
 
 		try {
@@ -41,7 +41,10 @@ void describe("Pi runtime compatibility", () => {
 			await loader.reload();
 			const loaded = loader.getExtensions();
 			assert.deepEqual(loaded.errors, []);
-			assert.deepEqual(loaded.extensions.map((extension) => extension.path).sort(), extensionPaths.sort());
+			assert.deepEqual(
+				loaded.extensions.map((extension) => extension.path).sort(),
+				[...extensionPaths, "builtin:codemode", "builtin:mcp"].sort(),
+			);
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}

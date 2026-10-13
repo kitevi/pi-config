@@ -5,20 +5,22 @@
       "command": "npx",
       "args": ["-y", "exa-mcp-server"],
       "env": {
-        "EXA_API_KEY": "$env:EXA_API_KEY"
+        "EXA_API_KEY": "${EXA_API_KEY}"
       },
-      "allowedTools": [
-        "web_search_exa",
-        "web_fetch_exa"
-      ]
+      "exposure": "hidden",
+      "toolExposure": {
+        "web_search_exa": "codemode",
+        "web_fetch_exa": "codemode"
+      }
     },
     "context7": {
       "description": "Look up current library and framework documentation with Context7.",
-      "baseUrl": "https://mcp.context7.com/mcp",
-      "allowedTools": [
-        "resolve-library-id",
-        "query-docs"
-      ]
+      "url": "https://mcp.context7.com/mcp",
+      "exposure": "hidden",
+      "toolExposure": {
+        "resolve-library-id": "codemode",
+        "query-docs": "codemode"
+      }
     },
     "tinyfish": {
       "description": "Free TinyFish web search and page fetching through an auto-started stdio connection.",
@@ -33,16 +35,13 @@
         "X-API-Key:${TINYFISH_API_KEY}"
       ],
       "env": {
-        "TINYFISH_API_KEY": "$env:TINYFISH_API_KEY"
+        "TINYFISH_API_KEY": "${TINYFISH_API_KEY}"
       },
-      "allowedTools": [
-        "search",
-        "fetch_content",
-        "get_search_usage",
-        "list_fetch_usage",
-        "get_wallet"
-      ]
+      "exposure": "hidden",
+      "toolExposure": {
+        "search": "codemode",
+        "fetch_content": "codemode"
+      }
     }
-  },
-  "imports": []
+  }
 }
