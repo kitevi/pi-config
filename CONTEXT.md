@@ -81,7 +81,7 @@ are behavioral (they inject messages into the LLM context on session start).
 `~/.pi/agent/mcp.json`, and connected by Pi's built-in MCP. Codemode is the
 model-facing tool (`codemode.mode` is `only` in `settings.json`). Pi's
 tool-search extension stays disabled. `extensions/codemode-output-cap.ts`
-caps that codemode return at 10,000 characters. `pi-vcc-config.json` is installed
+caps that codemode return at 10,000 characters, with the full-text path in the omission hole. `pi-vcc-config.json` is installed
 into `~/.pi/agent/pi-vcc-config.json` and compacts the session after context use
 passes 90% of the model context window.
 - **API keys** for custom providers live outside this repo (Bitwarden). This repo

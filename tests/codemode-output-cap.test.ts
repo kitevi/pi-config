@@ -16,6 +16,26 @@ function textEvent(text: string, extra: Partial<CapEvent> = {}): CapEvent {
 	};
 }
 
+function assertOmissionMarker(text: string, path: string, full: string): void {
+	assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
+	const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	assert.match(text, new RegExp(`characters omitted\\. Full text: ${escapedPath}`));
+	assert.match(text, /Read it with tools\.read, about 80 lines at a time, or search it/);
+	assert.match(text, /text\(\) of the whole file is cut again/);
+	assert.match(text, /Do not re-run the command/);
+	assert.equal(text.includes("[Full output"), false);
+	const markerStart = text.indexOf("\n\n... ");
+	const tailStart = text.lastIndexOf("\n\n");
+	assert.ok(markerStart >= 0);
+	assert.ok(tailStart > markerStart);
+	const head = text.slice(0, markerStart);
+	const tail = text.slice(tailStart + 2);
+	const omitted = Number(text.match(/(\d+) characters omitted/)?.[1]);
+	assert.equal(omitted, full.length - head.length - tail.length);
+	assert.ok(full.startsWith(head));
+	assert.ok(full.endsWith(tail));
+}
+
 function io(overrides: Partial<CapIo> = {}): CapIo & { writes: string[]; reads: string[] } {
 	const writes: string[] = [];
 	const reads: string[] = [];
@@ -41,11 +61,9 @@ void describe("capCodemodeText", () => {
 		const path = "/tmp/pi-codemode-cap-test.txt";
 		const text = capCodemodeText(full, path);
 
-		assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
 		assert.ok(text.startsWith("START"));
 		assert.ok(text.includes("END"));
-		assert.ok(text.includes(path));
-		assert.match(text, /characters omitted/);
+		assertOmissionMarker(text, path, full);
 	});
 });
 
@@ -69,10 +87,9 @@ void describe("applyCodemodeOutputCap", () => {
 		const text = result.content.find((block) => block.type === "text");
 		assert.equal(text?.type, "text");
 		if (text?.type !== "text") return;
-		assert.ok(text.text.length <= CODEMODE_OUTPUT_MAX_CHARS);
 		assert.ok(text.text.includes("START"));
 		assert.ok(text.text.includes("END"));
-		assert.ok(text.text.includes("/tmp/pi-codemode-cap-test.txt"));
+		assertOmissionMarker(text.text, "/tmp/pi-codemode-cap-test.txt", full);
 		assert.deepEqual(result.details, { fullOutputPath: "/tmp/pi-codemode-cap-test.txt" });
 	});
 
@@ -93,10 +110,9 @@ void describe("applyCodemodeOutputCap", () => {
 		const text = result.content.find((block) => block.type === "text");
 		assert.equal(text?.type, "text");
 		if (text?.type !== "text") return;
-		assert.ok(text.text.length <= CODEMODE_OUTPUT_MAX_CHARS);
 		assert.ok(text.text.startsWith("HEAD"));
 		assert.ok(text.text.includes("TAIL"));
-		assert.ok(text.text.includes(path));
+		assertOmissionMarker(text.text, path, full);
 		assert.equal(text.text.includes(preview), false);
 		assert.equal(result.details, undefined);
 	});

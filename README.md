@@ -80,7 +80,7 @@ Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact
 
 ## Codemode
 
-`settings.json` sets `codemode.mode` to `only` and enables `codemode`, `grep`, `find`, and `ls` beside the default `read`, `bash`, `edit`, and `write` tools. The model reaches those tools through one codemode script. Pi's `tool-search` extension stays disabled. MCP servers in `mcp.json` are hidden except the Context7, TinyFish, and Exa tools scripts call. `extensions/codemode-output-cap.ts` keeps the model-facing codemode return to 10,000 characters: a longer return is written once to a private temp file, or Pi's existing spill is reused, and the visible text keeps the start and the end with that path inside the budget. `npm:@monotykamary/pi-vcc` replaces Pi's summarizer: `pi-vcc-config.json` compacts when context use passes 90% of the model context window.
+`settings.json` sets `codemode.mode` to `only` and enables `codemode`, `grep`, `find`, and `ls` beside the default `read`, `bash`, `edit`, and `write` tools. The model reaches those tools through one codemode script. Pi's `tool-search` extension stays disabled. MCP servers in `mcp.json` are hidden except the Context7, TinyFish, and Exa tools scripts call. `extensions/codemode-output-cap.ts` keeps the model-facing codemode return to 10,000 characters: a longer return is written once to a private temp file, or Pi's existing spill is reused, and the visible text keeps the start and the end with that path in the omission hole, inside the budget. `npm:@monotykamary/pi-vcc` replaces Pi's summarizer: `pi-vcc-config.json` compacts when context use passes 90% of the model context window.
 
 
 ## What `npm run setup` does
@@ -118,7 +118,7 @@ Paths this repository does not declare are never touched, so leftovers from remo
   - `extensions/skill-guide.ts` — TUI skill-index widget, toggled with `/skill-guide` (settings live in `DEFAULT_SKILL_GUIDE_CONFIG` at the top of the file)
   - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
-  - `extensions/codemode-output-cap.ts` — caps the model-facing codemode return at 10,000 characters and spills the complete return to one temp file
+  - `extensions/codemode-output-cap.ts` — caps the model-facing codemode return at 10,000 characters and spills the complete return to one temp file, with the path in the omission hole
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
   - `extensions/opencode-go-usage.ts` — single-account OpenCode Go footer: uses the installed provider's `UsageController.line()` for 5h/7d/30d remaining budgets, reset countdowns, and stale warnings. Only `config.ts` and `usage-controller.ts` are imported; auth, polling, parsing, and countdown formatting stay upstream. The adapter places each reset countdown beside its percentage. `opencode-go-provider.json` disables the native widget to avoid a second poller. Run `npm test -- tests/opencode-go-usage.integration.test.ts` when updating the provider.
 - `skills/` — pi skills

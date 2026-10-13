@@ -19,7 +19,7 @@ Deterministic, git-managed configuration for the pi coding agent (the [pi-mono](
 - `extensions/`, `prompts/`, `skills/`, `reminders/`, `keybindings.json` → symlinked into `~/.pi/agent/`
 - `bootstrap.mjs` — the reconciler that performs those steps
 
-`settings.json` enables native codemode (`codemode.mode` is `only`) and native MCP, and leaves Pi's `tool-search` extension disabled. `extensions/codemode-output-cap.ts` caps the model-facing codemode return at 10,000 characters. `npm:@monotykamary/pi-vcc` compacts the session when context use passes 90% of the model's context window (`pi-vcc-config.json`).
+`settings.json` enables native codemode (`codemode.mode` is `only`) and native MCP, and leaves Pi's `tool-search` extension disabled. `extensions/codemode-output-cap.ts` caps the model-facing codemode return at 10,000 characters, with the full-text path in the omission hole. `npm:@monotykamary/pi-vcc` compacts the session when context use passes 90% of the model's context window (`pi-vcc-config.json`).
 
 ## Making a change
 

@@ -3,7 +3,8 @@
  *
  * Nested tool results stay as Pi delivered them. When the return is longer,
  * the complete text is one private temp file and the model sees a middle cut
- * with that path inside the budget. An existing Pi spill is reused.
+ * with that path and the read instruction in the omission hole. An existing
+ * Pi spill is reused.
  */
 import { randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
@@ -46,6 +47,9 @@ export interface CapIo {
 	writeFile(text: string): Promise<string>;
 }
 
+const OMISSION_INSTRUCTION =
+	"Read it with tools.read, about 80 lines at a time, or search it. text() of the whole file is cut again. Do not re-run the command.";
+
 export function middleCut(value: string, maxChars: number): string {
 	if (maxChars <= 0) return "";
 	if (value.length <= maxChars) return value;
@@ -57,11 +61,29 @@ export function middleCut(value: string, maxChars: number): string {
 	return `${value.slice(0, head)}${marker}${tail > 0 ? value.slice(value.length - tail) : ""}`;
 }
 
+function omissionMarker(omitted: number, path: string): string {
+	return `\n\n... ${omitted} characters omitted. Full text: ${path}\n${OMISSION_INSTRUCTION}\n\n`;
+}
+
 export function capCodemodeText(fullText: string, path: string, maxChars = CODEMODE_OUTPUT_MAX_CHARS): string {
-	const suffix = `\n\n[Full output (${fullText.length} chars) saved to: ${path}]`;
-	if (suffix.length >= maxChars) return suffix.slice(-maxChars);
-	const text = `${middleCut(fullText, maxChars - suffix.length)}${suffix}`;
-	return text.length <= maxChars ? text : suffix.slice(-maxChars);
+	if (maxChars <= 0) return "";
+	if (fullText.length <= maxChars) return fullText;
+
+	let omitted = fullText.length - maxChars;
+	let marker = omissionMarker(omitted, path);
+	for (let attempt = 0; attempt < 8; attempt++) {
+		const next = fullText.length - maxChars + marker.length;
+		const nextMarker = omissionMarker(next, path);
+		if (next === omitted && nextMarker === marker) break;
+		omitted = next;
+		marker = nextMarker;
+	}
+
+	if (marker.length >= maxChars) return marker.slice(-maxChars);
+	const available = maxChars - marker.length;
+	const head = Math.ceil(available / 2);
+	const tail = Math.floor(available / 2);
+	return `${fullText.slice(0, head)}${marker}${tail > 0 ? fullText.slice(fullText.length - tail) : ""}`;
 }
 
 function joinedText(content: CapContentBlock[]): string {

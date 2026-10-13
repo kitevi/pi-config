@@ -8,6 +8,10 @@
 - A declined command stays declined. Wait for the user instead of retrying it in another form.
 - `pi` is the agent, not a shell command. A skill needing an unavailable subagent tool gets the work done directly or a report naming the missing tool.
 
+# Codemode output
+
+When a codemode return names a saved file, the rest of the output is in that file. Read it with `tools.read`, about 80 lines at a time, or search the file. `text()` of the whole file is cut again. Do not re-run the command to recover the missing middle.
+
 # Web and documentation tools
 
 Use Context7 for library and API documentation. Resolve the library, then query its docs. Use TinyFish for web search and page fetching. Use Exa when TinyFish is unavailable, a request fails, results are empty or irrelevant, or a fetched page has no usable content. Repair argument errors before switching providers. Use shell HTTP only after those tools cannot satisfy the lookup, and state why.
