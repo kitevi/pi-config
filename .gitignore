@@ -14,9 +14,6 @@ pnpm-lock.yaml
 bun.lock
 bun.lockb
 
-# Pi Fabric runtime cache
-.pi/fabric/mcp-cache.json
-
 # TypeScript/build caches
 *.tsbuildinfo
 .cache

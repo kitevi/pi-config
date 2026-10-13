@@ -97,7 +97,7 @@ void describe("bootstrap Pi settings", () => {
 	});
 });
 
-void describe("bootstrap MCP and Fabric config", () => {
+void describe("bootstrap MCP config", () => {
 	void it("installs native mcp.json and leaves an undeclared mcporter file", async () => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-mcp-"));
 		const agentDir = join(home, ".pi", "agent");

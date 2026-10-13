@@ -70,7 +70,7 @@ void describe("skill guide config", () => {
 		const configured = loadSkillGuideConfig();
 
 		assert.strictEqual(configured.maxSummaryLength, 30);
-		assert.deepStrictEqual(configured.hiddenSkills, ["fabric-*"]);
+		assert.deepStrictEqual(configured.hiddenSkills, []);
 		assert.deepStrictEqual(configured.pinnedSkills, []);
 		for (const [skill, summary] of Object.entries(configured.summaryOverrides)) {
 			assert.ok(summary.length <= 30, `${skill} summary is ${summary.length} characters`);

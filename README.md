@@ -68,8 +68,8 @@ Configure it in `extensions/skill-guide.ts` (`DEFAULT_SKILL_GUIDE_CONFIG`, then 
 - `placement` — `aboveEditor` or `belowEditor`.
 - `maxSummaryLength` — maximum summary length before shortening (30 characters by default).
 - `summaryOverrides` — replacements for unclear upstream descriptions, keyed by skill name.
-- `hiddenSkills` — skills hidden by exact name or `"prefix*"` glob (`["fabric-*"]` by default).
-- `pinnedSkills` — skills always shown, even under a glob (`[]` by default, so `fabric-*` stays fully hidden).
+- `hiddenSkills` — skills hidden by exact name or `"prefix*"` glob (`[]` by default).
+- `pinnedSkills` — skills always shown, even under a glob (`[]` by default).
 
 ## Desktop notifications
 

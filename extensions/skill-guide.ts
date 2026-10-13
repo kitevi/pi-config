@@ -20,7 +20,7 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 	hideOnPrompt: true,
 	placement: "aboveEditor",
 	maxSummaryLength: DEFAULT_MAX_SUMMARY_LENGTH,
-	hiddenSkills: ["fabric-*"],
+	hiddenSkills: [],
 	pinnedSkills: [...DEFAULT_PINNED_SKILLS],
 	summaryOverrides: {
 		"buku-bookmarks": "Bookmark search/add/cleanup.",
