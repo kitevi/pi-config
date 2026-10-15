@@ -29,12 +29,6 @@ const PI_VCC_OVERLAY = join(REPO_DIR, "pi-vcc-config.json");
 const PI_VCC_CONFIG = join(PI_DIR, "pi-vcc-config.json");
 const MCP_CONFIG_OVERLAY = join(REPO_DIR, "mcp.json");
 const PI_MCP_CONFIG = join(PI_DIR, "mcp.json");
-const RESETTABLE_PI_PATHS = [
-  // Fully managed by this repo.
-  ...links.map(({link}) => link),
-  PI_APPEND_SYSTEM,
-  PI_EXTENSIONS_DIR,
-];
 
 function pathIsInside(root, targetPath) {
   const rel = relative(root, targetPath);
@@ -140,15 +134,6 @@ async function installJsonConfig(sourcePath, targetPath, label) {
   console.log(`wrote ${label} to ${targetPath}`);
 }
 
-async function cleanupManagedPiPaths() {
-  for (const managedPath of RESETTABLE_PI_PATHS) {
-    assertSafePath(managedPath, [PI_DIR]);
-    await rm(managedPath, {recursive: true, force: true});
-  }
-
-  console.log("cleaned fully managed pi paths");
-}
-
 async function syncDirectoryLinks(sourceDir, targetDir) {
   assertSafePath(targetDir, [PI_DIR]);
   await mkdir(targetDir, { recursive: true });
@@ -156,6 +141,18 @@ async function syncDirectoryLinks(sourceDir, targetDir) {
   const repoEntries = existsSync(sourceDir)
     ? (await readdir(sourceDir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))
     : [];
+  const declared = new Set(repoEntries.map((entry) => entry.name));
+
+  // Prune only repo-owned symlinks. A regular file here is runtime state this
+  // repository does not declare, so reconciliation leaves it alone.
+  for (const entry of await readdir(targetDir, { withFileTypes: true })) {
+    if (declared.has(entry.name) || !entry.isSymbolicLink()) continue;
+
+    const stalePath = join(targetDir, entry.name);
+    assertSafePath(stalePath, [PI_DIR]);
+    await rm(stalePath, { recursive: true, force: true });
+    console.log(`removed stale link ${stalePath}`);
+  }
 
   for (const entry of repoEntries) {
     await relink(join(targetDir, entry.name), join(sourceDir, entry.name));
@@ -167,8 +164,6 @@ async function main() {
   if (!existsSync(PI_DIR)) {
     await mkdir(PI_DIR, { recursive: true });
   }
-
-  await cleanupManagedPiPaths();
 
   for (const { link, target } of links) {
     await relink(link, target);

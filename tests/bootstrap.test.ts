@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, lstat, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, lstat, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -50,7 +50,29 @@ void describe("bootstrap reconciliation", () => {
 			await rm(home, { recursive: true, force: true });
 		}
 	});
+});
 
+void describe("bootstrap extension links", () => {
+	void it("prunes repo-owned links that lost their source and keeps undeclared runtime files", async () => {
+		const home = await mkdtemp(join(tmpdir(), "pi-config-extensions-"));
+		const extensionsDir = join(home, ".pi", "agent", "extensions");
+		const staleLink = join(extensionsDir, "removed-extension.ts");
+		const runtimeConfig = join(extensionsDir, "pi-model-sort.json");
+
+		try {
+			await mkdir(extensionsDir, { recursive: true });
+			await symlink(join(repoRoot, "extensions", "removed-extension.ts"), staleLink);
+			await writeFile(runtimeConfig, '{"lastUsed":{}}\n');
+
+			await runBootstrap(home);
+
+			await assert.rejects(lstat(staleLink), { code: "ENOENT" });
+			assert.equal(await readFile(runtimeConfig, "utf8"), '{"lastUsed":{}}\n');
+			assert.equal((await lstat(join(extensionsDir, "git-editor-guard.ts"))).isSymbolicLink(), true);
+		} finally {
+			await rm(home, { recursive: true, force: true });
+		}
+	});
 });
 
 void describe("bootstrap Pi settings", () => {
