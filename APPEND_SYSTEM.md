@@ -8,6 +8,12 @@
 - A declined command stays declined. Wait for the user instead of retrying it in another form.
 - `pi` is the agent, not a shell command. A skill needing an unavailable subagent tool gets the work done directly or a report naming the missing tool.
 
+# Codemode scripts
+
+Write the script in plain JavaScript. Pi does not transpile it, so TypeScript syntax fails at parse time (`const files: Record<string, string> = {}`, `x as any`, `new Map<string, number>()`).
+
+`await` every tool call. An unawaited call is a Promise, so its fields read as `undefined` instead of the tool's result.
+
 # Codemode output
 
 When a codemode return names a saved file, the rest of the output is in that file. Read it with `tools.read`, about 80 lines at a time, or search the file. `text()` of the whole file is cut again. Do not re-run the command to recover the missing middle.
