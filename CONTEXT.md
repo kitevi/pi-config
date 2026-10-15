@@ -41,11 +41,6 @@ A third-party extension installed via npm package or GitHub URL and managed by
 pi's internal package system.
 _Avoid_: External extension, remote extension.
 
-**Theme**:
-A JSON color palette that defines pi's TUI visual styling, with light and dark
-variants.
-_Avoid_: Color scheme, palette (too generic).
-
 **Reminder**:
 A session-start message injected into the LLM context by `pi-system-reminders`,
 defined in `reminders/`.
@@ -58,19 +53,18 @@ _Avoid_: Master copy, canonical copy.
 
 ## Relationships
 
-- A **Theme** has a `light` and `dark` variant. Pi follows the terminal's
-appearance automatically through the `light/dark` pair in the `theme` setting.
 - An **Extension** can be either a **Local Extension** (in `extensions/`) or a
 **Package Extension** (installed via npm/GitHub and tracked in `settings.json`).
-- A **Package** can bring any combination of **Extensions**, **Skills**, and
-**Themes**. This repo selectively loads only the pieces it wants through `settings.json`.
+- A **Package** can bring any combination of **Extensions** and **Skills**.
+This repo selectively loads only the pieces it wants through `settings.json`.
 - **Overlay** install is used for JSON config files, including ones pi mutates
 at runtime (`settings.json`). Reconciliation replaces preferences with the
 repository file, so local preference changes do not survive; declare them in
 the repo instead. Pi's
 runtime-generated installation `deviceId` is preserved, not configured here.
-- **Symlink** is used for static assets that pi only reads (`prompts/`,
-`skills/`, `themes/`, `extensions/`).
+- **Symlink** is used for static assets that pi only reads: `prompts/` and
+`skills/` as whole directories, and each file in `extensions/` individually.
+Pi writes runtime state into `extensions/`, so those files stay put.
 - **Managed copy** is used for `APPEND_SYSTEM.md`: reconciliation copies the
 repository-owned file as-is (no network fetch). Its web and documentation provider order applies to every model.
 - **Reconciliation** is idempotent — re-running it is safe and intended to be
@@ -106,15 +100,16 @@ manages *configuration*, not *credentials*.
 >
 > **Domain expert:** "Run `npm run setup` and it'll reconstruct the whole thing.
 > API keys live in Bitwarden, not here — you'll need to re-add those manually.
-> But your **extensions**, **skills**, **themes**, **reminders**, and config
+> But your **extensions**, **skills**, **reminders**, and config
 > **overlays** are all back exactly as declared."
 
 ## Flagged ambiguities
 
 - "Prompt" was historically used for both **Skill** definitions and the
   `prompts/` directory. Resolved: **Skills** are behavioral task guidance
-  (markdown instructions), while `prompts/` is for raw prompt text fragments
-  (currently unused). The installed `~/.pi/agent/APPEND_SYSTEM.md` is a copy of the repository-owned file and serves as the de facto system prompt overlay.
+  (markdown instructions), while `prompts/` holds prompt templates — Markdown
+  files that become `/` commands, such as `/branch-from-task` and
+  `/context-revalidation`. The installed `~/.pi/agent/APPEND_SYSTEM.md` is a copy of the repository-owned file and serves as the de facto system prompt overlay.
 - "Bootstrap" is sometimes used casually for "first-time setup." Resolved:
   **Reconciliation** is the correct term — the script is idempotent and meant to
   be run repeatedly, not just once.

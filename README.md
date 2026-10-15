@@ -1,7 +1,7 @@
 # pi-config
 
 My personal pi agent config repo.
-It keeps prompts/extensions/skills/themes/reminders plus repo-managed pi config files (settings, keybindings, etc.) in version control and bootstraps them into `~/.pi/agent`.
+It keeps prompts/extensions/skills/reminders plus repo-managed pi config files (settings, keybindings, etc.) in version control and bootstraps them into `~/.pi/agent`.
 
 ## Prerequisites
 
@@ -87,7 +87,7 @@ Focus detection uses CSI mode 1004 reports where the terminal supports them, wit
 
 `npm run setup` runs `bootstrap.mjs`, which:
 
-1. **Clears** all repo-managed paths under `~/.pi/agent/` (prompts, skills, reminders, APPEND_SYSTEM.md, keybindings.json, extensions/, themes/) — stale symlinks and files are cleaned out before re-creation.
+1. **Clears** each repo-managed path under `~/.pi/agent/` (prompts, skills, reminders, APPEND_SYSTEM.md, keybindings.json) before re-creating it — stale symlinks and files are cleaned out first.
 
 2. **Symlinks** directories and files into `~/.pi/agent`:
    - `prompts/`
@@ -97,8 +97,7 @@ Focus detection uses CSI mode 1004 reports where the terminal supports them, wit
 
 3. **Installs** the repository-owned `APPEND_SYSTEM.md` as `~/.pi/agent/APPEND_SYSTEM.md`.
 
-4. **Symlinks** the extension directory from the repo into `~/.pi/agent`:
-   - `extensions/` → `~/.pi/agent/extensions/`
+4. **Symlinks** the repo's extension files into `~/.pi/agent/extensions/`, and prunes repo-owned symlinks whose source file left the repository. Regular files this repo does not declare — such as the model-order state `pi-model-sort` writes — are left in place.
 
 5. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
    - `settings.json` → `~/.pi/agent/settings.json`
@@ -107,7 +106,7 @@ Focus detection uses CSI mode 1004 reports where the terminal supports them, wit
    - `opencode-go-provider.json` → `~/.pi/agent/opencode-go-provider.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
 
-Paths this repository does not declare are never touched, so leftovers from removed packages, renamed configuration, or earlier bootstrap versions stay on disk after setup. Delete `~/.pi`, rerun setup, and reload Pi for a large configuration change (`AGENTS.md` rule 5).
+Paths this repository does not declare are never touched, except repo-owned symlinks inside `~/.pi/agent/extensions/`, which are pruned when their source file leaves the repository. Leftovers from removed packages, renamed configuration, or earlier bootstrap versions otherwise stay on disk after setup. Delete `~/.pi`, rerun setup, and reload Pi for a large configuration change (`AGENTS.md` rule 5).
 
 ## Repo layout
 

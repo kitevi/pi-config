@@ -25,6 +25,9 @@ coverage
 *.lcov
 .nyc_output
 
+# Pi runtime state written inside this repo (never configuration)
+.pi/
+
 # dotenv environment variable files
 .env
 .env.*

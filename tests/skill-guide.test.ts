@@ -23,7 +23,7 @@ const config: SkillGuideConfig = {
 	placement: "aboveEditor",
 	maxSummaryLength: 30,
 	hiddenSkills: [],
-	pinnedSkills: ["fabric-exec"],
+	pinnedSkills: ["demo-exec"],
 	summaryOverrides: {
 		"code-review": "Review a diff vs its spec.",
 	},
@@ -81,7 +81,7 @@ void describe("skill guide config", () => {
 		assert.throws(() => parseSkillGuideConfig({ placement: "sidebar" }), /placement/);
 		assert.throws(() => parseSkillGuideConfig({ maxSummaryLength: 12 }), /at least 24/);
 		assert.throws(() => parseSkillGuideConfig({ summaryOverrides: [] }), /must be an object/);
-		assert.throws(() => parseSkillGuideConfig({ hiddenSkills: "fabric-*" }), /hiddenSkills/);
+		assert.throws(() => parseSkillGuideConfig({ hiddenSkills: "demo-*" }), /hiddenSkills/);
 		assert.throws(() => parseSkillGuideConfig({ hiddenSkills: [""] }), /hiddenSkills/);
 		assert.throws(() => parseSkillGuideConfig({ pinnedSkills: ["", "x"] }), /pinnedSkills/);
 	});
@@ -126,29 +126,29 @@ void describe("skill guide entries", () => {
 		assert.strictEqual(entries[1]?.summary, "Scan a codebase for…");
 	});
 
-	void it("hides glob-matched skills but keeps pinned fabric-exec", () => {
-		const fabricCommands = [
-			{ name: "skill:fabric-exec", description: "Pi core work.", source: "skill", sourceInfo: {} },
-			{ name: "skill:fabric-guide", description: "Choose a workflow.", source: "skill", sourceInfo: {} },
-			{ name: "skill:fabric-swarm", description: "Coordinate actors.", source: "skill", sourceInfo: {} },
+	void it("hides glob-matched skills but keeps pinned demo-exec", () => {
+		const demoCommands = [
+			{ name: "skill:demo-exec", description: "Run a script.", source: "skill", sourceInfo: {} },
+			{ name: "skill:demo-guide", description: "Choose a workflow.", source: "skill", sourceInfo: {} },
+			{ name: "skill:demo-swarm", description: "Coordinate actors.", source: "skill", sourceInfo: {} },
 			{ name: "skill:code-review", description: "Review a diff.", source: "skill", sourceInfo: {} },
 		] as never[];
-		const hidden = { ...config, hiddenSkills: ["fabric-*"] };
+		const hidden = { ...config, hiddenSkills: ["demo-*"] };
 
 		assert.deepStrictEqual(
-			collectSkillGuideEntries(fabricCommands, hidden).map((entry) => entry.command),
-			["/skill:code-review", "/skill:fabric-exec"],
+			collectSkillGuideEntries(demoCommands, hidden).map((entry) => entry.command),
+			["/skill:code-review", "/skill:demo-exec"],
 		);
 	});
 
-	void it("lets an empty pin list hide fabric-exec too", () => {
-		const fabricCommands = [
-			{ name: "skill:fabric-exec", description: "Pi core work.", source: "skill", sourceInfo: {} },
+	void it("lets an empty pin list hide demo-exec too", () => {
+		const demoCommands = [
+			{ name: "skill:demo-exec", description: "Run a script.", source: "skill", sourceInfo: {} },
 		] as never[];
-		const hidden = { ...config, hiddenSkills: ["fabric-*"], pinnedSkills: [] };
+		const hidden = { ...config, hiddenSkills: ["demo-*"], pinnedSkills: [] };
 
 		assert.deepStrictEqual(
-			collectSkillGuideEntries(fabricCommands, hidden).map((entry) => entry.command),
+			collectSkillGuideEntries(demoCommands, hidden).map((entry) => entry.command),
 			[],
 		);
 	});
