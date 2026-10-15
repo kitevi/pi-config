@@ -24,6 +24,7 @@
   ],
   "packages": [
     "https://github.com/kitevi/piref",
+    "https://github.com/kitevi/pi-nudge",
     "npm:@monotykamary/pi-vcc",
     "npm:@monotykamary/pi-tps",
     "npm:pi-quiet-spinner",

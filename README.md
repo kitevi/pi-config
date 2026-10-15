@@ -73,9 +73,9 @@ Configure it in `extensions/skill-guide.ts` (`DEFAULT_SKILL_GUIDE_CONFIG`, then 
 
 ## Desktop notifications
 
-`extensions/desktop-notifications.ts` requests terminal focus reporting and sends an attention notification only when Pi's terminal surface is known to be unfocused. It notifies for the final `agent_settled` lifecycle event (`Pi is waiting for you`). The waiting notification is debounced by ~10s: if a new agent run starts within the window (auto-retry, compaction retry, queued follow-up), the settle was transient, so nothing is sent. Unknown focus is treated conservatively as focused, so unsupported or headless sessions stay silent.
+`git:github.com/kitevi/pi-nudge` sends a native desktop notification when Pi's terminal surface is unfocused at the final `agent_settled` lifecycle event (`Pi is waiting for you`). The waiting notification is debounced by 10s: if a new agent run starts within the window (auto-retry, compaction retry, queued follow-up), the settle was transient, so nothing is sent. Unknown focus is treated conservatively as focused, so unsupported or headless sessions stay silent.
 
-Ghostty is the primary path on both Linux and macOS: CSI mode 1004 reports exact surface focus, and OSC 777 raises the native desktop notification. The extension also supports Kitty's OSC 99 protocol. When no native notification protocol is recognized, it falls back to `notify-send` on Linux or `osascript` on macOS. If no terminal focus report has arrived, focus detection falls back to X11's active window when `DISPLAY` and `WINDOWID` are available, or the frontmost terminal application on macOS. Terminal reports take precedence over these best-effort fallbacks.
+Focus detection uses CSI mode 1004 reports where the terminal supports them, with X11's active window or the frontmost macOS application as best-effort fallbacks. Delivery is delegated to node-notifier — Notification Center on macOS, toasts on Windows, `notify-send` on Linux — so no terminal-emulator notification protocol is required.
 
 
 ## Codemode
