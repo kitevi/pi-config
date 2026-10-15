@@ -1,7 +1,7 @@
 /**
  * Find HBM companions in Maven resources, checking the matching package first
- * and then its parents. Sinfomar's nested logging entities keep their mappings
- * in the parent entities directory rather than mirroring the Java package.
+ * and then its parents. Projects with nested entities often keep mappings in a
+ * parent resources directory rather than mirroring the Java package.
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as fs from "node:fs";

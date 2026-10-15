@@ -121,7 +121,7 @@ Paths this repository does not declare are never touched, except repo-owned syml
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
   - `extensions/opencode-go-usage.ts` — single-account OpenCode Go footer: uses the installed provider's `UsageController.line()` for 5h/7d/30d remaining budgets, reset countdowns, and stale warnings. Only `config.ts` and `usage-controller.ts` are imported; auth, polling, parsing, and countdown formatting stay upstream. The adapter places each reset countdown beside its percentage. `opencode-go-provider.json` disables the native widget to avoid a second poller. Run `npm test -- tests/opencode-go-usage.integration.test.ts` when updating the provider.
 - `skills/` — pi skills
-- `reminders/` — global reminder definitions for `pi-system-reminders`
+- `reminders/` — global reminder definitions for `pi-system-reminders`; `hbm-companion.ts` points to the companion `.hbm.xml` mapping when a Hibernate-mapped Java entity is read
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
 - `keybindings.json` — repo-managed keybinding overrides; unbinds the built-in commands that use `Ctrl+P` so `footer-veil` can own `Ctrl+P`
