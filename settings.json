@@ -32,6 +32,7 @@
     "npm:@monotykamary/pi-better-openai",
     "npm:pi-hypercharm-provider",
     "npm:pi-opencode-go-provider",
+    "npm:pi-coralbricks-provider",
     "npm:pi-model-sort",
     "npm:pi-invisible-continue",
     "npm:pi-system-reminders",
