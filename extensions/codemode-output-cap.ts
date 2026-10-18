@@ -4,10 +4,10 @@
  * Nested tool results and smaller previews stay as Pi delivered them. Longer
  * returns get a middle cut with the full-text path and read instruction in
  * the omission hole. Pi spills are reused for text-only returns; image returns
- * get a private spill that includes Pi's image-path annotations.
+ * get a private spill with the complete output and Pi's image-path annotations.
  */
 import { randomBytes } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { JsonValue } from "@earendil-works/pi-ai";
@@ -43,6 +43,7 @@ export interface CapResult {
 }
 
 export interface CapIo {
+	readFile(path: string): Promise<string>;
 	writeFile(text: string): Promise<string>;
 }
 
@@ -131,15 +132,20 @@ export async function applyCodemodeOutputCap(event: CapEvent, io: CapIo): Promis
 	if (full.length <= CODEMODE_OUTPUT_MAX_CHARS) return undefined;
 
 	// Pi writes its text spill before adding image-path annotations.
-	let path = otherBlocks(event.content).length === 0 ? fullOutputPathOf(event.details) : undefined;
+	const nativePath = fullOutputPathOf(event.details);
+	let path = otherBlocks(event.content).length === 0 ? nativePath : undefined;
 	let wroteFile = false;
 	if (!path) {
 		try {
-			path = await io.writeFile(full);
+			const spillText = nativePath
+				? `${await io.readFile(nativePath)}\n\n[Pi return preview and image paths]\n${full}`
+				: full;
+			path = await io.writeFile(spillText);
 			wroteFile = true;
 		} catch (error) {
 			const reason = error instanceof Error ? error.message : String(error);
 			const notice = `\n\n[Could not save the full output: ${reason}]`;
+			if (nativePath) return cappedResult(event, `${full}${notice}`, nativePath, false);
 			const budget = Math.max(1, CODEMODE_OUTPUT_MAX_CHARS - notice.length);
 			return {
 				content: [{ type: "text", text: `${middleCut(full, budget)}${notice}` }, ...otherBlocks(event.content)],
@@ -163,6 +169,7 @@ export default function (pi: ExtensionAPI) {
 			...(event.parentToolCallId !== undefined ? { parentToolCallId: event.parentToolCallId } : {}),
 			...(event.structuredContent !== undefined ? { structuredContent: event.structuredContent } : {}),
 		}, {
+			readFile: (path) => readFile(path, "utf8"),
 			writeFile: writeCapFile,
 		});
 		if (!result) return undefined;

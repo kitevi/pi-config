@@ -67,6 +67,7 @@ function io(overrides: Partial<CapIo> = {}): CapIo & { writes: string[] } {
 	const writes: string[] = [];
 	return {
 		writes,
+		readFile: overrides.readFile ?? ((path) => readFile(path, "utf8")),
 		writeFile: async (text) => {
 			writes.push(text);
 			if (overrides.writeFile) return overrides.writeFile(text);
@@ -165,6 +166,34 @@ void describe("applyCodemodeOutputCap", () => {
 		assert.deepEqual(files.writes, []);
 	});
 
+	for (const operation of ["read", "write"]) {
+		void it(`keeps the native full-output link when the image spill ${operation} fails`, async () => {
+			const nativePath = "/tmp/pi-codemode-native.txt";
+			const image = { type: "image" as const, data: "abc", mimeType: "image/png" };
+			const files = io({
+				readFile: async () => {
+					if (operation === "read") throw new Error("read failed");
+					return "complete native output";
+				},
+				writeFile: async () => {
+					throw new Error("write failed");
+				},
+			});
+			const result = await applyCodemodeOutputCap({
+				toolName: "codemode",
+				content: [{ type: "text", text: "x".repeat(12_000) }, image],
+				details: { fullOutputPath: nativePath },
+			}, files);
+
+			assert.ok(result);
+			const text = result.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+			assert.ok(text.includes(`Full text: ${nativePath}`));
+			assert.ok(text.includes(`Could not save the full output: ${operation} failed`));
+			assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
+			assert.deepEqual(result.content.filter((block) => block.type === "image"), [image]);
+		});
+	}
+
 	void it("returns structured content when it replaces the text", async () => {
 		const files = io();
 		const structuredContent = { ok: true };
@@ -188,8 +217,10 @@ void describe("codemode-output-cap extension", () => {
 		});
 	});
 
-	void it("preserves image paths added after Pi writes its text spill", async () => {
-		await withNativeSpill(`HEAD${"x".repeat(50_000)}TAIL`, async (nativePath) => {
+	void it("preserves the complete native output and image paths", async () => {
+		const flag = "FLAG{complete_output_with_images}";
+		const nativeText = `HEAD${"x".repeat(25_000)}${flag}${"x".repeat(25_000)}TAIL`;
+		await withNativeSpill(nativeText, async (nativePath) => {
 			const firstPath = "/tmp/pi-codemode-first.png";
 			const secondPath = "/tmp/pi-codemode-second.png";
 			const firstImage = { type: "image" as const, data: "first", mimeType: "image/png" };
@@ -205,7 +236,6 @@ void describe("codemode-output-cap extension", () => {
 				],
 				details: { fullOutputPath: nativePath, calls: [] },
 			};
-			const fullReturn = event.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
 			const result = await codemodeResultHandler()(event);
 			assert.ok(result);
 			const savedPath = ((result.details ?? event.details) as { fullOutputPath: string }).fullOutputPath;
@@ -215,8 +245,12 @@ void describe("codemode-output-cap extension", () => {
 				assert.ok(text.includes(secondPath), "second image path must remain visible");
 				assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
 				assert.deepEqual(result.content.filter((block) => block.type === "image"), [firstImage, secondImage]);
-				assert.equal(await readFile(savedPath, "utf8"), fullReturn);
-				assert.equal(await readFile(nativePath, "utf8"), `HEAD${"x".repeat(50_000)}TAIL`);
+				const saved = await readFile(savedPath, "utf8");
+				assert.ok(saved.includes(flag), "the advertised full text must contain the omitted flag");
+				assert.ok(saved.startsWith(nativeText), "the complete native output must be preserved");
+				assert.ok(saved.includes(firstPath));
+				assert.ok(saved.includes(secondPath));
+				assert.equal(await readFile(nativePath, "utf8"), nativeText);
 			} finally {
 				if (savedPath !== nativePath) await rm(savedPath);
 			}
