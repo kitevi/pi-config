@@ -48,7 +48,7 @@ export interface CapIo {
 }
 
 const OMISSION_INSTRUCTION =
-	"Read it with tools.read, about 80 lines at a time, or search it. text() of the whole file is cut again. Do not re-run the command.";
+	"Extract only needed fields or ~6,000-character slices from this file before text(). tools.read offset/limit count lines, not characters. For oversized lines or another cut, use tools.bash with Node/Python to emit only a bounded field or character range from the saved file. Do not rerun the original command.";
 
 export function middleCut(value: string, maxChars: number): string {
 	if (maxChars <= 0) return "";
@@ -107,13 +107,56 @@ function withOutputPath(details: unknown, path: string): unknown {
 	return { fullOutputPath: path };
 }
 
-function cappedResult(event: CapEvent, fullText: string, path: string, wroteFile: boolean): CapResult {
-	const content: CapContentBlock[] = [
-		{ type: "text", text: capCodemodeText(fullText, path) },
-		...otherBlocks(event.content),
-	];
+function cappedContent(content: CapContentBlock[], path?: string, notice = ""): CapContentBlock[] {
+	const first = content[0];
+	const header = first?.type === "text" && /^Script (completed|failed)\nWall time [\d.]+ seconds\nOutput:\n$/.test(first.text)
+		? first
+		: undefined;
+	const output = header ? content.slice(1) : content;
+	const body: CapContentBlock[] = [];
+	let images: CapContentBlock[] = [];
+	for (const [index, block] of output.entries()) {
+		if (block.type === "image") {
+			images.push(block);
+			continue;
+		}
+		const label = output[index + 1]?.type === "image"
+			? block.text.match(/(?:^|\n)(\[Image (?:saved to |\()[^\n]*\])$/)
+			: null;
+		if (label?.[1]) {
+			body.push({ type: "text", text: block.text.slice(0, label.index) });
+			images.push({ type: "text", text: label[1] });
+		} else {
+			body.push(block);
+		}
+	}
+
+	// Like Pi's native truncation, move each path annotation with its image.
+	const headerChars = header ? header.text.length + 1 : 0;
+	let annotationChars = images.reduce((count, block) => count + (block.type === "text" ? block.text.length + 1 : 0), 0);
+	let full = joinedText(body);
+	const originalLength = joinedText(content).length;
+	const markerChars = path
+		? omissionMarker(originalLength, path).length
+		: `\n\n... ${originalLength} characters omitted ...\n\n`.length;
+	const maxReserved = CODEMODE_OUTPUT_MAX_CHARS - headerChars - markerChars - 2;
+	if (annotationChars > 0 && annotationChars + notice.length > maxReserved) {
+		full = joinedText(output);
+		images = otherBlocks(output);
+		annotationChars = 0;
+		notice += path && !notice
+			? "\n\nImage annotations are in the full text, in image order."
+			: "\n\nImage annotations were omitted and could not be saved.";
+	}
+	notice = middleCut(notice, maxReserved - annotationChars);
+	const budget = CODEMODE_OUTPUT_MAX_CHARS - headerChars - annotationChars - notice.length;
+	const preview = path ? capCodemodeText(full, path, budget) : middleCut(full, budget);
+	return [...(header ? [header] : []), { type: "text", text: `${preview}${notice}` }, ...images];
+}
+
+function cappedResult(event: CapEvent, path: string, wroteFile: boolean, notice = ""): CapResult {
 	return {
-		content,
+		content: cappedContent(event.content, path, notice),
 		...(wroteFile ? { details: withOutputPath(event.details, path) } : {}),
 		...(event.structuredContent !== undefined ? { structuredContent: event.structuredContent } : {}),
 	};
@@ -145,16 +188,15 @@ export async function applyCodemodeOutputCap(event: CapEvent, io: CapIo): Promis
 		} catch (error) {
 			const reason = error instanceof Error ? error.message : String(error);
 			const notice = `\n\n[Could not save the full output: ${reason}]`;
-			if (nativePath) return cappedResult(event, `${full}${notice}`, nativePath, false);
-			const budget = Math.max(1, CODEMODE_OUTPUT_MAX_CHARS - notice.length);
+			if (nativePath) return cappedResult(event, nativePath, false, notice);
 			return {
-				content: [{ type: "text", text: `${middleCut(full, budget)}${notice}` }, ...otherBlocks(event.content)],
+				content: cappedContent(event.content, undefined, notice),
 				...(event.structuredContent !== undefined ? { structuredContent: event.structuredContent } : {}),
 			};
 		}
 	}
 
-	return cappedResult(event, full, path, wroteFile);
+	return cappedResult(event, path, wroteFile);
 }
 
 export default function (pi: ExtensionAPI) {

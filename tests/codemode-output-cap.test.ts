@@ -24,9 +24,10 @@ function assertOmissionMarker(text: string, path: string, full: string): void {
 	assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
 	const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	assert.match(text, new RegExp(`characters omitted\\. Full text: ${escapedPath}`));
-	assert.match(text, /Read it with tools\.read, about 80 lines at a time, or search it/);
-	assert.match(text, /text\(\) of the whole file is cut again/);
-	assert.match(text, /Do not re-run the command/);
+	assert.match(text, /needed fields or ~6,000-character slices/);
+	assert.match(text, /tools\.read offset\/limit count lines/);
+	assert.match(text, /tools\.bash with Node\/Python/);
+	assert.match(text, /Do not rerun the original command/);
 	assert.equal(text.includes("[Full output"), false);
 	const markerStart = text.indexOf("\n\n... ");
 	const tailStart = text.lastIndexOf("\n\n");
@@ -144,6 +145,92 @@ void describe("applyCodemodeOutputCap", () => {
 		assert.ok(result);
 		assert.deepEqual(result.content.filter((block) => block.type === "image"), [image]);
 	});
+
+	void it("keeps interleaved image paths beside their images and preserves the native header", async () => {
+		const header = { type: "text" as const, text: "Script completed\nWall time 0.1 seconds\nOutput:\n" };
+		const firstLabel = "[Image saved to /tmp/first.png (image/png, 1 B)]";
+		const secondLabel = "[Image saved to /tmp/second.png (image/png, 1 B)]";
+		const firstImage = { type: "image" as const, data: "first", mimeType: "image/png" };
+		const secondImage = { type: "image" as const, data: "second", mimeType: "image/png" };
+		const event: CapEvent = {
+			toolName: "codemode",
+			content: [
+				header,
+				{ type: "text", text: `HEAD${"a".repeat(12_000)}\n${firstLabel}` },
+				firstImage,
+				{ type: "text", text: `MIDDLE${"b".repeat(12_000)}\n${secondLabel}` },
+				secondImage,
+				{ type: "text", text: `${"c".repeat(12_000)}TAIL` },
+			],
+		};
+		const files = io();
+		const result = await applyCodemodeOutputCap(event, files);
+
+		assert.ok(result);
+		const text = result.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+		assert.ok(text.includes(firstLabel), "first image path must remain visible");
+		assert.ok(text.includes(secondLabel), "second image path must remain visible");
+		assert.ok(text.includes("HEAD"));
+		assert.ok(text.includes("TAIL"));
+		assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
+		assert.deepEqual(result.content[0], header);
+		assert.deepEqual(result.content.filter((block) => block.type === "image"), [firstImage, secondImage]);
+		for (const [image, label] of [[firstImage, firstLabel], [secondImage, secondLabel]] as const) {
+			const imageIndex = result.content.indexOf(image);
+			assert.ok(imageIndex > 0);
+			const preceding = result.content.at(imageIndex - 1);
+			assert.equal(preceding?.type, "text");
+			if (preceding?.type === "text") assert.ok(preceding.text.endsWith(label));
+		}
+		assert.equal(files.writes[0], event.content.filter((block) => block.type === "text").map((block) => block.text).join("\n"));
+	});
+
+	void it("keeps the recovery link when image annotations alone exceed the budget", async () => {
+		const images = Array.from({ length: 80 }, (_, index) => ({
+			type: "image" as const, data: String(index), mimeType: "image/png",
+		}));
+		const entries = images.map((image, index) => ({
+			image, label: `[Image saved to /tmp/${"p".repeat(120)}/image-${index}.png (image/png, 1 B)]`,
+		}));
+		const content: CapEvent["content"] = entries.flatMap(({ image, label }) => [
+			{ type: "text", text: label }, image,
+		]);
+		const files = io();
+		const result = await applyCodemodeOutputCap({ toolName: "codemode", content }, files);
+
+		assert.ok(result);
+		const text = result.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+		assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
+		assert.ok(text.includes("Full text: /tmp/pi-codemode-cap-test.txt"));
+		assert.match(text, /Image annotations are in the full text, in image order/);
+		assert.deepEqual(result.content.filter((block) => block.type === "image"), images);
+		assert.equal(files.writes[0], entries.map(({ label }) => label).join("\n"));
+	});
+
+	for (const nativePath of [undefined, "/tmp/pi-codemode-native.txt"]) {
+		void it(`reports unsaved image annotations when the spill fails ${nativePath ? "with" : "without"} a native path`, async () => {
+			const content: CapEvent["content"] = Array.from({ length: 80 }, (_, index) => [
+				{ type: "text" as const, text: `[Image saved to /tmp/${"p".repeat(120)}/image-${index}.png (image/png, 1 B)]` },
+				{ type: "image" as const, data: String(index), mimeType: "image/png" },
+			]).flat();
+			const files = io({
+				readFile: async () => "native output without image paths",
+				writeFile: async () => { throw new Error("disk full"); },
+			});
+			const result = await applyCodemodeOutputCap({
+				toolName: "codemode", content,
+				...(nativePath ? { details: { fullOutputPath: nativePath } } : {}),
+			}, files);
+
+			assert.ok(result);
+			const text = result.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+			assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
+			assert.match(text, /Could not save the full output: disk full/);
+			assert.match(text, /Image annotations were omitted and could not be saved/);
+			assert.equal(text.includes("Image annotations are in the full text"), false);
+			assert.deepEqual(result.content.filter((block) => block.type === "image"), content.filter((block) => block.type === "image"));
+		});
+	}
 
 	void it("ignores a non-codemode result", async () => {
 		const files = io();

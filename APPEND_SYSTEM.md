@@ -16,7 +16,18 @@ Write the script in plain JavaScript. Pi does not transpile it, so TypeScript sy
 
 # Codemode output
 
-When a codemode return names a saved file, the rest of the output is in that file. Read it with `tools.read`, about 80 lines at a time, or search the file. `text()` of the whole file is cut again. Do not re-run the command to recover the missing middle.
+Filter, summarize, or extract fields before `text()` or `return`. Aim for at most
+6,000 printed characters total per codemode call; multiple prints share the cap.
+
+When a capped return names a saved file, recover from that file instead of rerunning
+the original command:
+- Read or search for the relevant data, then print only needed fields or a bounded
+  slice such as `text(value.slice(start, start + 6000))`.
+- `tools.read` uses line offsets and limits, not character offsets. Even one long
+  line can exceed the cap; reduce what you print rather than repeating the dump.
+- If a line exceeds the reader's 50 KiB limit, or line paging is capped again, use
+  `tools.bash` with a small Node/Python script to read the saved file and emit only
+  the needed field or character range. Advance the range offset to continue.
 
 # Web and documentation tools
 
