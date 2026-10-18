@@ -99,9 +99,10 @@ Focus detection uses CSI mode 1004 reports where the terminal supports them, wit
 
 4. **Symlinks** the repo's extension files into `~/.pi/agent/extensions/`, and prunes repo-owned symlinks whose source file left the repository. Regular files this repo does not declare — such as the model-order state `pi-model-sort` writes — are left in place.
 
-5. **Installs** JSON config files (full replacement — the repo file becomes the target file). If a source file is later removed from the repo, re-running setup removes the corresponding target:
+5. **Installs** JSON config files (full replacement — the repo file becomes the target file, written atomically). If a source file is later removed from the repo, re-running setup copies the target to `<target>.bak` and then removes it:
    - `settings.json` → `~/.pi/agent/settings.json`
    - `pi-better-openai.json` → `~/.pi/agent/extensions/pi-better-openai.json`
+   - `coralbricks.json` → `~/.pi/agent/extensions/coralbricks.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
    - `opencode-go-provider.json` → `~/.pi/agent/opencode-go-provider.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
@@ -126,6 +127,7 @@ Paths this repository does not declare are never touched, except repo-owned syml
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
 - `keybindings.json` — repo-managed keybinding overrides; unbinds the built-in commands that use `Ctrl+P` so `footer-veil` can own `Ctrl+P`
 - `mcp.json` — Pi MCP server configuration installed into `~/.pi/agent/mcp.json` (see [Codemode](#codemode))
+- `coralbricks.json` — `pi-coralbricks-provider` settings installed into `~/.pi/agent/extensions/coralbricks.json`; turns cache-optimized pricing (`X-Coral-Pricing: cache-optimized`) on by default, so `ctrl+alt+c` toggles are reset by the next `npm run setup`
 - `opencode-go-provider.json` — disables `pi-opencode-go-provider`'s native usage widget, installed into `~/.pi/agent/opencode-go-provider.json`; the footer adapter refuses to start (with one warning) while native usage is enabled
 - `pi-vcc-config.json` — pi-vcc compaction settings installed into `~/.pi/agent/pi-vcc-config.json`; compacts after 90% of the context window
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
@@ -141,6 +143,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `pi-better-openai.json`, `mcp.json`, `opencode-go-provider.json`, and `pi-vcc-config.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `pi-better-openai.json`, `coralbricks.json`, `mcp.json`, `opencode-go-provider.json`, and `pi-vcc-config.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
-If a JSON source file is removed from the repo, re-running setup deletes the corresponding target file.
+If a JSON source file is removed from the repo, re-running setup backs the target up to `<target>.bak` and deletes it. `*.bak` files are gitignored.

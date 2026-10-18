@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,67 +20,53 @@ const links = [
   { link: join(PI_DIR, "keybindings.json"), target: join(REPO_DIR, "keybindings.json") },
 ];
 
-const SETTINGS_OVERLAY = join(REPO_DIR, "settings.json");
-const PI_SETTINGS = join(PI_DIR, "settings.json");
-const BETTER_OPENAI_OVERLAY = join(REPO_DIR, "pi-better-openai.json");
-const PI_BETTER_OPENAI = join(PI_EXTENSIONS_DIR, "pi-better-openai.json");
-const OPENCODE_GO_OVERLAY = join(REPO_DIR, "opencode-go-provider.json");
-const PI_OPENCODE_GO = join(PI_DIR, "opencode-go-provider.json");
-const PI_VCC_OVERLAY = join(REPO_DIR, "pi-vcc-config.json");
-const PI_VCC_CONFIG = join(PI_DIR, "pi-vcc-config.json");
-const MCP_CONFIG_OVERLAY = join(REPO_DIR, "mcp.json");
-const PI_MCP_CONFIG = join(PI_DIR, "mcp.json");
+// JSON config files installed wholesale over their target. `preserve` names
+// runtime keys the installation owns, kept when the repo file omits them.
+const OVERLAYS = [
+  {
+    source: join(REPO_DIR, "pi-better-openai.json"),
+    target: join(PI_EXTENSIONS_DIR, "pi-better-openai.json"),
+    label: "pi-better-openai settings",
+  },
+  {
+    source: join(REPO_DIR, "coralbricks.json"),
+    target: join(PI_EXTENSIONS_DIR, "coralbricks.json"),
+    label: "coralbricks settings",
+  },
+  {
+    source: join(REPO_DIR, "opencode-go-provider.json"),
+    target: join(PI_DIR, "opencode-go-provider.json"),
+    label: "opencode-go provider settings",
+  },
+  {
+    source: join(REPO_DIR, "pi-vcc-config.json"),
+    target: join(PI_DIR, "pi-vcc-config.json"),
+    label: "pi-vcc settings",
+  },
+  {
+    source: join(REPO_DIR, "settings.json"),
+    target: join(PI_DIR, "settings.json"),
+    label: "pi settings",
+    preserve: ["deviceId"],
+  },
+  {
+    source: join(REPO_DIR, "mcp.json"),
+    target: join(PI_DIR, "mcp.json"),
+    label: "MCP config",
+  },
+];
 
-function pathIsInside(root, targetPath) {
-  const rel = relative(root, targetPath);
-  return rel === "" || (!rel.startsWith("..") && rel !== ".." && !isAbsolute(rel));
-}
+// A malformed preserved value is skipped, so reconciliation replaces it.
+const PRESERVED_KEY_GUARDS = {
+  deviceId: (value) => typeof value === "string" && value.trim() !== "",
+};
 
-function assertSafePath(path, allowedRoots = [HOME]) {
-  const resolvedPath = resolve(path);
-  const blocked = [resolve("/"), HOME, join(HOME, ".pi"), PI_DIR, REPO_DIR, EXTENSIONS_DIR].map((value) => resolve(value));
-
-  if (blocked.includes(resolvedPath)) {
-    throw new Error(`Refusing unsafe path removal: ${path}`);
+// Every managed path lives inside ~/.pi/agent; anything else is a bug.
+function assertSafePath(path) {
+  const rel = relative(PI_DIR, resolve(path));
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    throw new Error(`Refusing unsafe path write: ${path}`);
   }
-
-  if (!allowedRoots.some((root) => pathIsInside(resolve(root), resolvedPath))) {
-    throw new Error(`Refusing removal outside managed roots: ${path}`);
-  }
-}
-
-async function relink(linkPath, targetPath) {
-  assertSafePath(linkPath, [HOME]);
-
-  await mkdir(dirname(linkPath), { recursive: true });
-  await rm(linkPath, { recursive: true, force: true });
-
-  if (!existsSync(targetPath)) {
-    console.log(`skip ${linkPath}: target does not exist`);
-    return;
-  }
-
-  const targetLooksLikeFile = /\.[^/\\]+$/.test(targetPath);
-
-  if (process.platform === "win32" && targetLooksLikeFile) {
-    await mkdir(dirname(targetPath), { recursive: true });
-    await copyFile(targetPath, linkPath);
-    console.log(`copied ${targetPath} -> ${linkPath}`);
-    return;
-  }
-
-  const symlinkTarget = process.platform === "win32" ? resolve(targetPath) : targetPath;
-  const symlinkType = process.platform === "win32"
-    ? (targetLooksLikeFile ? "file" : "junction")
-    : (targetLooksLikeFile ? "file" : "dir");
-
-  await symlink(symlinkTarget, linkPath, symlinkType);
-
-  console.log(`linked ${linkPath} -> ${targetPath}`);
-}
-
-async function ensureParentDir(path) {
-  await mkdir(dirname(path), { recursive: true });
 }
 
 function isObject(value) {
@@ -90,52 +77,88 @@ async function readJsonFile(path) {
   return JSON.parse(await readFile(path, "utf-8"));
 }
 
-async function writeManagedJsonFile(path, value) {
-  assertSafePath(path, [HOME]);
-  await ensureParentDir(path);
-  await rm(path, { recursive: true, force: true });
-  await writeFile(path, JSON.stringify(value, null, 2) + "\n");
-}
+async function relink(linkPath, targetPath) {
+  assertSafePath(linkPath);
 
-async function writeManagedTextFile(path, content) {
-  assertSafePath(path, [HOME]);
-  await ensureParentDir(path);
-  await rm(path, { recursive: true, force: true });
-  await writeFile(path, content, "utf-8");
-}
+  await mkdir(dirname(linkPath), { recursive: true });
+  await rm(linkPath, { recursive: true, force: true });
 
-async function installJsonConfig(sourcePath, targetPath, label) {
-  assertSafePath(targetPath, [HOME]);
-  if (!existsSync(sourcePath)) {
-    await rm(targetPath, { recursive: true, force: true });
-    console.log(`removed ${label}: source not found at ${sourcePath}`);
+  if (!existsSync(targetPath)) {
+    console.log(`skip ${linkPath}: target does not exist`);
     return;
   }
 
-  const value = await readJsonFile(sourcePath);
-  if (!isObject(value)) {
-    throw new Error(`${label} must be a JSON object: ${sourcePath}`);
+  await symlink(targetPath, linkPath);
+
+  console.log(`linked ${linkPath} -> ${targetPath}`);
+}
+
+// Write through a sibling temp file so the target is never absent.
+async function writeAtomic(path, content) {
+  assertSafePath(path);
+  await mkdir(dirname(path), { recursive: true });
+
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, content, { mode: 0o644 });
+    await rename(temporary, path);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
+async function writeManagedJsonFile(path, value) {
+  await writeAtomic(path, JSON.stringify(value, null, 2) + "\n");
+}
+
+// Back up before removing: an accidental source removal stays recoverable.
+async function removeWithBackup(target, label, reason) {
+  assertSafePath(target);
+
+  if (existsSync(target)) {
+    const backup = `${target}.bak`;
+    await copyFile(target, backup);
+    console.log(`backed up ${backup}`);
   }
 
-  // Pi's ChatGPT login uses a stable installation identity, not a preference.
-  // Keep it local while replacing every other setting from the repository.
-  if (targetPath === PI_SETTINGS && !Object.hasOwn(value, "deviceId")) {
+  await rm(target, { recursive: true, force: true });
+  console.log(`removed ${label}: ${reason}`);
+}
+
+async function installJsonConfig({ source, target, label, preserve = [] }) {
+  assertSafePath(target);
+
+  if (!existsSync(source)) {
+    await removeWithBackup(target, label, `source not found at ${source}`);
+    return;
+  }
+
+  const value = await readJsonFile(source);
+  if (!isObject(value)) {
+    throw new Error(`${label} must be a JSON object: ${source}`);
+  }
+
+  if (preserve.length > 0) {
+    let current;
     try {
-      const current = await readJsonFile(targetPath);
-      if (typeof current?.deviceId === "string" && current.deviceId.trim()) {
-        value.deviceId = current.deviceId;
-      }
+      current = await readJsonFile(target);
     } catch (error) {
       if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) throw error;
     }
+
+    for (const key of preserve) {
+      if (Object.hasOwn(value, key)) continue;
+      const candidate = current?.[key];
+      if (PRESERVED_KEY_GUARDS[key]?.(candidate)) value[key] = candidate;
+    }
   }
 
-  await writeManagedJsonFile(targetPath, value);
-  console.log(`wrote ${label} to ${targetPath}`);
+  await writeManagedJsonFile(target, value);
+  console.log(`wrote ${label} to ${target}`);
 }
 
 async function syncDirectoryLinks(sourceDir, targetDir) {
-  assertSafePath(targetDir, [PI_DIR]);
+  assertSafePath(targetDir);
   await mkdir(targetDir, { recursive: true });
 
   const repoEntries = existsSync(sourceDir)
@@ -149,7 +172,7 @@ async function syncDirectoryLinks(sourceDir, targetDir) {
     if (declared.has(entry.name) || !entry.isSymbolicLink()) continue;
 
     const stalePath = join(targetDir, entry.name);
-    assertSafePath(stalePath, [PI_DIR]);
+    assertSafePath(stalePath);
     await rm(stalePath, { recursive: true, force: true });
     console.log(`removed stale link ${stalePath}`);
   }
@@ -158,27 +181,23 @@ async function syncDirectoryLinks(sourceDir, targetDir) {
     await relink(join(targetDir, entry.name), join(sourceDir, entry.name));
   }
 }
+
 async function main() {
   const appendSystem = await readFile(APPEND_SYSTEM_SOURCE, "utf-8");
-
-  if (!existsSync(PI_DIR)) {
-    await mkdir(PI_DIR, { recursive: true });
-  }
 
   for (const { link, target } of links) {
     await relink(link, target);
   }
 
-  await writeManagedTextFile(PI_APPEND_SYSTEM, appendSystem);
+  await writeAtomic(PI_APPEND_SYSTEM, appendSystem);
   console.log(`wrote APPEND_SYSTEM.md to ${PI_APPEND_SYSTEM}`);
 
   await syncDirectoryLinks(EXTENSIONS_DIR, PI_EXTENSIONS_DIR);
 
-  await installJsonConfig(BETTER_OPENAI_OVERLAY, PI_BETTER_OPENAI, "pi-better-openai settings");
-  await installJsonConfig(OPENCODE_GO_OVERLAY, PI_OPENCODE_GO, "opencode-go provider settings");
-  await installJsonConfig(PI_VCC_OVERLAY, PI_VCC_CONFIG, "pi-vcc settings");
-  await installJsonConfig(SETTINGS_OVERLAY, PI_SETTINGS, "pi settings");
-  await installJsonConfig(MCP_CONFIG_OVERLAY, PI_MCP_CONFIG, "MCP config");
+  for (const overlay of OVERLAYS) {
+    await installJsonConfig(overlay);
+  }
+
   console.log("bootstrap complete");
 }
 

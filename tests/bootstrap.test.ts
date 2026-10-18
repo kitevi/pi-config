@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, lstat, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, lstat, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -12,14 +12,18 @@ const execFileAsync = promisify(execFile);
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const bootstrapPath = join(repoRoot, "bootstrap.mjs");
 
+function bootstrapEnv(home: string): NodeJS.ProcessEnv {
+	return {
+		...process.env,
+		HOME: home,
+		USERPROFILE: home,
+	};
+}
+
 async function runBootstrap(home: string): Promise<void> {
-	await execFileAsync(process.execPath, [bootstrapPath, "--light"], {
+	await execFileAsync(process.execPath, [bootstrapPath], {
 		cwd: repoRoot,
-		env: {
-			...process.env,
-			HOME: home,
-			USERPROFILE: home,
-		},
+		env: bootstrapEnv(home),
 		timeout: 30_000,
 	});
 }
@@ -178,6 +182,26 @@ void describe("bootstrap opencode-go provider settings", () => {
 
 			await runBootstrap(home);
 			assert.equal(await readFile(configPath, "utf8"), firstOutput);
+		} finally {
+			await rm(home, { recursive: true, force: true });
+		}
+	});
+});
+
+void describe("bootstrap managed writes", () => {
+	void it("writes the declared settings and leaves no temporary siblings", async () => {
+		const home = await mkdtemp(join(tmpdir(), "pi-config-atomic-"));
+
+		try {
+			await runBootstrap(home);
+
+			const agentDir = join(home, ".pi", "agent");
+			const repo = JSON.parse(await readFile(join(repoRoot, "settings.json"), "utf8"));
+			const installed = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8"));
+
+			assert.deepEqual(installed, repo);
+			assert.deepEqual((await readdir(agentDir)).filter((name) => name.endsWith(".tmp")), []);
+			assert.deepEqual((await readdir(join(agentDir, "extensions"))).filter((name) => name.endsWith(".tmp")), []);
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}

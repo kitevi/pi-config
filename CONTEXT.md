@@ -62,6 +62,8 @@ at runtime (`settings.json`). Reconciliation replaces preferences with the
 repository file, so local preference changes do not survive; declare them in
 the repo instead. Pi's
 runtime-generated installation `deviceId` is preserved, not configured here.
+Overlays are written atomically, and a target whose source left the repository is
+copied to `<target>.bak` before removal.
 - **Symlink** is used for static assets that pi only reads: `prompts/` and
 `skills/` as whole directories, and each file in `extensions/` individually.
 Pi writes runtime state into `extensions/`, so those files stay put.
@@ -77,7 +79,9 @@ model-facing tool (`codemode.mode` is `only` in `settings.json`). Pi's
 tool-search extension stays disabled. `extensions/codemode-output-cap.ts`
 caps that codemode return at 10,000 characters, with the full-text path in the omission hole. `pi-vcc-config.json` is installed
 into `~/.pi/agent/pi-vcc-config.json` and compacts the session after context use
-passes 90% of the model context window.
+passes 90% of the model context window. `coralbricks.json` is installed
+into `~/.pi/agent/extensions/coralbricks.json` and sends
+`X-Coral-Pricing: cache-optimized` on every CoralBricks request.
 - **API keys** for custom providers live outside this repo (Bitwarden). This repo
 manages *configuration*, not *credentials*.
 

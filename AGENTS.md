@@ -15,7 +15,8 @@ Deterministic, git-managed configuration for the pi coding agent (the [pi-mono](
 - `settings.json` → installed into `~/.pi/agent/settings.json`; replaces preferences but preserves the local runtime `deviceId`
 - `APPEND_SYSTEM.md`, `opencode-go-provider.json`, `pi-vcc-config.json` → installed wholesale into `~/.pi/agent/`
 - `mcp.json` → installed wholesale into `~/.pi/agent/mcp.json` for Pi's built-in MCP
-- `pi-better-openai.json` → installed wholesale into `~/.pi/agent/extensions/`
+- `pi-better-openai.json`, `coralbricks.json` → installed wholesale into `~/.pi/agent/extensions/`
+- `coralbricks.json` turns the CoralBricks provider's cache-optimized pricing (`X-Coral-Pricing: cache-optimized`) on by default; the provider's runtime `ctrl+alt+c` toggle is overwritten on the next reconciliation
 - `extensions/`, `prompts/`, `skills/`, `reminders/`, `keybindings.json` → symlinked into `~/.pi/agent/`
 - `bootstrap.mjs` — the reconciler that performs those steps
 

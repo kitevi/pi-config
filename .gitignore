@@ -20,6 +20,9 @@ bun.lockb
 .npm
 .eslintcache
 
+# Reconciliation backups of removed overlay targets
+*.bak
+
 # Test coverage
 coverage
 *.lcov
