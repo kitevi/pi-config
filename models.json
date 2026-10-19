@@ -1,10 +1,10 @@
 {
   "$schema": "https://pi.dev/schemas/models.schema.json",
   "providers": {
-    "open-design": {
+    "opendesign": {
       "baseUrl": "https://amr-link.open-design.ai/v1",
       "api": "openai-completions",
-      "apiKey": "${OPEN_DESIGN_API_KEY}",
+      "apiKey": "${OPENDESIGN_API_KEY}",
       "models": [
         {
           "id": "deepseek-v4.1-flash",

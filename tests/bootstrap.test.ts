@@ -168,7 +168,7 @@ void describe("bootstrap pi-vcc settings", () => {
 });
 
 void describe("bootstrap model config", () => {
-	void it("installs models.json declaring the open-design provider", async () => {
+	void it("installs models.json declaring the opendesign provider", async () => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-models-"));
 
 		try {
@@ -180,11 +180,11 @@ void describe("bootstrap model config", () => {
 					{ baseUrl?: string; api?: string; apiKey?: string; models?: { id?: string }[] }
 				>;
 			};
-			const provider = installed.providers?.["open-design"];
+			const provider = installed.providers?.["opendesign"];
 
 			assert.equal(provider?.baseUrl, "https://amr-link.open-design.ai/v1");
 			assert.equal(provider?.api, "openai-completions");
-			assert.match(provider?.apiKey ?? "", /^\$\{OPEN_DESIGN_API_KEY\}$/);
+			assert.match(provider?.apiKey ?? "", /^\$\{OPENDESIGN_API_KEY\}$/);
 			assert.equal(provider?.models?.[0]?.id, "deepseek-v4.1-flash");
 		} finally {
 			await rm(home, { recursive: true, force: true });
