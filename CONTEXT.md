@@ -112,8 +112,7 @@ manages *configuration*, not *credentials*.
 - "Prompt" was historically used for both **Skill** definitions and the
   `prompts/` directory. Resolved: **Skills** are behavioral task guidance
   (markdown instructions), while `prompts/` holds prompt templates — Markdown
-  files that become `/` commands, such as `/branch-from-task` and
-  `/context-revalidation`. The installed `~/.pi/agent/APPEND_SYSTEM.md` is a copy of the repository-owned file and serves as the de facto system prompt overlay.
+  files that become `/` commands, such as `/context-revalidation`. The installed `~/.pi/agent/APPEND_SYSTEM.md` is a copy of the repository-owned file and serves as the de facto system prompt overlay.
 - "Bootstrap" is sometimes used casually for "first-time setup." Resolved:
   **Reconciliation** is the correct term — the script is idempotent and meant to
   be run repeatedly, not just once.
