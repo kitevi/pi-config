@@ -177,7 +177,12 @@ void describe("bootstrap model config", () => {
 			const installed = JSON.parse(await readFile(join(home, ".pi", "agent", "models.json"), "utf8")) as {
 				providers?: Record<
 					string,
-					{ baseUrl?: string; api?: string; apiKey?: string; models?: { id?: string }[] }
+					{
+						baseUrl?: string;
+						api?: string;
+						apiKey?: string;
+						models?: { id?: string; contextWindow?: number; maxTokens?: number }[];
+					}
 				>;
 			};
 			const provider = installed.providers?.["opendesign"];
@@ -186,6 +191,8 @@ void describe("bootstrap model config", () => {
 			assert.equal(provider?.api, "openai-completions");
 			assert.match(provider?.apiKey ?? "", /^\$\{OPENDESIGN_API_KEY\}$/);
 			assert.equal(provider?.models?.[0]?.id, "deepseek-v4.1-flash");
+			assert.equal(provider?.models?.[0]?.contextWindow, 328000);
+			assert.equal(provider?.models?.[0]?.maxTokens, 128000);
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}

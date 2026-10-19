@@ -12,7 +12,7 @@
           "reasoning": true,
           "thinkingLevelMap": {
             "off": "none",
-            "minimal": null,
+            "minimal": "minimal",
             "low": "low",
             "medium": null,
             "high": "high",
@@ -20,8 +20,11 @@
             "max": "max"
           },
           "input": ["text", "image"],
-          "contextWindow": 1048576,
-          "maxTokens": 943718
+          "contextWindow": 328000,
+          "maxTokens": 128000,
+          "compat": {
+            "thinkingFormat": "openrouter"
+          }
         }
       ]
     }
