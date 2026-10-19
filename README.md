@@ -119,6 +119,7 @@ Paths this repository does not declare are never touched, except repo-owned syml
   - `extensions/footer-veil.ts` — `Ctrl+P` footer veil for model info and provider usage widgets
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/codemode-output-cap.ts` — caps the model-facing codemode return at 10,000 characters and spills the complete return to one temp file, with the path in the omission hole
+  - `extensions/disable-opencode-zen.ts` — replaces the built-in `opencode` provider's models with an empty list, so `/model` and `pi --list-models` drop OpenCode Zen while `opencode-go` keeps `OPENCODE_API_KEY`
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
 - `skills/` — pi skills
 - `reminders/` — global reminder definitions for `pi-system-reminders`; `hbm-companion.ts` points to the companion `.hbm.xml` mapping when a Hibernate-mapped Java entity is read
