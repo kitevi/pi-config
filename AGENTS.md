@@ -16,6 +16,7 @@ Deterministic, git-managed configuration for the pi coding agent (the [pi-mono](
 - `APPEND_SYSTEM.md`, `pi-vcc-config.json` → installed wholesale into `~/.pi/agent/`
 - `mcp.json` → installed wholesale into `~/.pi/agent/mcp.json` for Pi's built-in MCP
 - `models.json` → installed wholesale into `~/.pi/agent/models.json`; declares the `opendesign` (`amr-link`) provider, whose key is read from `$OPENDESIGN_API_KEY` at runtime and never stored here
+- Adding or changing an `opendesign` model follows `docs/opendesign.md`: record the gateway's `context_budget` and `output_budget`, never a catalog's `context_limit`
 - `pi-better-openai.json`, `coralbricks.json` → installed wholesale into `~/.pi/agent/extensions/`
 - `coralbricks.json` turns the CoralBricks provider's cache-optimized pricing (`X-Coral-Pricing: cache-optimized`) on by default; the provider's runtime `ctrl+alt+c` toggle is overwritten on the next reconciliation
 - `extensions/`, `prompts/`, `skills/`, `reminders/`, `keybindings.json` → symlinked into `~/.pi/agent/`

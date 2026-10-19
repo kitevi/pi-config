@@ -127,8 +127,10 @@ Paths this repository does not declare are never touched, except repo-owned syml
 - `keybindings.json` — repo-managed keybinding overrides; unbinds the built-in commands that use `Ctrl+P` so `footer-veil` can own `Ctrl+P`
 - `mcp.json` — Pi MCP server configuration installed into `~/.pi/agent/mcp.json` (see [Codemode](#codemode))
 - `coralbricks.json` — `pi-coralbricks-provider` settings installed into `~/.pi/agent/extensions/coralbricks.json`; turns cache-optimized pricing (`X-Coral-Pricing: cache-optimized`) on by default, so `ctrl+alt+c` toggles are reset by the next `npm run setup`
-- `models.json` — `opendesign` provider (`amr-link`): Chat Completions against `https://amr-link.open-design.ai/v1`, keyed by `$OPENDESIGN_API_KEY`, exposing the DeepSeek V4.1 Flash 1017 checkpoint as `deepseek-v4.1-flash`
+- `models.json` — `opendesign` provider (`amr-link`): Chat Completions against `https://amr-link.open-design.ai/v1`, keyed by `$OPENDESIGN_API_KEY`, exposing the DeepSeek V4.1 Flash 1017 checkpoint as `deepseek-v4.1-flash` (see [`docs/opendesign.md`](docs/opendesign.md))
 - `pi-vcc-config.json` — pi-vcc compaction settings installed into `~/.pi/agent/pi-vcc-config.json`; compacts after 90% of the context window
+- `docs/` — provider runbooks
+  - `docs/opendesign.md` — how to add or change an `opendesign` model: field mapping, the `context_budget` trap, reasoning compat, and the missing-provider diagnosis
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
 The bootstrap script is plain Node.js; the pi extensions in `extensions/` are TypeScript.
