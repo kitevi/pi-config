@@ -104,7 +104,7 @@ Focus detection uses CSI mode 1004 reports where the terminal supports them, wit
    - `pi-better-openai.json` → `~/.pi/agent/extensions/pi-better-openai.json`
    - `coralbricks.json` → `~/.pi/agent/extensions/coralbricks.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
-   - `opencode-go-provider.json` → `~/.pi/agent/opencode-go-provider.json`
+   - `models.json` → `~/.pi/agent/models.json`
    - `pi-vcc-config.json` → `~/.pi/agent/pi-vcc-config.json`
 
 Paths this repository does not declare are never touched, except repo-owned symlinks inside `~/.pi/agent/extensions/`, which are pruned when their source file leaves the repository. Leftovers from removed packages, renamed configuration, or earlier bootstrap versions otherwise stay on disk after setup. Delete `~/.pi`, rerun setup, and reload Pi for a large configuration change (`AGENTS.md` rule 5).
@@ -120,7 +120,6 @@ Paths this repository does not declare are never touched, except repo-owned syml
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/codemode-output-cap.ts` — caps the model-facing codemode return at 10,000 characters and spills the complete return to one temp file, with the path in the omission hole
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
-  - `extensions/opencode-go-usage.ts` — single-account OpenCode Go footer: uses the installed provider's `UsageController.line()` for 5h/7d/30d remaining budgets, reset countdowns, and stale warnings. Only `config.ts` and `usage-controller.ts` are imported; auth, polling, parsing, and countdown formatting stay upstream. The adapter places each reset countdown beside its percentage. `opencode-go-provider.json` disables the native widget to avoid a second poller. Run `npm test -- tests/opencode-go-usage.integration.test.ts` when updating the provider.
 - `skills/` — pi skills
 - `reminders/` — global reminder definitions for `pi-system-reminders`; `hbm-companion.ts` points to the companion `.hbm.xml` mapping when a Hibernate-mapped Java entity is read
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
@@ -128,7 +127,7 @@ Paths this repository does not declare are never touched, except repo-owned syml
 - `keybindings.json` — repo-managed keybinding overrides; unbinds the built-in commands that use `Ctrl+P` so `footer-veil` can own `Ctrl+P`
 - `mcp.json` — Pi MCP server configuration installed into `~/.pi/agent/mcp.json` (see [Codemode](#codemode))
 - `coralbricks.json` — `pi-coralbricks-provider` settings installed into `~/.pi/agent/extensions/coralbricks.json`; turns cache-optimized pricing (`X-Coral-Pricing: cache-optimized`) on by default, so `ctrl+alt+c` toggles are reset by the next `npm run setup`
-- `opencode-go-provider.json` — disables `pi-opencode-go-provider`'s native usage widget, installed into `~/.pi/agent/opencode-go-provider.json`; the footer adapter refuses to start (with one warning) while native usage is enabled
+- `models.json` — Open Design (`amr-link`) provider: Chat Completions against `https://amr-link.open-design.ai/v1`, keyed by `$OPEN_DESIGN_API_KEY`, exposing the DeepSeek V4.1 Flash 1017 checkpoint as `deepseek-v4.1-flash`
 - `pi-vcc-config.json` — pi-vcc compaction settings installed into `~/.pi/agent/pi-vcc-config.json`; compacts after 90% of the context window
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
@@ -143,6 +142,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `pi-better-openai.json`, `coralbricks.json`, `mcp.json`, `opencode-go-provider.json`, and `pi-vcc-config.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `pi-better-openai.json`, `coralbricks.json`, `mcp.json`, `models.json`, and `pi-vcc-config.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup backs the target up to `<target>.bak` and deletes it. `*.bak` files are gitignored.

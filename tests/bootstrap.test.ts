@@ -167,21 +167,25 @@ void describe("bootstrap pi-vcc settings", () => {
 	});
 });
 
-void describe("bootstrap opencode-go provider settings", () => {
-	void it("reconciles native usage off and stays idempotent", async () => {
-		const home = await mkdtemp(join(tmpdir(), "pi-config-opencode-go-"));
+void describe("bootstrap model config", () => {
+	void it("installs models.json declaring the open-design provider", async () => {
+		const home = await mkdtemp(join(tmpdir(), "pi-config-models-"));
 
 		try {
 			await runBootstrap(home);
 
-			const configPath = join(home, ".pi", "agent", "opencode-go-provider.json");
-			const firstOutput = await readFile(configPath, "utf8");
-			const parsed = JSON.parse(firstOutput) as { usage?: { enabled?: boolean } };
+			const installed = JSON.parse(await readFile(join(home, ".pi", "agent", "models.json"), "utf8")) as {
+				providers?: Record<
+					string,
+					{ baseUrl?: string; api?: string; apiKey?: string; models?: { id?: string }[] }
+				>;
+			};
+			const provider = installed.providers?.["open-design"];
 
-			assert.equal(parsed.usage?.enabled, false);
-
-			await runBootstrap(home);
-			assert.equal(await readFile(configPath, "utf8"), firstOutput);
+			assert.equal(provider?.baseUrl, "https://amr-link.open-design.ai/v1");
+			assert.equal(provider?.api, "openai-completions");
+			assert.match(provider?.apiKey ?? "", /^\$\{OPEN_DESIGN_API_KEY\}$/);
+			assert.equal(provider?.models?.[0]?.id, "deepseek-v4.1-flash");
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}

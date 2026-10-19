@@ -34,14 +34,14 @@ const OVERLAYS = [
     label: "coralbricks settings",
   },
   {
-    source: join(REPO_DIR, "opencode-go-provider.json"),
-    target: join(PI_DIR, "opencode-go-provider.json"),
-    label: "opencode-go provider settings",
-  },
-  {
     source: join(REPO_DIR, "pi-vcc-config.json"),
     target: join(PI_DIR, "pi-vcc-config.json"),
     label: "pi-vcc settings",
+  },
+  {
+    source: join(REPO_DIR, "models.json"),
+    target: join(PI_DIR, "models.json"),
+    label: "model config",
   },
   {
     source: join(REPO_DIR, "settings.json"),
