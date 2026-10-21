@@ -90,6 +90,7 @@ void describe("skill guide config", () => {
 void describe("skill guide entries", () => {
 	void it.each([
 		{ skill: "plain", summary: "Say that plainly." },
+		{ skill: "plan", summary: "Feature needs a plan first." },
 		{ skill: "principle-fix-root-causes", summary: "Fix causes, not symptoms." },
 		{ skill: "show-me", summary: "Explain with visuals." },
 		{ skill: "tdd", summary: "Feature work, test-first." },

@@ -30,11 +30,11 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 		grilling: "Want your idea challenged.",
 		handoff: "Passing work to next session.",
 		plain: "Say that plainly.",
+		plan: "Feature needs a plan first.",
 		"principle-fix-root-causes": "Fix causes, not symptoms.",
 		"review-animations": "Auditing UI motion & feel.",
 		"show-me": "Explain with visuals.",
 		tdd: "Feature work, test-first.",
-		"tech-spec": "Feature needs a plan first.",
 		"test-audit": "Which tests to cut.",
 	},
 };
