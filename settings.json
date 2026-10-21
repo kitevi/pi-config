@@ -39,8 +39,16 @@
       "source": "https://github.com/mattpocock/skills",
       "skills": [
         "skills/productivity/grilling",
-        "skills/productivity/writing-for-agents",
         "skills/productivity/handoff"
+      ],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
+    },
+    {
+      "source": "https://github.com/getsentry/skills",
+      "skills": [
+        "skills/agents-md"
       ],
       "extensions": [],
       "prompts": [],
