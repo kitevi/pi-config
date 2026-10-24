@@ -154,6 +154,21 @@ function cappedContent(content: CapContentBlock[], path?: string, notice = ""): 
 	return [...(header ? [header] : []), { type: "text", text: `${preview}${notice}` }, ...images];
 }
 
+/**
+ * Swap Pi's truncated preview for the complete text in its spill, so the cut and the omission
+ * count describe the advertised file. Returns undefined when the preview has an unknown shape.
+ */
+function withNativeText(content: CapContentBlock[], nativePath: string, nativeText: string): CapContentBlock[] | undefined {
+	const hint = `\n\n[Full output: ${nativePath} (read with offset/limit)]`;
+	const index = content.findIndex((block) => block.type === "text" && block.text.includes(hint));
+	const block = content[index];
+	if (block?.type !== "text") return undefined;
+	const hintAt = block.text.lastIndexOf(hint);
+	// Image annotations follow the hint; keep them beside their images.
+	const rest = block.text.slice(hintAt + hint.length);
+	return content.with(index, { type: "text", text: `${nativeText}${rest}` });
+}
+
 function cappedResult(event: CapEvent, path: string, wroteFile: boolean, notice = ""): CapResult {
 	return {
 		content: cappedContent(event.content, path, notice),
@@ -171,19 +186,34 @@ export async function writeCapFile(text: string): Promise<string> {
 export async function applyCodemodeOutputCap(event: CapEvent, io: CapIo): Promise<CapResult | undefined> {
 	if (event.toolName !== "codemode" || event.parentToolCallId !== undefined) return undefined;
 
-	const full = joinedText(event.content);
-	if (full.length <= CODEMODE_OUTPUT_MAX_CHARS) return undefined;
+	if (joinedText(event.content).length <= CODEMODE_OUTPUT_MAX_CHARS) return undefined;
 
 	// Pi writes its text spill before adding image-path annotations.
 	const nativePath = fullOutputPathOf(event.details);
+	let nativeText: string | undefined;
+	let readError: unknown;
+	if (nativePath) {
+		try {
+			nativeText = await io.readFile(nativePath);
+		} catch (error) {
+			// A text-only return keeps Pi's preview, which still names the native spill.
+			readError = error;
+		}
+	}
+	const content = nativePath && nativeText !== undefined
+		? withNativeText(event.content, nativePath, nativeText)
+		: undefined;
+	if (content) event = { ...event, content };
 	let path = otherBlocks(event.content).length === 0 ? nativePath : undefined;
 	let wroteFile = false;
 	if (!path) {
 		try {
-			const spillText = nativePath
-				? `${await io.readFile(nativePath)}\n\n[Pi return preview and image paths]\n${full}`
-				: full;
-			path = await io.writeFile(spillText);
+			if (readError !== undefined) throw readError;
+			const full = joinedText(event.content);
+			// An unrecognized preview cannot be swapped, so the spill keeps both texts.
+			path = await io.writeFile(nativeText !== undefined && !content
+				? `${nativeText}\n\n[Pi return preview and image paths]\n${full}`
+				: full);
 			wroteFile = true;
 		} catch (error) {
 			const reason = error instanceof Error ? error.message : String(error);

@@ -334,7 +334,11 @@ void describe("codemode-output-cap extension", () => {
 				assert.deepEqual(result.content.filter((block) => block.type === "image"), [firstImage, secondImage]);
 				const saved = await readFile(savedPath, "utf8");
 				assert.ok(saved.includes(flag), "the advertised full text must contain the omitted flag");
-				assert.ok(saved.startsWith(nativeText), "the complete native output must be preserved");
+				assert.ok(saved.includes(nativeText), "the complete native output must be preserved");
+				assert.equal(saved.includes("[Full output:"), false, "Pi's truncated preview is replaced by the native text");
+				assert.equal(text.includes("[Full output:"), false);
+				const omitted = Number(text.match(/(\d+) characters omitted/)?.[1]);
+				assert.ok(omitted > nativeText.length - CODEMODE_OUTPUT_MAX_CHARS, "the count describes the native text, not Pi's preview");
 				assert.ok(saved.includes(firstPath));
 				assert.ok(saved.includes(secondPath));
 				assert.equal(await readFile(nativePath, "utf8"), nativeText);
@@ -342,6 +346,46 @@ void describe("codemode-output-cap extension", () => {
 				if (savedPath !== nativePath) await rm(savedPath);
 			}
 		});
+	});
+
+	void it("cuts a text-only return from the native spill so the count describes that file", async () => {
+		const nativeText = `HEAD${"x".repeat(60_000)}TAIL`;
+		await withNativeSpill(nativeText, async (nativePath) => {
+			const header = { type: "text" as const, text: "Script completed\nWall time 0.1 seconds\nOutput:\n" };
+			const preview = `Warning: truncated output (original token count: 15002)\nTotal output lines: 1\n\nHEAD${"x".repeat(19_996)}…5001 tokens truncated…${"x".repeat(19_996)}TAIL\n\n[Full output: ${nativePath} (read with offset/limit)]`;
+			const result = await codemodeResultHandler()(textEvent(preview, {
+				content: [header, { type: "text", text: preview }],
+				details: { fullOutputPath: nativePath, calls: [] },
+			}));
+
+			assert.ok(result);
+			assert.equal(result.details, undefined, "the native spill is reused");
+			assert.deepEqual(result.content[0], header);
+			const body = result.content[1];
+			assert.equal(body?.type, "text");
+			if (body?.type !== "text") return;
+			assert.equal(body.text.includes("tokens truncated"), false);
+			assert.equal(body.text.includes("[Full output:"), false);
+			assertOmissionMarker(body.text, nativePath, nativeText);
+		});
+	});
+
+	void it("keeps Pi's preview when the native spill cannot be read", async () => {
+		const nativePath = "/tmp/pi-codemode-missing.txt";
+		const preview = `Warning: truncated output\n\nHEAD${"x".repeat(20_000)}TAIL\n\n[Full output: ${nativePath} (read with offset/limit)]`;
+		const files = io({ readFile: async () => { throw new Error("gone"); } });
+		const result = await applyCodemodeOutputCap(textEvent(preview, {
+			details: { fullOutputPath: nativePath },
+		}), files);
+
+		assert.ok(result);
+		assert.deepEqual(files.writes, []);
+		const text = result.content[0];
+		assert.equal(text?.type, "text");
+		if (text?.type !== "text") return;
+		assert.ok(text.text.length <= CODEMODE_OUTPUT_MAX_CHARS);
+		assert.ok(text.text.startsWith("Warning: truncated output\n\nHEAD"));
+		assert.ok(text.text.includes(`characters omitted. Full text: ${nativePath}`));
 	});
 
 	void it("caps a codemode tool result", async () => {
