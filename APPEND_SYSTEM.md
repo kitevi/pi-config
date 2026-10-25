@@ -43,10 +43,10 @@ For that shell fallback, use `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, li
 
 # Mermaid diagrams
 
-Pi renders mermaid as terminal box art through `grok-mermaid`, which draws only `flowchart`/`graph`, `stateDiagram`, `classDiagram`, `erDiagram`, and `sequenceDiagram`.
+Pi draws mermaid as terminal box art through `grok-mermaid`, which supports only `flowchart`/`graph`, `stateDiagram`, `classDiagram`, `erDiagram`, and `sequenceDiagram`; any other type shows as plain source.
 
-- Stay under 80 columns: `flowchart TD` with short labels over `flowchart LR` with long ones. A wide diagram parses cleanly yet falls back to framed source, flashing as art during streaming before it breaks, which means too wide rather than a syntax error.
-- Quote any label holding `()`, `<>`, `/`, `.`, or `<br>`: `A["foo(bar)<br>baz"]`, written `<br>` and never `<br/>`.
-- Labels wrap at 24 columns over up to 4 lines, edge labels truncate at 28, so shorten labels instead of trusting the wrap.
-- Emit every mermaid fence at column 0, never indented inside a list item or blockquote: pi renders only top-level mermaid blocks, so a nested one stays plain fenced source even when the diagram is valid.
-- `sequenceDiagram` width tracks its longest message text, not participant names — keep messages short or the laid-out width exceeds the terminal and falls back to source.
+- Tag the fence ```` ```mermaid ```` and put it at column 0, outside lists and blockquotes: pi renders only top-level code blocks whose language tag is `mermaid`.
+- Keep the drawing under about 80 columns: you cannot see the pane width, and a diagram wider than the pane shows as plain source. Each node in a flowchart row costs its label width plus about 8 columns, so switch to `flowchart TD` before a row reaches that.
+- Labels wrap at 24 columns over at most 4 lines and edge labels cut off at 28, so write short labels; `<br>` renders as a space, not a line break.
+- `sequenceDiagram` width grows with its longest message text, so keep messages short.
+- Quote labels holding parentheses, as in `A["foo(bar)"]`: pi draws them either way, but standard Mermaid rejects them unquoted.
