@@ -147,7 +147,7 @@ void describe("bootstrap MCP config", () => {
 });
 
 void describe("bootstrap pi-vcc settings", () => {
-	void it("compacts after 90 percent of the context window", async () => {
+	void it("lets pi-vcc own compaction", async () => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-vcc-"));
 
 		try {
@@ -156,11 +156,9 @@ void describe("bootstrap pi-vcc settings", () => {
 			const configPath = join(home, ".pi", "agent", "pi-vcc-config.json");
 			const parsed = JSON.parse(await readFile(configPath, "utf8")) as {
 				overrideDefaultCompaction?: boolean;
-				globalThreshold?: { compactPercent?: number };
 			};
 
-			assert.equal(parsed.overrideDefaultCompaction, true);
-			assert.equal(parsed.globalThreshold?.compactPercent, 90);
+			assert.deepEqual(parsed, { overrideDefaultCompaction: true });
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}

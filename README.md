@@ -80,7 +80,7 @@ Focus detection uses CSI mode 1004 reports where the terminal supports them, wit
 
 ## Codemode
 
-`settings.json` sets `codemode.mode` to `only` and enables `codemode`, `grep`, `find`, and `ls` beside the default `read`, `bash`, `edit`, and `write` tools. The model reaches those tools through one codemode script. Pi's `tool-search` extension stays disabled. MCP servers in `mcp.json` are hidden except the Context7, TinyFish, and Exa tools scripts call. `extensions/codemode-output-cap.ts` keeps the model-facing codemode return to 10,000 characters: a longer return is written once to a private temp file, or Pi's existing spill is reused, and the visible text keeps the start and the end with that path in the omission hole, inside the budget. `npm:@monotykamary/pi-vcc` replaces Pi's summarizer: `pi-vcc-config.json` compacts when context use passes 90% of the model context window.
+`settings.json` sets `codemode.mode` to `only` and enables `codemode`, `grep`, `find`, and `ls` beside the default `read`, `bash`, `edit`, and `write` tools. The model reaches those tools through one codemode script. Pi's `tool-search` extension stays disabled. MCP servers in `mcp.json` are hidden except the Context7, TinyFish, and Exa tools scripts call. `extensions/codemode-output-cap.ts` keeps the model-facing codemode return to 10,000 characters: a longer return is written once to a private temp file, or Pi's existing spill is reused, and the visible text keeps the start and the end with that path in the omission hole, inside the budget. `npm:@sting8k/pi-vcc` replaces Pi's summarizer with an algorithmic one (`pi-vcc-config.json`). `extensions/settle-compact.ts` compacts once the agent settles with context use at or above 90% of the model window, so compaction lands between tasks; Pi's own threshold (`contextWindow - compaction.reserveTokens`) stays as the mid-run safety net.
 
 
 ## What `npm run setup` does
@@ -121,6 +121,7 @@ Paths this repository does not declare are never touched, except repo-owned syml
   - `extensions/codemode-output-cap.ts` — caps the model-facing codemode return at 10,000 characters and spills the complete return to one temp file, with the path in the omission hole
   - `extensions/disable-opencode-zen.ts` — replaces the built-in `opencode` provider's models with an empty list, so `/model` and `pi --list-models` drop OpenCode Zen while `opencode-go` keeps `OPENCODE_API_KEY`
   - `extensions/xai-quota-guard.ts` — hides pi-grok's `x_search` tool, and on `xai-oauth` models refuses prompts and aborts running loops once SuperGrok weekly usage reaches 65% (`QUOTA_LIMIT_PERCENT`), so other Grok clients keep the rest; warns and lets turns through when the unofficial billing endpoint cannot be read
+  - `extensions/settle-compact.ts` — compacts once the agent settles with context use at or above 90% (`SETTLE_COMPACT_PERCENT`); skips aborted runs and runs with queued messages
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
 - `skills/` — pi skills
 - `reminders/` — global reminder definitions for `pi-system-reminders`; `hbm-companion.ts` points to the companion `.hbm.xml` mapping when a Hibernate-mapped Java entity is read
@@ -130,7 +131,7 @@ Paths this repository does not declare are never touched, except repo-owned syml
 - `mcp.json` — Pi MCP server configuration installed into `~/.pi/agent/mcp.json` (see [Codemode](#codemode))
 - `coralbricks.json` — `pi-coralbricks-provider` settings installed into `~/.pi/agent/extensions/coralbricks.json`; turns cache-optimized pricing (`X-Coral-Pricing: cache-optimized`) on by default, so `ctrl+alt+c` toggles are reset by the next `npm run setup`
 - `models.json` — `opendesign` provider (`amr-link`): Chat Completions against `https://amr-link.open-design.ai/v1`, keyed by `$OPENDESIGN_API_KEY`, exposing the DeepSeek V4.1 Flash 1017 checkpoint as `deepseek-v4.1-flash` (see [`docs/opendesign.md`](docs/opendesign.md))
-- `pi-vcc-config.json` — pi-vcc compaction settings installed into `~/.pi/agent/pi-vcc-config.json`; compacts after 90% of the context window
+- `pi-vcc-config.json` — pi-vcc compaction settings installed into `~/.pi/agent/pi-vcc-config.json`; pi-vcc writes every compaction summary
 - `docs/` — provider runbooks
   - `docs/opendesign.md` — how to add or change an `opendesign` model: field mapping, the `context_budget` trap, reasoning compat, and the missing-provider diagnosis
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`

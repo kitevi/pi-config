@@ -1,6 +1,3 @@
 {
-  "overrideDefaultCompaction": true,
-  "globalThreshold": {
-    "compactPercent": 90
-  }
+  "overrideDefaultCompaction": true
 }
