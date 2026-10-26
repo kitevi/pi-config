@@ -48,16 +48,16 @@ void describe("xai-quota-guard", () => {
 	});
 
 	void it("lets input through below the limit", async () => {
-		const guard = setup({ percent: 64.9 });
+		const guard = setup({ percent: 79.9 });
 		assert.deepEqual(await guard.fire("input"), { action: "continue" });
 		assert.equal(guard.notices.length, 0);
 	});
 
 	void it("refuses input at the limit and names the reset", async () => {
-		const guard = setup({ percent: 65, resetsAt: "2026-10-27T14:03:33Z" });
+		const guard = setup({ percent: 80, resetsAt: "2026-10-27T14:03:33Z" });
 		assert.deepEqual(await guard.fire("input"), { action: "handled" });
 		assert.equal(guard.notices[0]?.level, "error");
-		assert.match(guard.notices[0]?.message ?? "", /65%.*resets/);
+		assert.match(guard.notices[0]?.message ?? "", /80%.*resets/);
 	});
 
 	void it("aborts a running loop at the limit", async () => {

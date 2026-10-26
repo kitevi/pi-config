@@ -3,7 +3,7 @@
  *
  * Keeps part of the SuperGrok weekly pool for other Grok clients. On
  * `xai-oauth` models (pi-grok), prompts are refused and running agent loops
- * are aborted once the pool's `creditUsagePercent` reaches 65%. The billing
+ * are aborted once the pool's `creditUsagePercent` reaches 80%. The billing
  * endpoint is unofficial; when it cannot be read, the guard warns and lets
  * the turn through.
  *
@@ -13,7 +13,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export const GUARDED_PROVIDER = "xai-oauth";
-export const QUOTA_LIMIT_PERCENT = 65;
+export const QUOTA_LIMIT_PERCENT = 80;
 export const DISABLED_TOOLS = ["x_search"];
 export const BILLING_URL = "https://cli-chat-proxy.grok.com/v1/billing?format=credits";
 const CACHE_TTL_MS = 60_000;
