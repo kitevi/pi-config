@@ -32,7 +32,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 ## Behavior that affects how you work
 
 - `settings.json` sets `codemode.mode` to `only`; MCP servers are reachable only from codemode scripts.
-- `extensions/codemode-output-cap.ts` caps the codemode return at 10,000 characters and leaves the full-text path in the omission hole.
+- `extensions/codemode-output-cap.ts` caps the codemode return at 30,000 characters, or at a larger `max_output_tokens` from the script's `// @options:` line, and leaves the full-text path and the omitted `slice(start, end)` in the omission hole.
 - `coralbricks.json` sends `X-Coral-Pricing: cache-optimized` by default; the provider's runtime `ctrl+alt+c` toggle is overwritten on the next reconciliation.
 - `opendesign` models (`models.json`) record the gateway's `context_budget` and `output_budget`, never a catalog's `context_limit` — see `docs/opendesign.md`.
 - `extensions/settle-compact.ts` compacts once the agent settles at 90% or more of the model window; `npm:@sting8k/pi-vcc` writes the summary without an LLM call (`pi-vcc-config.json`).

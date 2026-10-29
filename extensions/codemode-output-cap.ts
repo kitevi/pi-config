@@ -1,10 +1,12 @@
 /**
- * Caps the model-facing codemode return at 10,000 characters.
+ * Caps the model-facing codemode return at 30,000 characters.
  *
- * Nested tool results and smaller previews stay as Pi delivered them. Longer
- * returns get a middle cut with the full-text path and read instruction in
- * the omission hole. Pi spills are reused for text-only returns; image returns
- * get a private spill with the complete output and Pi's image-path annotations.
+ * Nested tool results and smaller previews stay as Pi delivered them. A script
+ * whose `// @options:` line asks for a larger `max_output_tokens` raises the cap
+ * to that budget. Longer returns get a middle cut with the full-text path, the
+ * omitted range when it indexes that file, and a read instruction in the
+ * omission hole. Pi spills are reused for text-only returns; image returns get
+ * a private spill with the complete output and Pi's image-path annotations.
  */
 import { randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
@@ -13,7 +15,12 @@ import { join } from "node:path";
 import type { JsonValue } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ToolResultEventResult } from "@earendil-works/pi-coding-agent";
 
-export const CODEMODE_OUTPUT_MAX_CHARS = 10_000;
+export const CODEMODE_OUTPUT_MAX_CHARS = 30_000;
+
+/** Pi's codemode budget allows this many characters per `max_output_tokens` token. */
+const CHARS_PER_TOKEN = 4;
+
+const OPTIONS_PREFIX = "// @options:";
 
 export interface TextBlock {
 	type: "text";
@@ -31,6 +38,8 @@ export type CapContentBlock = TextBlock | ImageBlock;
 export interface CapEvent {
 	toolName: string;
 	parentToolCallId?: string;
+	/** The tool input; a codemode script is `input.code`. */
+	input?: Record<string, unknown>;
 	content: CapContentBlock[];
 	details?: unknown;
 	structuredContent?: JsonValue;
@@ -47,8 +56,22 @@ export interface CapIo {
 	writeFile(text: string): Promise<string>;
 }
 
+/** A complete-output file and, when known, its text, which the cut's offsets must index. */
+interface Spill {
+	path: string;
+	text?: string;
+}
+
+interface OmittedRange {
+	start: number;
+	end: number;
+	total: number;
+}
+
 const OMISSION_INSTRUCTION =
-	"Extract only needed fields or ~6,000-character slices from this file before text(). tools.read offset/limit count lines, not characters. For oversized lines or another cut, use tools.bash with Node/Python to emit only a bounded field or character range from the saved file. Do not rerun the original command.";
+	`You already have the text before and after the gap. Get what you still need in one call: use tools.bash to run node on the full text and print only the lines, fields, or character range you need (offsets are JavaScript string indices). One call prints at most ${CODEMODE_OUTPUT_MAX_CHARS.toLocaleString("en-US")} characters; a script whose first line is // @options: {"max_output_tokens": N} may print about ${CHARS_PER_TOKEN} characters per token. Do not rerun the original command.`;
+
+const HEADER_PATTERN = /^Script (completed|failed)\nWall time [\d.]+ seconds\nOutput:\n$/;
 
 export function middleCut(value: string, maxChars: number): string {
 	if (maxChars <= 0) return "";
@@ -61,29 +84,34 @@ export function middleCut(value: string, maxChars: number): string {
 	return `${value.slice(0, head)}${marker}${tail > 0 ? value.slice(value.length - tail) : ""}`;
 }
 
-function omissionMarker(omitted: number, path: string): string {
-	return `\n\n... ${omitted} characters omitted. Full text: ${path}\n${OMISSION_INSTRUCTION}\n\n`;
+function omissionMarker(omitted: number, path: string, range?: OmittedRange): string {
+	const where = range ? `, slice(${range.start}, ${range.end}) of ${range.total}` : "";
+	return `\n\n... ${omitted} characters omitted${where}. Full text: ${path}\n${OMISSION_INSTRUCTION}\n\n`;
 }
 
-export function capCodemodeText(fullText: string, path: string, maxChars = CODEMODE_OUTPUT_MAX_CHARS): string {
+/** The longest marker for a text of `total` characters: every number as wide as `total`. */
+function markerReserve(total: number, path: string, showRange: boolean): number {
+	return omissionMarker(total, path, showRange ? { start: total, end: total, total } : undefined).length;
+}
+
+/**
+ * Middle-cut `fullText` to `maxChars`, naming `path` in the hole. `showRange` adds the omitted
+ * `slice(start, end)`; pass false when `fullText` is not the start of that file.
+ */
+export function capCodemodeText(fullText: string, path: string, maxChars = CODEMODE_OUTPUT_MAX_CHARS, showRange = true): string {
 	if (maxChars <= 0) return "";
 	if (fullText.length <= maxChars) return fullText;
 
-	let omitted = fullText.length - maxChars;
-	let marker = omissionMarker(omitted, path);
-	for (let attempt = 0; attempt < 8; attempt++) {
-		const next = fullText.length - maxChars + marker.length;
-		const nextMarker = omissionMarker(next, path);
-		if (next === omitted && nextMarker === marker) break;
-		omitted = next;
-		marker = nextMarker;
+	const total = fullText.length;
+	// Reserve the widest marker, so the cut can be chosen before the marker names it.
+	const available = maxChars - markerReserve(total, path, showRange);
+	if (available <= 0) {
+		return omissionMarker(total, path, showRange ? { start: 0, end: total, total } : undefined).slice(-maxChars);
 	}
-
-	if (marker.length >= maxChars) return marker.slice(-maxChars);
-	const available = maxChars - marker.length;
 	const head = Math.ceil(available / 2);
-	const tail = Math.floor(available / 2);
-	return `${fullText.slice(0, head)}${marker}${tail > 0 ? fullText.slice(fullText.length - tail) : ""}`;
+	const end = total - Math.floor(available / 2);
+	const marker = omissionMarker(end - head, path, showRange ? { start: head, end, total } : undefined);
+	return `${fullText.slice(0, head)}${marker}${fullText.slice(end)}`;
 }
 
 function joinedText(content: CapContentBlock[]): string {
@@ -92,6 +120,14 @@ function joinedText(content: CapContentBlock[]): string {
 
 function otherBlocks(content: CapContentBlock[]): CapContentBlock[] {
 	return content.filter((block) => block.type !== "text");
+}
+
+/** Pi's "Script completed" header block, apart from the output it introduces. */
+function splitHeader(content: CapContentBlock[]): { header?: TextBlock; output: CapContentBlock[] } {
+	const first = content[0];
+	return first?.type === "text" && HEADER_PATTERN.test(first.text)
+		? { header: first, output: content.slice(1) }
+		: { output: content };
 }
 
 function fullOutputPathOf(details: unknown): string | undefined {
@@ -107,12 +143,29 @@ function withOutputPath(details: unknown, path: string): unknown {
 	return { fullOutputPath: path };
 }
 
-function cappedContent(content: CapContentBlock[], path?: string, notice = ""): CapContentBlock[] {
-	const first = content[0];
-	const header = first?.type === "text" && /^Script (completed|failed)\nWall time [\d.]+ seconds\nOutput:\n$/.test(first.text)
-		? first
-		: undefined;
-	const output = header ? content.slice(1) : content;
+/** `max_output_tokens` from a script's first-line `// @options:`, read the way Pi's codemode reads it. */
+function requestedOutputTokens(input: Record<string, unknown> | undefined): number | undefined {
+	const code = input?.["code"];
+	if (typeof code !== "string") return undefined;
+	const firstLine = (code.split("\n", 1)[0] ?? "").replace(/\r$/, "").trimStart();
+	if (!firstLine.startsWith(OPTIONS_PREFIX)) return undefined;
+	try {
+		const options: unknown = JSON.parse(firstLine.slice(OPTIONS_PREFIX.length));
+		if (typeof options !== "object" || options === null) return undefined;
+		const tokens = (options as { max_output_tokens?: unknown }).max_output_tokens;
+		return typeof tokens === "number" && Number.isSafeInteger(tokens) && tokens >= 0 ? tokens : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/** A script's budget raises the cap; a smaller one is already enforced by Pi. */
+function outputCap(input: Record<string, unknown> | undefined): number {
+	return Math.max(CODEMODE_OUTPUT_MAX_CHARS, (requestedOutputTokens(input) ?? 0) * CHARS_PER_TOKEN);
+}
+
+function cappedContent(content: CapContentBlock[], maxChars: number, spill?: Spill, notice = ""): CapContentBlock[] {
+	const { header, output } = splitHeader(content);
 	const body: CapContentBlock[] = [];
 	let images: CapContentBlock[] = [];
 	for (const [index, block] of output.entries()) {
@@ -136,21 +189,24 @@ function cappedContent(content: CapContentBlock[], path?: string, notice = ""): 
 	let annotationChars = images.reduce((count, block) => count + (block.type === "text" ? block.text.length + 1 : 0), 0);
 	let full = joinedText(body);
 	const originalLength = joinedText(content).length;
-	const markerChars = path
-		? omissionMarker(originalLength, path).length
+	const markerChars = spill
+		? markerReserve(originalLength, spill.path, true)
 		: `\n\n... ${originalLength} characters omitted ...\n\n`.length;
-	const maxReserved = CODEMODE_OUTPUT_MAX_CHARS - headerChars - markerChars - 2;
+	const maxReserved = maxChars - headerChars - markerChars - 2;
 	if (annotationChars > 0 && annotationChars + notice.length > maxReserved) {
 		full = joinedText(output);
 		images = otherBlocks(output);
 		annotationChars = 0;
-		notice += path && !notice
+		notice += spill && !notice
 			? "\n\nImage annotations are in the full text, in image order."
 			: "\n\nImage annotations were omitted and could not be saved.";
 	}
 	notice = middleCut(notice, maxReserved - annotationChars);
-	const budget = CODEMODE_OUTPUT_MAX_CHARS - headerChars - annotationChars - notice.length;
-	const preview = path ? capCodemodeText(full, path, budget) : middleCut(full, budget);
+	const budget = maxChars - headerChars - annotationChars - notice.length;
+	// Offsets index the file only when the cut text is its start.
+	const preview = spill
+		? capCodemodeText(full, spill.path, budget, spill.text?.startsWith(full) ?? false)
+		: middleCut(full, budget);
 	return [...(header ? [header] : []), { type: "text", text: `${preview}${notice}` }, ...images];
 }
 
@@ -169,10 +225,10 @@ function withNativeText(content: CapContentBlock[], nativePath: string, nativeTe
 	return content.with(index, { type: "text", text: `${nativeText}${rest}` });
 }
 
-function cappedResult(event: CapEvent, path: string, wroteFile: boolean, notice = ""): CapResult {
+function cappedResult(event: CapEvent, maxChars: number, spill: Spill, wroteFile: boolean, notice = ""): CapResult {
 	return {
-		content: cappedContent(event.content, path, notice),
-		...(wroteFile ? { details: withOutputPath(event.details, path) } : {}),
+		content: cappedContent(event.content, maxChars, spill, notice),
+		...(wroteFile ? { details: withOutputPath(event.details, spill.path) } : {}),
 		...(event.structuredContent !== undefined ? { structuredContent: event.structuredContent } : {}),
 	};
 }
@@ -186,7 +242,8 @@ export async function writeCapFile(text: string): Promise<string> {
 export async function applyCodemodeOutputCap(event: CapEvent, io: CapIo): Promise<CapResult | undefined> {
 	if (event.toolName !== "codemode" || event.parentToolCallId !== undefined) return undefined;
 
-	if (joinedText(event.content).length <= CODEMODE_OUTPUT_MAX_CHARS) return undefined;
+	const maxChars = outputCap(event.input);
+	if (joinedText(event.content).length <= maxChars) return undefined;
 
 	// Pi writes its text spill before adding image-path annotations.
 	const nativePath = fullOutputPathOf(event.details);
@@ -204,35 +261,41 @@ export async function applyCodemodeOutputCap(event: CapEvent, io: CapIo): Promis
 		? withNativeText(event.content, nativePath, nativeText)
 		: undefined;
 	if (content) event = { ...event, content };
-	let path = otherBlocks(event.content).length === 0 ? nativePath : undefined;
+	const nativeSpill: Spill | undefined = nativePath
+		? { path: nativePath, ...(nativeText !== undefined ? { text: nativeText } : {}) }
+		: undefined;
+	let spill = otherBlocks(event.content).length === 0 ? nativeSpill : undefined;
 	let wroteFile = false;
-	if (!path) {
+	if (!spill) {
 		try {
 			if (readError !== undefined) throw readError;
-			const full = joinedText(event.content);
+			// Like Pi's spill, the file holds the output without the header.
+			const full = joinedText(splitHeader(event.content).output);
 			// An unrecognized preview cannot be swapped, so the spill keeps both texts.
-			path = await io.writeFile(nativeText !== undefined && !content
+			const text = nativeText !== undefined && !content
 				? `${nativeText}\n\n[Pi return preview and image paths]\n${full}`
-				: full);
+				: full;
+			spill = { path: await io.writeFile(text), text };
 			wroteFile = true;
 		} catch (error) {
 			const reason = error instanceof Error ? error.message : String(error);
 			const notice = `\n\n[Could not save the full output: ${reason}]`;
-			if (nativePath) return cappedResult(event, nativePath, false, notice);
+			if (nativeSpill) return cappedResult(event, maxChars, nativeSpill, false, notice);
 			return {
-				content: cappedContent(event.content, undefined, notice),
+				content: cappedContent(event.content, maxChars, undefined, notice),
 				...(event.structuredContent !== undefined ? { structuredContent: event.structuredContent } : {}),
 			};
 		}
 	}
 
-	return cappedResult(event, path, wroteFile);
+	return cappedResult(event, maxChars, spill, wroteFile);
 }
 
 export default function (pi: ExtensionAPI) {
 	pi.on("tool_result", async (event): Promise<ToolResultEventResult | undefined> => {
 		const result = await applyCodemodeOutputCap({
 			toolName: event.toolName,
+			input: event.input,
 			content: event.content.flatMap((block): CapContentBlock[] => {
 				if (block.type === "text") return [{ type: "text", text: block.text }];
 				return [{ type: "image", data: block.data, mimeType: block.mimeType }];

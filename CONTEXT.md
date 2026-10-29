@@ -77,7 +77,7 @@ are behavioral (they inject messages into the LLM context on session start).
 `~/.pi/agent/mcp.json`, and connected by Pi's built-in MCP. Codemode is the
 model-facing tool (`codemode.mode` is `only` in `settings.json`). Pi's
 tool-search extension stays disabled. `extensions/codemode-output-cap.ts`
-caps that codemode return at 10,000 characters, with the full-text path in the omission hole. `pi-vcc-config.json` is installed
+caps that codemode return at 30,000 characters, or at a script's larger `max_output_tokens`, with the full-text path and the omitted range in the omission hole. `pi-vcc-config.json` is installed
 into `~/.pi/agent/pi-vcc-config.json` for pi-vcc, which writes compaction summaries;
 `extensions/settle-compact.ts` compacts once the agent settles with context use
 at or above 90% of the model context window. `coralbricks.json` is installed

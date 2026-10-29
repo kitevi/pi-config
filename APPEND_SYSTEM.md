@@ -16,18 +16,18 @@ Write the script in plain JavaScript. Pi does not transpile it, so TypeScript sy
 
 # Codemode output
 
-Filter, summarize, or extract fields before `text()` or `return`. Aim for at most
-6,000 printed characters total per codemode call; multiple prints share the cap.
+Filter, summarize, or extract fields before `text()` or `return`. A codemode call
+prints at most 30,000 characters; multiple prints share the cap. Only when you need
+the whole text, raise the cap for that call: start the script with
+`// @options: {"max_output_tokens": N}`, about 4 characters per token.
 
-When a capped return names a saved file, recover from that file instead of rerunning
-the original command:
-- Read or search for the relevant data, then print only needed fields or a bounded
-  slice such as `text(value.slice(start, start + 6000))`.
-- `tools.read` uses line offsets and limits, not character offsets. Even one long
-  line can exceed the cap; reduce what you print rather than repeating the dump.
-- If a line exceeds the reader's 50 KiB limit, or line paging is capped again, use
-  `tools.bash` with a small Node/Python script to read the saved file and emit only
-  the needed field or character range. Advance the range offset to continue.
+When a capped return names a saved file, you already have the text before and after
+the gap. Get what you still need in one call; do not rerun the original command or
+page through the file:
+- Search the file and print only the lines or fields you need, or print the gap the
+  marker names, `slice(start, end)`, when you need all of it.
+- Offsets are JavaScript string indices, so read the file with `node` through
+  `tools.bash`. `tools.read` counts lines, not characters, and stops at 50 KiB.
 
 # Web and documentation tools
 

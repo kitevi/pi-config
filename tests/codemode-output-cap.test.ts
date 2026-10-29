@@ -12,6 +12,11 @@ import plugin, {
 	type CapResult,
 } from "../extensions/codemode-output-cap.ts";
 
+/** A return just past the cap. */
+const OVER_CAP = CODEMODE_OUTPUT_MAX_CHARS + 1_000;
+const HEADER = { type: "text" as const, text: "Script completed\nWall time 0.1 seconds\nOutput:\n" };
+const RAISED_BUDGET = { code: '// @options: {"max_output_tokens": 20000}\ntext(value);' };
+
 function textEvent(text: string, extra: Partial<CapEvent> = {}): CapEvent {
 	return {
 		toolName: "codemode",
@@ -20,13 +25,15 @@ function textEvent(text: string, extra: Partial<CapEvent> = {}): CapEvent {
 	};
 }
 
-function assertOmissionMarker(text: string, path: string, full: string): void {
+function assertOmissionMarker(text: string, path: string, full: string, { range }: { range: boolean }): void {
 	assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
 	const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	assert.match(text, new RegExp(`characters omitted\\. Full text: ${escapedPath}`));
-	assert.match(text, /needed fields or ~6,000-character slices/);
-	assert.match(text, /tools\.read offset\/limit count lines/);
-	assert.match(text, /tools\.bash with Node\/Python/);
+	const marker = text.match(new RegExp(`(\\d+) characters omitted(?:, slice\\((\\d+), (\\d+)\\) of (\\d+))?\\. Full text: ${escapedPath}\\n`));
+	assert.ok(marker, "the marker names the full text");
+	assert.match(text, /Get what you still need in one call/);
+	assert.match(text, /use tools\.bash to run node on the full text/);
+	assert.match(text, /offsets are JavaScript string indices/);
+	assert.match(text, /\/\/ @options: \{"max_output_tokens": N\}/);
 	assert.match(text, /Do not rerun the original command/);
 	assert.equal(text.includes("[Full output"), false);
 	const markerStart = text.indexOf("\n\n... ");
@@ -35,10 +42,14 @@ function assertOmissionMarker(text: string, path: string, full: string): void {
 	assert.ok(tailStart > markerStart);
 	const head = text.slice(0, markerStart);
 	const tail = text.slice(tailStart + 2);
-	const omitted = Number(text.match(/(\d+) characters omitted/)?.[1]);
-	assert.equal(omitted, full.length - head.length - tail.length);
+	assert.equal(Number(marker[1]), full.length - head.length - tail.length);
 	assert.ok(full.startsWith(head));
 	assert.ok(full.endsWith(tail));
+	if (range) {
+		assert.deepEqual(marker.slice(2).map(Number), [head.length, full.length - tail.length, full.length]);
+	} else {
+		assert.equal(marker[2], undefined, "offsets are named only when they index the file");
+	}
 }
 
 function codemodeResultHandler(): (event: CapEvent) => Promise<CapResult | undefined> {
@@ -77,15 +88,23 @@ function io(overrides: Partial<CapIo> = {}): CapIo & { writes: string[] } {
 	};
 }
 
+/** Enough image entries that their path annotations alone pass the budget. */
+function imageEntries(): Array<{ image: { type: "image"; data: string; mimeType: string }; label: string }> {
+	return Array.from({ length: Math.ceil(CODEMODE_OUTPUT_MAX_CHARS / 100) }, (_, index) => ({
+		image: { type: "image" as const, data: String(index), mimeType: "image/png" },
+		label: `[Image saved to /tmp/${"p".repeat(120)}/image-${index}.png (image/png, 1 B)]`,
+	}));
+}
+
 void describe("capCodemodeText", () => {
-	void it("keeps the start, the end, and the path inside the budget", () => {
-		const full = `START${"x".repeat(20_000)}END`;
+	void it("keeps the start, the end, the path, and the omitted range inside the budget", () => {
+		const full = `START${"x".repeat(CODEMODE_OUTPUT_MAX_CHARS * 2)}END`;
 		const path = "/tmp/pi-codemode-cap-test.txt";
 		const text = capCodemodeText(full, path);
 
 		assert.ok(text.startsWith("START"));
 		assert.ok(text.includes("END"));
-		assertOmissionMarker(text, path, full);
+		assertOmissionMarker(text, path, full, { range: true });
 	});
 });
 
@@ -99,7 +118,7 @@ void describe("applyCodemodeOutputCap", () => {
 	});
 
 	void it("writes one file and middle-cuts a longer return", async () => {
-		const full = `START${"m".repeat(12_000)}END`;
+		const full = `START${"m".repeat(OVER_CAP)}END`;
 		const files = io();
 		const result = await applyCodemodeOutputCap(textEvent(full), files);
 
@@ -111,12 +130,29 @@ void describe("applyCodemodeOutputCap", () => {
 		if (text?.type !== "text") return;
 		assert.ok(text.text.includes("START"));
 		assert.ok(text.text.includes("END"));
-		assertOmissionMarker(text.text, "/tmp/pi-codemode-cap-test.txt", full);
+		assertOmissionMarker(text.text, "/tmp/pi-codemode-cap-test.txt", full, { range: true });
 		assert.deepEqual(result.details, { fullOutputPath: "/tmp/pi-codemode-cap-test.txt" });
 	});
 
+	void it("spills the output without Pi's header, so the named range indexes the file", async () => {
+		const output = `START${"h".repeat(OVER_CAP)}END`;
+		const files = io();
+		const result = await applyCodemodeOutputCap({
+			toolName: "codemode",
+			content: [HEADER, { type: "text", text: output }],
+		}, files);
+
+		assert.deepEqual(files.writes, [output]);
+		assert.ok(result);
+		assert.deepEqual(result.content[0], HEADER);
+		const body = result.content[1];
+		assert.equal(body?.type, "text");
+		if (body?.type !== "text") return;
+		assertOmissionMarker(body.text, "/tmp/pi-codemode-cap-test.txt", output, { range: true });
+	});
+
 	void it("caps the delivered preview while reusing its existing full-output path", async () => {
-		const preview = `HEAD${"q".repeat(15_000)}TAIL`;
+		const preview = `HEAD${"q".repeat(OVER_CAP)}TAIL`;
 		const path = "/tmp/pi-codemode-existing.txt";
 		const files = io();
 		const result = await applyCodemodeOutputCap(textEvent(preview, {
@@ -130,8 +166,31 @@ void describe("applyCodemodeOutputCap", () => {
 		if (text?.type !== "text") return;
 		assert.ok(text.text.startsWith("HEAD"));
 		assert.ok(text.text.includes("TAIL"));
-		assertOmissionMarker(text.text, path, preview);
+		assertOmissionMarker(text.text, path, preview, { range: false });
 		assert.equal(result.details, undefined);
+	});
+
+	void it("raises the cap to a larger max_output_tokens from the script's options line", async () => {
+		const files = io();
+		assert.equal(await applyCodemodeOutputCap(textEvent("f".repeat(80_000), { input: RAISED_BUDGET }), files), undefined);
+		const result = await applyCodemodeOutputCap(textEvent("f".repeat(80_001), { input: RAISED_BUDGET }), files);
+
+		assert.ok(result);
+		const text = result.content[0];
+		assert.equal(text?.type, "text");
+		if (text?.type !== "text") return;
+		assert.ok(text.text.length <= 80_000);
+		assert.ok(text.text.length > CODEMODE_OUTPUT_MAX_CHARS);
+	});
+
+	void it("keeps the default cap when the options line asks for less", async () => {
+		const files = io();
+		const result = await applyCodemodeOutputCap(textEvent("g".repeat(CODEMODE_OUTPUT_MAX_CHARS), {
+			input: { code: '// @options: {"max_output_tokens": 1000}\ntext(value);' },
+		}), files);
+
+		assert.equal(result, undefined);
+		assert.deepEqual(files.writes, []);
 	});
 
 	void it("keeps image blocks", async () => {
@@ -139,7 +198,7 @@ void describe("applyCodemodeOutputCap", () => {
 		const files = io();
 		const result = await applyCodemodeOutputCap({
 			toolName: "codemode",
-			content: [{ type: "text", text: "z".repeat(11_000) }, image],
+			content: [{ type: "text", text: "z".repeat(OVER_CAP) }, image],
 		}, files);
 
 		assert.ok(result);
@@ -147,7 +206,7 @@ void describe("applyCodemodeOutputCap", () => {
 	});
 
 	void it("keeps interleaved image paths beside their images and preserves the native header", async () => {
-		const header = { type: "text" as const, text: "Script completed\nWall time 0.1 seconds\nOutput:\n" };
+		const part = Math.ceil(CODEMODE_OUTPUT_MAX_CHARS / 2);
 		const firstLabel = "[Image saved to /tmp/first.png (image/png, 1 B)]";
 		const secondLabel = "[Image saved to /tmp/second.png (image/png, 1 B)]";
 		const firstImage = { type: "image" as const, data: "first", mimeType: "image/png" };
@@ -155,12 +214,12 @@ void describe("applyCodemodeOutputCap", () => {
 		const event: CapEvent = {
 			toolName: "codemode",
 			content: [
-				header,
-				{ type: "text", text: `HEAD${"a".repeat(12_000)}\n${firstLabel}` },
+				HEADER,
+				{ type: "text", text: `HEAD${"a".repeat(part)}\n${firstLabel}` },
 				firstImage,
-				{ type: "text", text: `MIDDLE${"b".repeat(12_000)}\n${secondLabel}` },
+				{ type: "text", text: `MIDDLE${"b".repeat(part)}\n${secondLabel}` },
 				secondImage,
-				{ type: "text", text: `${"c".repeat(12_000)}TAIL` },
+				{ type: "text", text: `${"c".repeat(part)}TAIL` },
 			],
 		};
 		const files = io();
@@ -173,7 +232,8 @@ void describe("applyCodemodeOutputCap", () => {
 		assert.ok(text.includes("HEAD"));
 		assert.ok(text.includes("TAIL"));
 		assert.ok(text.length <= CODEMODE_OUTPUT_MAX_CHARS);
-		assert.deepEqual(result.content[0], header);
+		assert.match(text, /\d+ characters omitted\. Full text: /, "annotations between the texts shift the file's offsets");
+		assert.deepEqual(result.content[0], HEADER);
 		assert.deepEqual(result.content.filter((block) => block.type === "image"), [firstImage, secondImage]);
 		for (const [image, label] of [[firstImage, firstLabel], [secondImage, secondLabel]] as const) {
 			const imageIndex = result.content.indexOf(image);
@@ -182,16 +242,12 @@ void describe("applyCodemodeOutputCap", () => {
 			assert.equal(preceding?.type, "text");
 			if (preceding?.type === "text") assert.ok(preceding.text.endsWith(label));
 		}
-		assert.equal(files.writes[0], event.content.filter((block) => block.type === "text").map((block) => block.text).join("\n"));
+		assert.equal(files.writes[0], event.content.slice(1).filter((block) => block.type === "text").map((block) => block.text).join("\n"));
 	});
 
 	void it("keeps the recovery link when image annotations alone exceed the budget", async () => {
-		const images = Array.from({ length: 80 }, (_, index) => ({
-			type: "image" as const, data: String(index), mimeType: "image/png",
-		}));
-		const entries = images.map((image, index) => ({
-			image, label: `[Image saved to /tmp/${"p".repeat(120)}/image-${index}.png (image/png, 1 B)]`,
-		}));
+		const entries = imageEntries();
+		const images = entries.map(({ image }) => image);
 		const content: CapEvent["content"] = entries.flatMap(({ image, label }) => [
 			{ type: "text", text: label }, image,
 		]);
@@ -209,10 +265,9 @@ void describe("applyCodemodeOutputCap", () => {
 
 	for (const nativePath of [undefined, "/tmp/pi-codemode-native.txt"]) {
 		void it(`reports unsaved image annotations when the spill fails ${nativePath ? "with" : "without"} a native path`, async () => {
-			const content: CapEvent["content"] = Array.from({ length: 80 }, (_, index) => [
-				{ type: "text" as const, text: `[Image saved to /tmp/${"p".repeat(120)}/image-${index}.png (image/png, 1 B)]` },
-				{ type: "image" as const, data: String(index), mimeType: "image/png" },
-			]).flat();
+			const content: CapEvent["content"] = imageEntries().flatMap(({ image, label }) => [
+				{ type: "text" as const, text: label }, image,
+			]);
 			const files = io({
 				readFile: async () => "native output without image paths",
 				writeFile: async () => { throw new Error("disk full"); },
@@ -236,7 +291,7 @@ void describe("applyCodemodeOutputCap", () => {
 		const files = io();
 		const result = await applyCodemodeOutputCap({
 			toolName: "bash",
-			content: [{ type: "text", text: "b".repeat(11_000) }],
+			content: [{ type: "text", text: "b".repeat(OVER_CAP) }],
 		}, files);
 
 		assert.equal(result, undefined);
@@ -245,7 +300,7 @@ void describe("applyCodemodeOutputCap", () => {
 
 	void it("ignores a nested codemode result", async () => {
 		const files = io();
-		const result = await applyCodemodeOutputCap(textEvent("c".repeat(11_000), {
+		const result = await applyCodemodeOutputCap(textEvent("c".repeat(OVER_CAP), {
 			parentToolCallId: "parent",
 		}), files);
 
@@ -268,7 +323,7 @@ void describe("applyCodemodeOutputCap", () => {
 			});
 			const result = await applyCodemodeOutputCap({
 				toolName: "codemode",
-				content: [{ type: "text", text: "x".repeat(12_000) }, image],
+				content: [{ type: "text", text: "x".repeat(OVER_CAP) }, image],
 				details: { fullOutputPath: nativePath },
 			}, files);
 
@@ -284,7 +339,7 @@ void describe("applyCodemodeOutputCap", () => {
 	void it("returns structured content when it replaces the text", async () => {
 		const files = io();
 		const structuredContent = { ok: true };
-		const result = await applyCodemodeOutputCap(textEvent("d".repeat(11_000), {
+		const result = await applyCodemodeOutputCap(textEvent("d".repeat(OVER_CAP), {
 			structuredContent,
 		}), files);
 
@@ -304,6 +359,12 @@ void describe("codemode-output-cap extension", () => {
 		});
 	});
 
+	void it("reads the script's options line from the tool input", async () => {
+		const result = await codemodeResultHandler()(textEvent("h".repeat(OVER_CAP), { input: RAISED_BUDGET }));
+
+		assert.equal(result, undefined);
+	});
+
 	void it("preserves the complete native output and image paths", async () => {
 		const flag = "FLAG{complete_output_with_images}";
 		const nativeText = `HEAD${"x".repeat(25_000)}${flag}${"x".repeat(25_000)}TAIL`;
@@ -315,8 +376,8 @@ void describe("codemode-output-cap extension", () => {
 			const event: CapEvent = {
 				toolName: "codemode",
 				content: [
-					{ type: "text", text: "Script completed\nWall time 0.1 seconds\nOutput:\n" },
-					{ type: "text", text: `HEAD${"x".repeat(20_000)}TAIL\n\n[Full output: ${nativePath} (read with offset/limit)]\n[Image saved to ${firstPath} (image/png, 1 B)]` },
+					HEADER,
+					{ type: "text", text: `HEAD${"x".repeat(40_000)}TAIL\n\n[Full output: ${nativePath} (read with offset/limit)]\n[Image saved to ${firstPath} (image/png, 1 B)]` },
 					firstImage,
 					{ type: "text", text: `[Image saved to ${secondPath} (image/png, 1 B)]` },
 					secondImage,
@@ -339,6 +400,9 @@ void describe("codemode-output-cap extension", () => {
 				assert.equal(text.includes("[Full output:"), false);
 				const omitted = Number(text.match(/(\d+) characters omitted/)?.[1]);
 				assert.ok(omitted > nativeText.length - CODEMODE_OUTPUT_MAX_CHARS, "the count describes the native text, not Pi's preview");
+				const range = text.match(/slice\((\d+), (\d+)\)/);
+				assert.ok(range, "the native text starts the saved file, so the range indexes it");
+				assert.ok(saved.slice(Number(range[1]), Number(range[2])).includes(flag), "the named slice holds the omitted flag");
 				assert.ok(saved.includes(firstPath));
 				assert.ok(saved.includes(secondPath));
 				assert.equal(await readFile(nativePath, "utf8"), nativeText);
@@ -351,28 +415,27 @@ void describe("codemode-output-cap extension", () => {
 	void it("cuts a text-only return from the native spill so the count describes that file", async () => {
 		const nativeText = `HEAD${"x".repeat(60_000)}TAIL`;
 		await withNativeSpill(nativeText, async (nativePath) => {
-			const header = { type: "text" as const, text: "Script completed\nWall time 0.1 seconds\nOutput:\n" };
 			const preview = `Warning: truncated output (original token count: 15002)\nTotal output lines: 1\n\nHEAD${"x".repeat(19_996)}…5001 tokens truncated…${"x".repeat(19_996)}TAIL\n\n[Full output: ${nativePath} (read with offset/limit)]`;
 			const result = await codemodeResultHandler()(textEvent(preview, {
-				content: [header, { type: "text", text: preview }],
+				content: [HEADER, { type: "text", text: preview }],
 				details: { fullOutputPath: nativePath, calls: [] },
 			}));
 
 			assert.ok(result);
 			assert.equal(result.details, undefined, "the native spill is reused");
-			assert.deepEqual(result.content[0], header);
+			assert.deepEqual(result.content[0], HEADER);
 			const body = result.content[1];
 			assert.equal(body?.type, "text");
 			if (body?.type !== "text") return;
 			assert.equal(body.text.includes("tokens truncated"), false);
 			assert.equal(body.text.includes("[Full output:"), false);
-			assertOmissionMarker(body.text, nativePath, nativeText);
+			assertOmissionMarker(body.text, nativePath, nativeText, { range: true });
 		});
 	});
 
 	void it("keeps Pi's preview when the native spill cannot be read", async () => {
 		const nativePath = "/tmp/pi-codemode-missing.txt";
-		const preview = `Warning: truncated output\n\nHEAD${"x".repeat(20_000)}TAIL\n\n[Full output: ${nativePath} (read with offset/limit)]`;
+		const preview = `Warning: truncated output\n\nHEAD${"x".repeat(40_000)}TAIL\n\n[Full output: ${nativePath} (read with offset/limit)]`;
 		const files = io({ readFile: async () => { throw new Error("gone"); } });
 		const result = await applyCodemodeOutputCap(textEvent(preview, {
 			details: { fullOutputPath: nativePath },
@@ -389,7 +452,7 @@ void describe("codemode-output-cap extension", () => {
 	});
 
 	void it("caps a codemode tool result", async () => {
-		const full = "e".repeat(11_000);
+		const full = "e".repeat(OVER_CAP);
 		const event = textEvent(full);
 		const result = await codemodeResultHandler()(event);
 		assert.ok(result);
