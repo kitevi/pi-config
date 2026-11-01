@@ -120,7 +120,6 @@ Paths this repository does not declare are never touched, except repo-owned syml
   - `extensions/git-editor-guard.ts` — stops git from spawning an interactive editor inside agent `bash` calls
   - `extensions/codemode-output-cap.ts` — caps the model-facing codemode return at 30,000 characters (a script's larger `max_output_tokens` raises it) and spills the complete return to one temp file, with the path and the omitted range in the omission hole
   - `extensions/disable-opencode-zen.ts` — replaces the built-in `opencode` provider's models with an empty list, so `/model` and `pi --list-models` drop OpenCode Zen while `opencode-go` keeps `OPENCODE_API_KEY`
-  - `extensions/xai-quota-guard.ts` — hides pi-grok's `x_search` tool, and on `xai-oauth` models refuses prompts and aborts running loops once SuperGrok weekly usage reaches 80% (`QUOTA_LIMIT_PERCENT`), so other Grok clients keep the rest; warns and lets turns through when the unofficial billing endpoint cannot be read
   - `extensions/settle-compact.ts` — compacts once the agent settles with context use at or above 90% (`SETTLE_COMPACT_PERCENT`); skips aborted runs and runs with queued messages
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
 - `skills/` — pi skills
