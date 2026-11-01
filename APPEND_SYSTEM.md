@@ -41,6 +41,10 @@ For that shell fallback, use `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, li
 - Put each reference beside the explanation it earns, and order them by execution for a walkthrough.
 - Reach for the precise entry point over a wide line range.
 
+# Debugging
+
+Trace each symptom back to the first place the system went wrong and fix it there. A guard is a fix only when the state it handles is legitimate; if that state should never exist, find what produced it.
+
 # Mermaid diagrams
 
 Pi draws mermaid as terminal box art through `grok-mermaid`, which supports only `flowchart`/`graph`, `stateDiagram`, `classDiagram`, `erDiagram`, and `sequenceDiagram`; any other type shows as plain source.

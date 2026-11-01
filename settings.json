@@ -18,9 +18,7 @@
     "--dangerously-allow-all-scripts"
   ],
   "skills": [
-    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me",
-    "git/github.com/cursor/plugins/cursor-team-kit/skills/deslop",
-    "git/github.com/cursor/plugins/pstack/skills/principle-fix-root-causes"
+    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me"
   ],
   "packages": [
     "https://github.com/kitevi/piref",
@@ -67,33 +65,7 @@
       "themes": []
     },
     {
-      "source": "https://github.com/petekp/claude-code-setup",
-      "skills": [
-        "skills/plain"
-      ],
-      "extensions": [],
-      "prompts": [],
-      "themes": []
-    },
-    {
       "source": "https://github.com/humanlayer/skills",
-      "skills": [],
-      "extensions": [],
-      "prompts": [],
-      "themes": []
-    },
-    {
-      "source": "https://github.com/emilkowalski/skills",
-      "skills": [
-        "skills/emil-design-eng",
-        "skills/review-animations"
-      ],
-      "extensions": [],
-      "prompts": [],
-      "themes": []
-    },
-    {
-      "source": "https://github.com/cursor/plugins",
       "skills": [],
       "extensions": [],
       "prompts": [],
