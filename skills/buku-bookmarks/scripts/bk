@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Run Buku against the user's live collection, safely and without prompts.
+#
+#   bk <buku options>      buku --nostdin <options>
+#   bk backup              save a timestamped backup and print its path
+#   bk show-backup [FILE]  list backups, or print FILE as JSON (read-only)
+#
+# Stops when Buku or the live collection is missing, so Buku never creates an
+# empty database. Deletes, imports, tag replacements, reorders, and updates of
+# anything other than one bookmark are backed up first and do not run if the
+# backup fails. Stdin is detached, so confirmation prompts can only fail.
+set -u
+export NO_COLOR=1
+
+fail() { printf 'bk: %s\n' "$*" >&2; exit 1; }
+
+command -v buku >/dev/null 2>&1 || { printf 'bk: buku is not installed or not on PATH\n' >&2; exit 127; }
+
+data_dir="${BUKU_DEFAULT_DBDIR:-$HOME/.local/share/buku}"
+backup_dir="$data_dir/backups"
+
+if [ "${1:-}" = show-backup ]; then
+  if [ $# -lt 2 ]; then
+    ls -1 "$backup_dir"/*.db 2>/dev/null || fail "no backups in $backup_dir"
+    exit 0
+  fi
+  case "$2" in */*) file="$2" ;; *) file="$backup_dir/$2" ;; esac
+  { [ -f "$file" ] && [ -r "$file" ]; } || fail "backup unavailable: $file"
+  exec buku --nostdin --db "$(realpath -- "$file")" --print --json </dev/null
+fi
+
+{ [ -f "$data_dir/bookmarks.db" ] && [ -r "$data_dir/bookmarks.db" ]; } ||
+  fail "collection unavailable: $data_dir/bookmarks.db"
+export BUKU_DEFAULT_DBDIR="$data_dir"
+
+backup() (
+  umask 077
+  { mkdir -p "$backup_dir" && tmp="$(mktemp -d "$backup_dir/.bk-XXXXXX")"; } || fail "cannot write to $backup_dir"
+  if buku --nostdin --export "$tmp/bookmarks.db" --tacit </dev/null >/dev/null && [ -s "$tmp/bookmarks.db" ]; then
+    file="$backup_dir/bookmarks-before-change-$(date +%Y%m%d-%H%M%S)-${tmp##*-}.db"
+    mv -- "$tmp/bookmarks.db" "$file" && rmdir -- "$tmp" && printf 'Backup: %s\n' "$file" && exit 0
+  fi
+  rm -rf -- "$tmp"
+  fail "backup failed; nothing was changed"
+)
+
+case "${1:-}" in
+  backup) backup; exit ;;
+  '') fail 'usage: bk <buku options> | bk backup | bk show-backup [FILE]' ;;
+esac
+
+# Split --option=value so every option is matched by name.
+args=()
+for arg in "$@"; do
+  case "$arg" in --*=*) args+=("${arg%%=*}" "${arg#*=}") ;; *) args+=("$arg") ;; esac
+done
+
+needs_backup=false
+for i in "${!args[@]}"; do
+  case "${args[i]}" in
+    --db) fail "use 'bk show-backup FILE' to read another database" ;;
+    -d|--delete|-i|--import|--ai|--replace|--reorder|--swap|-l|--lock|-k|--unlock) needs_backup=true ;;
+    -u|--update)
+      # Only an update of exactly one positive index skips the backup.
+      next="${args[i+1]:-}" after="${args[i+2]:-}"
+      { [[ "$next" =~ ^[1-9][0-9]*$ ]] && [[ -z "$after" || "$after" == -* ]]; } || needs_backup=true ;;
+  esac
+done
+
+if $needs_backup; then backup || exit 1; fi
+exec buku --nostdin "$@" </dev/null
