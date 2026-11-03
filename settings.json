@@ -45,15 +45,6 @@
       "themes": []
     },
     {
-      "source": "https://github.com/getsentry/skills",
-      "skills": [
-        "skills/agents-md"
-      ],
-      "extensions": [],
-      "prompts": [],
-      "themes": []
-    },
-    {
       "source": "https://github.com/mblode/agent-skills",
       "skills": [
         "skills/planning"
