@@ -24,7 +24,7 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 	pinnedSkills: [...DEFAULT_PINNED_SKILLS],
 	summaryOverrides: {
 		"blast-radius": "What could this diff break?",
-		"buku-bookmarks": "Bookmark search/add/cleanup.",
+		buku: "Bookmark search/add/cleanup.",
 		grilling: "Want your idea challenged.",
 		handoff: "Passing work to next session.",
 		planning: "Feature needs a plan first.",

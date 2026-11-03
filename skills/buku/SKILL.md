@@ -1,15 +1,15 @@
 ---
-name: buku-bookmarks
+name: buku
 description: "Search, add, tag, edit, delete, import, export, back up, and open the user's Buku bookmarks. Use whenever the user mentions bookmarks, Buku, or the `b` bookmark launcher."
 compatibility: Requires Buku 5.0+ and Bash.
 ---
 
-# Buku Bookmarks
+# Buku
 
 Run every Buku command through this skill's wrapper, `scripts/bk`:
 
 ```bash
-~/.pi/agent/skills/buku-bookmarks/scripts/bk <buku options>
+~/.pi/agent/skills/buku/scripts/bk <buku options>
 ```
 
 The wrapper adds `--nostdin`, uses the user's live collection, and stops if Buku or the collection is missing. Before a delete, import, tag replacement, or update of more than one bookmark, it saves a backup and prints `Backup: <path>`; if the backup fails, nothing changes.
@@ -31,30 +31,30 @@ The wrapper adds `--nostdin`, uses the user's live collection, and stops if Buku
 
 ```bash
 # Read: always add --json
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --print --json                     # all bookmarks
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --print 12 18 --json               # by index
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --sall postgres production --deep --json  # all words, substrings too
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --stag 'database + postgres' --json  # both tags; 'a, b' = either
+~/.pi/agent/skills/buku/scripts/bk --print --json                     # all bookmarks
+~/.pi/agent/skills/buku/scripts/bk --print 12 18 --json               # by index
+~/.pi/agent/skills/buku/scripts/bk --sall postgres production --deep --json  # all words, substrings too
+~/.pi/agent/skills/buku/scripts/bk --stag 'database + postgres' --json  # both tags; 'a, b' = either
 
 # Change
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --add 'https://example.com' 'database,postgres'
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --update 12 --tag + 'database,postgres'
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --update 12 --tag - 'obsolete'
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --update 12 --title 'PostgreSQL Operations' --comment 'Operations reference'
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --replace 'old-tag' 'new-tag'      # rename a tag everywhere
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --delete 12 18 --tacit
+~/.pi/agent/skills/buku/scripts/bk --add 'https://example.com' 'database,postgres'
+~/.pi/agent/skills/buku/scripts/bk --update 12 --tag + 'database,postgres'
+~/.pi/agent/skills/buku/scripts/bk --update 12 --tag - 'obsolete'
+~/.pi/agent/skills/buku/scripts/bk --update 12 --title 'PostgreSQL Operations' --comment 'Operations reference'
+~/.pi/agent/skills/buku/scripts/bk --replace 'old-tag' 'new-tag'      # rename a tag everywhere
+~/.pi/agent/skills/buku/scripts/bk --delete 12 18 --tacit
 
 # Files: only paths the user names
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --import /path/to/bookmarks.html --tacit
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --export /path/to/new-file.html
+~/.pi/agent/skills/buku/scripts/bk --import /path/to/bookmarks.html --tacit
+~/.pi/agent/skills/buku/scripts/bk --export /path/to/new-file.html
 
 # Browser: only when asked
-~/.pi/agent/skills/buku-bookmarks/scripts/bk --open 12
+~/.pi/agent/skills/buku/scripts/bk --open 12
 
 # Backups
-~/.pi/agent/skills/buku-bookmarks/scripts/bk backup                # make one now
-~/.pi/agent/skills/buku-bookmarks/scripts/bk show-backup           # list backups
-~/.pi/agent/skills/buku-bookmarks/scripts/bk show-backup FILE      # print one as JSON
+~/.pi/agent/skills/buku/scripts/bk backup                # make one now
+~/.pi/agent/skills/buku/scripts/bk show-backup           # list backups
+~/.pi/agent/skills/buku/scripts/bk show-backup FILE      # print one as JSON
 ```
 
 - `--add` fetches the page title and description. Pass `--title`, `--comment`, or `--offline` only when the request needs them.
