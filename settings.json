@@ -18,7 +18,8 @@
     "--dangerously-allow-all-scripts"
   ],
   "skills": [
-    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me"
+    "git/github.com/humanlayer/skills/plugins/show-me/skills/show-me",
+    "git/github.com/cursor/plugins/pstack/skills/tdd"
   ],
   "packages": [
     "https://github.com/kitevi/piref",
@@ -53,10 +54,9 @@
       "themes": []
     },
     {
-      "source": "https://github.com/celec7/beyond-code",
+      "source": "https://github.com/mblode/agent-skills",
       "skills": [
-        "skills/plan",
-        "skills/tdd"
+        "skills/planning"
       ],
       "extensions": [],
       "prompts": [],
@@ -64,6 +64,13 @@
     },
     {
       "source": "https://github.com/humanlayer/skills",
+      "skills": [],
+      "extensions": [],
+      "prompts": [],
+      "themes": []
+    },
+    {
+      "source": "https://github.com/cursor/plugins",
       "skills": [],
       "extensions": [],
       "prompts": [],

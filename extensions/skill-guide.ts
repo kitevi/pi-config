@@ -27,9 +27,9 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 		"buku-bookmarks": "Bookmark search/add/cleanup.",
 		grilling: "Want your idea challenged.",
 		handoff: "Passing work to next session.",
-		plan: "Feature needs a plan first.",
+		planning: "Feature needs a plan first.",
 		"show-me": "Explain with visuals.",
-		tdd: "Feature work, test-first.",
+		tdd: "Bug fix, failing test first.",
 		"test-audit": "Which tests to cut.",
 	},
 };

@@ -89,9 +89,9 @@ void describe("skill guide config", () => {
 
 void describe("skill guide entries", () => {
 	void it.each([
-		{ skill: "plan", summary: "Feature needs a plan first." },
+		{ skill: "planning", summary: "Feature needs a plan first." },
 		{ skill: "show-me", summary: "Explain with visuals." },
-		{ skill: "tdd", summary: "Feature work, test-first." },
+		{ skill: "tdd", summary: "Bug fix, failing test first." },
 	])("shows $skill with the default guide summary", ({ skill, summary }) => {
 		const entries = collectSkillGuideEntries(
 			[
