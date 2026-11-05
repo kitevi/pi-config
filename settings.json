@@ -29,7 +29,6 @@
     "npm:pi-quiet-spinner",
     "npm:@monotykamary/pi-retry",
     "npm:@monotykamary/pi-better-openai",
-    "npm:pi-hypercharm-provider",
     "npm:pi-coralbricks-provider",
     "npm:pi-model-sort",
     "npm:pi-invisible-continue",

@@ -50,8 +50,7 @@ npm run setup
 
 `extensions/footer-veil.ts` starts each session with model information and provider usage
 veiled. Press `Ctrl+P` to show or hide them; context statistics are never veiled. Provider usage covers both the
-footer status slots and the below-editor widget lines used by hypercharm
-and Better OpenAI (in its `status` footer mode). No per-provider
+footer status slots and the below-editor widget lines used by Better OpenAI (in its `status` footer mode). No per-provider
 commands are used; the veil filters at render time, so provider updates stay
 hidden until you reveal them with `Ctrl+P`. Reloads and new/resumed/forked sessions restore the
 initially veiled state.
