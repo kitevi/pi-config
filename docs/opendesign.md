@@ -43,6 +43,10 @@ model's nominal maximum.
 
 ## Reasoning
 
+`deepseek-v4.1-flash` and `claude-haiku-5.5` both reason by default and share
+the same wire shape, so both entries use `thinkingFormat: "openrouter"` and
+differ only in id, name, and limits.
+
 `deepseek-v4.1-flash` reasons by default. The gateway accepts
 `reasoning_effort` values `none`, `minimal`, `low`, `high`, and `max` (all HTTP
 200, with `none` producing zero `reasoning_tokens`). `medium` and `xhigh` are
@@ -61,6 +65,37 @@ probed to confirm it: an assistant message replayed without reasoning still
 returns 200 (so not `requiresReasoningContentOnAssistantMessages`), and a
 `developer` message returns 200 (so not `supportsDeveloperRole: false`). Do not
 add compat flags without that kind of probe.
+
+## `claude-haiku-5.5`
+
+Probed against the same gateway, the same way:
+
+| gateway field | recorded |
+|---|---|
+| `context_budget` | `contextWindow: 228000` (`context_limit` says 1000000) |
+| `output_budget` | `maxTokens: 128000` |
+| `input_modalities` | `["text", "image"]` — `file` is not a pi input |
+
+- Reasoning arrives in the OpenRouter shape (`message.reasoning`,
+  `message.reasoning_details[].type == "reasoning.text"`,
+  `usage.completion_tokens_details.reasoning_tokens`), and `off` →
+  `reasoning.effort: "none"` bills zero reasoning tokens.
+- All seven level labels return 200 while `"banana"` returns 400, so the gateway
+  validates the field instead of ignoring it. Reasoning length was **not**
+  monotonic in the label across repeated hard prompts (minimal often matched
+  high; xhigh once came in below high), so the entry forwards every label
+  unchanged rather than inventing a budget for a level the gateway maps its own
+  way.
+- `max_tokens` and `max_completion_tokens` both return 200, so pi's
+  auto-detected `max_completion_tokens` needs no `maxTokensField` override.
+- `developer` role, `store: false`, `strict: false` tools,
+  `stream_options.include_usage`, and an assistant replay with or without
+  `reasoning_details` all return 200, so no `supportsDeveloperRole`,
+  `supportsStore`, or `requiresReasoningContentOnAssistantMessages` override is
+  needed.
+
+The two entries share every compat flag; only their ids, names, and limits
+differ. Keep a new model to that shape.
 
 ## Do not copy catalog numbers
 
@@ -87,6 +122,7 @@ id is `opendesign` — no hyphen, no space — and the key variable is
 ```sh
 pi --list-models opendesign                      # registered, limits applied
 pi --provider opendesign --model deepseek-v4.1-flash "Reply with exactly: OK"
+pi --provider opendesign --model claude-haiku-5.5 "Reply with exactly: OK"
 ```
 
 ## When the provider is missing from `/model`
@@ -111,7 +147,7 @@ so its absence points at the environment, not the JSON:
 2. Add the entry to `models.json`, keeping `apiKey: "${OPENDESIGN_API_KEY}"` so
    the key never enters this repository.
 3. Extend `tests/bootstrap.test.ts`, which pins the provider's `baseUrl`, `api`,
-   key interpolation, model id, and limits.
+   key interpolation, and each model's id and limits.
 4. `npm run setup && npm test`.
 
 The gateway also exposes `openai-responses` at `/v1/responses` and

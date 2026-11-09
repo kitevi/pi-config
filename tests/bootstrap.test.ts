@@ -188,9 +188,14 @@ void describe("bootstrap model config", () => {
 			assert.equal(provider?.baseUrl, "https://amr-link.open-design.ai/v1");
 			assert.equal(provider?.api, "openai-completions");
 			assert.match(provider?.apiKey ?? "", /^\$\{OPENDESIGN_API_KEY\}$/);
-			assert.equal(provider?.models?.[0]?.id, "deepseek-v4.1-flash");
-			assert.equal(provider?.models?.[0]?.contextWindow, 328000);
-			assert.equal(provider?.models?.[0]?.maxTokens, 128000);
+			const models = provider?.models ?? [];
+			const deepseek = models.find((model) => model.id === "deepseek-v4.1-flash");
+			const haiku = models.find((model) => model.id === "claude-haiku-5.5");
+
+			assert.equal(deepseek?.contextWindow, 328000);
+			assert.equal(deepseek?.maxTokens, 128000);
+			assert.equal(haiku?.contextWindow, 228000);
+			assert.equal(haiku?.maxTokens, 128000);
 		} finally {
 			await rm(home, { recursive: true, force: true });
 		}

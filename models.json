@@ -25,6 +25,26 @@
           "compat": {
             "thinkingFormat": "openrouter"
           }
+        },
+        {
+          "id": "claude-haiku-5.5",
+          "name": "Claude Haiku 5.5",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "input": ["text", "image"],
+          "contextWindow": 228000,
+          "maxTokens": 128000,
+          "compat": {
+            "thinkingFormat": "openrouter"
+          }
         }
       ]
     }
