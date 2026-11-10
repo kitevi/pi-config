@@ -1,16 +1,15 @@
 {
   "mcpServers": {
-    "exa": {
-      "description": "Search the live web and fetch webpage content with Exa.",
-      "command": "npx",
-      "args": ["-y", "exa-mcp-server"],
-      "env": {
-        "EXA_API_KEY": "${EXA_API_KEY}"
+    "keenable": {
+      "description": "Search the live web and fetch webpage content with Keenable.",
+      "url": "https://api.keenable.ai/mcp",
+      "headers": {
+        "X-API-Key": "${KEENABLE_API_KEY}"
       },
       "exposure": "hidden",
       "toolExposure": {
-        "web_search_exa": "codemode",
-        "web_fetch_exa": "codemode"
+        "search_web_pages": "codemode",
+        "fetch_page_content": "codemode"
       }
     },
     "context7": {
@@ -20,27 +19,6 @@
       "toolExposure": {
         "resolve-library-id": "codemode",
         "query-docs": "codemode"
-      }
-    },
-    "tinyfish": {
-      "description": "Free TinyFish web search and page fetching through an auto-started stdio connection.",
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote@0.14.2",
-        "https://agent.tinyfish.ai/mcp",
-        "--transport",
-        "http-only",
-        "--header",
-        "X-API-Key:${TINYFISH_API_KEY}"
-      ],
-      "env": {
-        "TINYFISH_API_KEY": "${TINYFISH_API_KEY}"
-      },
-      "exposure": "hidden",
-      "toolExposure": {
-        "search": "codemode",
-        "fetch_content": "codemode"
       }
     }
   }

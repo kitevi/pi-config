@@ -31,7 +31,7 @@ page through the file:
 
 # Web and documentation tools
 
-Use Context7 for library and API documentation. Resolve the library, then query its docs. Use TinyFish for web search and page fetching. Use Exa when TinyFish is unavailable, a request fails, results are empty or irrelevant, or a fetched page has no usable content. Repair argument errors before switching providers. Use shell HTTP only after those tools cannot satisfy the lookup, and state why.
+Use Context7 for library and API documentation. Resolve the library, then query its docs. Use Keenable for web search and page fetching. Pass `live: true` to the fetch when a page is missing or stale, and repair argument errors before giving up on a call. Use shell HTTP only after those tools cannot satisfy the lookup, and state why.
 
 For that shell fallback, use `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" <url>`. If access is blocked, report the block.
 
