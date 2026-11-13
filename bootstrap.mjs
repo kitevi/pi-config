@@ -24,11 +24,6 @@ const links = [
 // runtime keys the installation owns, kept when the repo file omits them.
 const OVERLAYS = [
   {
-    source: join(REPO_DIR, "pi-better-openai.json"),
-    target: join(PI_EXTENSIONS_DIR, "pi-better-openai.json"),
-    label: "pi-better-openai settings",
-  },
-  {
     source: join(REPO_DIR, "coralbricks.json"),
     target: join(PI_EXTENSIONS_DIR, "coralbricks.json"),
     label: "coralbricks settings",

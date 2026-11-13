@@ -25,7 +25,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 |-----------|--------------|
 | `settings.json` | overlay at `~/.pi/agent/settings.json`, keeps the local `deviceId` |
 | `APPEND_SYSTEM.md`, `pi-vcc-config.json`, `mcp.json`, `models.json` | overlay at `~/.pi/agent/` |
-| `pi-better-openai.json`, `coralbricks.json` | overlay at `~/.pi/agent/extensions/` |
+| `coralbricks.json` | overlay at `~/.pi/agent/extensions/` |
 | `extensions/*.ts`, `prompts/`, `skills/`, `reminders/`, `keybindings.json` | symlinked into `~/.pi/agent/` |
 | `bootstrap.mjs` | the reconciler that performs setup |
 

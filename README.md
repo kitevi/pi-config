@@ -50,7 +50,7 @@ npm run setup
 
 `extensions/footer-veil.ts` starts each session with model information and provider usage
 veiled. Press `Ctrl+P` to show or hide them; context statistics are never veiled. Provider usage covers both the
-footer status slots and the below-editor widget lines used by Better OpenAI (in its `status` footer mode). No per-provider
+footer status slots and the below-editor widget lines. No per-provider
 commands are used; the veil filters at render time, so provider updates stay
 hidden until you reveal them with `Ctrl+P`. Reloads and new/resumed/forked sessions restore the
 initially veiled state.
@@ -100,7 +100,6 @@ Focus detection uses CSI mode 1004 reports where the terminal supports them, wit
 
 5. **Installs** JSON config files (full replacement — the repo file becomes the target file, written atomically). If a source file is later removed from the repo, re-running setup copies the target to `<target>.bak` and then removes it:
    - `settings.json` → `~/.pi/agent/settings.json`
-   - `pi-better-openai.json` → `~/.pi/agent/extensions/pi-better-openai.json`
    - `coralbricks.json` → `~/.pi/agent/extensions/coralbricks.json`
    - `mcp.json` → `~/.pi/agent/mcp.json`
    - `models.json` → `~/.pi/agent/models.json`
@@ -145,6 +144,6 @@ Re-run `npm run setup` any time you change files in this repo or set up a new ma
 
 ## Note
 
-All JSON config files (`settings.json`, `pi-better-openai.json`, `coralbricks.json`, `mcp.json`, `models.json`, and `pi-vcc-config.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
+All JSON config files (`settings.json`, `coralbricks.json`, `mcp.json`, `models.json`, and `pi-vcc-config.json`) are **fully replaced** on every `npm run setup` — the repo file is written wholesale over the target. Any local pi settings not tracked in this repo will be overwritten.
 
 If a JSON source file is removed from the repo, re-running setup backs the target up to `<target>.bak` and deletes it. `*.bak` files are gitignored.
