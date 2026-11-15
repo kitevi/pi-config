@@ -127,10 +127,11 @@ Paths this repository does not declare are never touched, except repo-owned syml
 - `keybindings.json` — repo-managed keybinding overrides; unbinds the built-in commands that use `Ctrl+P` so `footer-veil` can own `Ctrl+P`
 - `mcp.json` — Pi MCP server configuration installed into `~/.pi/agent/mcp.json` (see [Codemode](#codemode))
 - `coralbricks.json` — `pi-coralbricks-provider` settings installed into `~/.pi/agent/extensions/coralbricks.json`; turns cache-optimized pricing (`X-Coral-Pricing: cache-optimized`) on by default, so `ctrl+alt+c` toggles are reset by the next `npm run setup`
-- `models.json` — `opendesign` provider (`amr-link`): Chat Completions against `https://amr-link.open-design.ai/v1`, keyed by `$OPENDESIGN_API_KEY`, exposing the DeepSeek V4.1 Flash 1017 checkpoint as `deepseek-v4.1-flash` (see [`docs/opendesign.md`](docs/opendesign.md))
+- `models.json` — `opendesign` provider (`amr-link`): Chat Completions against `https://amr-link.open-design.ai/v1`, keyed by `$OPENDESIGN_API_KEY`, exposing the DeepSeek V4.1 Flash 1017 checkpoint as `deepseek-v4.1-flash` (see [`docs/opendesign.md`](docs/opendesign.md)); and the `deploy` provider: Chat Completions against `https://api-cdn.deploy.com/api/v1`, keyed by `$DEPLOY_API_KEY`, exposing `deepseek-ai/deepseek-v4.1-flash-1017` (see [`docs/deploy.md`](docs/deploy.md))
 - `pi-vcc-config.json` — pi-vcc compaction settings installed into `~/.pi/agent/pi-vcc-config.json`; pi-vcc writes every compaction summary
 - `docs/` — provider runbooks
   - `docs/opendesign.md` — how to add or change an `opendesign` model: field mapping, the `context_budget` trap, reasoning compat, and the missing-provider diagnosis
+  - `docs/deploy.md` — how to add or change a `deploy` model: the measured context boundary, the silently ignored `developer` role, and unvalidated `reasoning_effort`
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
 The bootstrap script is plain Node.js; the pi extensions in `extensions/` are TypeScript.

@@ -200,6 +200,43 @@ void describe("bootstrap model config", () => {
 			await rm(home, { recursive: true, force: true });
 		}
 	});
+
+	void it("installs models.json declaring the deploy provider", async () => {
+		const home = await mkdtemp(join(tmpdir(), "pi-config-models-"));
+
+		try {
+			await runBootstrap(home);
+
+			const installed = JSON.parse(await readFile(join(home, ".pi", "agent", "models.json"), "utf8")) as {
+				providers?: Record<
+					string,
+					{
+						baseUrl?: string;
+						api?: string;
+						apiKey?: string;
+						models?: {
+							id?: string;
+							contextWindow?: number;
+							maxTokens?: number;
+							compat?: { supportsDeveloperRole?: boolean };
+						}[];
+					}
+				>;
+			};
+			const provider = installed.providers?.["deploy"];
+
+			assert.equal(provider?.baseUrl, "https://api-cdn.deploy.com/api/v1");
+			assert.equal(provider?.api, "openai-completions");
+			assert.match(provider?.apiKey ?? "", /^\$\{DEPLOY_API_KEY\}$/);
+			const deepseek = provider?.models?.find((model) => model.id === "deepseek-ai/deepseek-v4.1-flash-1017");
+
+			assert.equal(deepseek?.contextWindow, 1048576);
+			assert.equal(deepseek?.maxTokens, 384000);
+			assert.equal(deepseek?.compat?.supportsDeveloperRole, false);
+		} finally {
+			await rm(home, { recursive: true, force: true });
+		}
+	});
 });
 
 void describe("bootstrap managed writes", () => {

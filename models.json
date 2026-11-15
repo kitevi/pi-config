@@ -47,6 +47,39 @@
           }
         }
       ]
+    },
+    "deploy": {
+      "baseUrl": "https://api-cdn.deploy.com/api/v1",
+      "api": "openai-completions",
+      "apiKey": "${DEPLOY_API_KEY}",
+      "models": [
+        {
+          "id": "deepseek-ai/deepseek-v4.1-flash-1017",
+          "name": "DeepSeek V4.1 Flash 1017",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": null,
+            "low": "low",
+            "medium": null,
+            "high": "high",
+            "xhigh": null,
+            "max": "max"
+          },
+          "input": ["text", "image"],
+          "contextWindow": 1048576,
+          "maxTokens": 384000,
+          "cost": {
+            "input": 0.1,
+            "output": 0.35,
+            "cacheRead": 0.003,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "supportsDeveloperRole": false
+          }
+        }
+      ]
     }
   }
 }

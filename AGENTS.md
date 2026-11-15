@@ -35,6 +35,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 - `extensions/codemode-output-cap.ts` caps the codemode return at 30,000 characters, or at a larger `max_output_tokens` from the script's `// @options:` line, and leaves the full-text path and the omitted `slice(start, end)` in the omission hole.
 - `coralbricks.json` sends `X-Coral-Pricing: cache-optimized` by default; the provider's runtime `ctrl+alt+c` toggle is overwritten on the next reconciliation.
 - `opendesign` models (`models.json`) record the gateway's `context_budget` and `output_budget`, never a catalog's `context_limit` — see `docs/opendesign.md`.
+- `deploy` models (`models.json`) need `compat.supportsDeveloperRole: false` because the gateway silently ignores `developer` messages while reasoning, and they record the measured `prompt + completion` limit as `contextWindow` — see `docs/deploy.md`.
 - `extensions/settle-compact.ts` compacts once the agent settles at 90% or more of the model window; `npm:@sting8k/pi-vcc` writes the summary without an LLM call (`pi-vcc-config.json`).
 
 ## External references
@@ -44,6 +45,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 | Prerequisites, setup details, extension behavior | `README.md` |
 | Domain terminology | `CONTEXT.md` |
 | `opendesign` model runbook | `docs/opendesign.md` |
+| `deploy` model runbook | `docs/deploy.md` |
 
 ## Making a change
 
