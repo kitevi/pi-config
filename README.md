@@ -82,6 +82,10 @@ Focus detection uses CSI mode 1004 reports where the terminal supports them, wit
 `settings.json` sets `codemode.mode` to `only` and enables `codemode`, `grep`, `find`, and `ls` beside the default `read`, `bash`, `edit`, and `write` tools. The model reaches those tools through one codemode script. Pi's `tool-search` extension stays disabled. MCP servers in `mcp.json` are hidden except the Context7 and Keenable tools scripts call. `extensions/codemode-output-cap.ts` keeps the model-facing codemode return to 30,000 characters; a script whose `// @options:` line sets a larger `max_output_tokens` raises the cap to that budget, at Pi's 4 characters per token. A longer return is written once to a private temp file, or Pi's existing spill is reused, and the visible text keeps the start and the end with that path and the omitted `slice(start, end)` in the omission hole, inside the budget. The range is left out when image annotations between the texts would shift the file's offsets. `npm:@sting8k/pi-vcc` replaces Pi's summarizer with an algorithmic one (`pi-vcc-config.json`). `extensions/settle-compact.ts` compacts once the agent settles with context use at or above 90% of the model window, so compaction lands between tasks; Pi's own threshold (`contextWindow - compaction.reserveTokens`) stays as the mid-run safety net.
 
 
+## Codebase search
+
+`skills/codebase-search` answers where-is, who-calls, and what-does-this-affect questions in any repository from a code graph built by [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp). Its wrapper, `skills/codebase-search/scripts/cbm`, is POSIX sh: on first use it downloads the release for the platform (Linux, macOS, or Windows Git Bash), checks for a newer one at most once a day, verifies each download's SHA-256, and keeps binaries in `~/.cache/codebase-memory-mcp/bin`. Indexes stay in cbm's cache: nothing is written into the repository or the working directory, and the wrapper refuses index calls that would write there (`--persistence`, or a repository that already holds a `.codebase-memory/` artifact). The download happens at first use, so reconciliation stays offline. `APPEND_SYSTEM.md` sends code-structure questions to a repository's own code-search tool first, and to this skill otherwise. The spec is [`docs/codebase-search.md`](docs/codebase-search.md).
+
 ## What `npm run setup` does
 
 `npm run setup` runs `bootstrap.mjs`, which:
@@ -121,6 +125,7 @@ Paths this repository does not declare are never touched, except repo-owned syml
   - `extensions/settle-compact.ts` — compacts once the agent settles with context use at or above 90% (`SETTLE_COMPACT_PERCENT`); skips aborted runs and runs with queued messages
   - `extensions/max-reasoning.ts` — raises the thinking level to any reasoning model’s highest supported level on model select/start (the runtime clamps “max” to the model’s top; `EXCLUDED_FAMILIES` opts models out)
 - `skills/` — pi skills
+  - `skills/codebase-search/` — structural code search through codebase-memory-mcp; `scripts/cbm` installs, updates, and runs it
 - `reminders/` — global reminder definitions for `pi-system-reminders`; `hbm-companion.ts` points to the companion `.hbm.xml` mapping when a Hibernate-mapped Java entity is read
 - `APPEND_SYSTEM.md` — repository-owned system prompt overlay rules installed into `~/.pi/agent/` during reconciliation
 - `settings.json` — repo-managed pi settings, including installed packages/extensions
@@ -129,9 +134,10 @@ Paths this repository does not declare are never touched, except repo-owned syml
 - `coralbricks.json` — `pi-coralbricks-provider` settings installed into `~/.pi/agent/extensions/coralbricks.json`; turns cache-optimized pricing (`X-Coral-Pricing: cache-optimized`) on by default, so `ctrl+alt+c` toggles are reset by the next `npm run setup`
 - `models.json` — `opendesign` provider (`amr-link`): Chat Completions against `https://amr-link.open-design.ai/v1`, keyed by `$OPENDESIGN_API_KEY`, exposing the DeepSeek V4.1 Flash 1017 checkpoint as `deepseek-v4.1-flash` (see [`docs/opendesign.md`](docs/opendesign.md)); and the `deploy` provider: Chat Completions against `https://api-cdn.deploy.com/api/v1`, keyed by `$DEPLOY_API_KEY`, exposing `deepseek-ai/deepseek-v4.1-flash-1017` (see [`docs/deploy.md`](docs/deploy.md))
 - `pi-vcc-config.json` — pi-vcc compaction settings installed into `~/.pi/agent/pi-vcc-config.json`; pi-vcc writes every compaction summary
-- `docs/` — provider runbooks
+- `docs/` — provider runbooks and skill specs
   - `docs/opendesign.md` — how to add or change an `opendesign` model: field mapping, the `context_budget` trap, reasoning compat, and the missing-provider diagnosis
   - `docs/deploy.md` — how to add or change a `deploy` model: the measured context boundary, the silently ignored `developer` role, and unvalidated `reasoning_effort`
+  - `docs/codebase-search.md` — spec for the `codebase-search` skill: routing, the `cbm` wrapper's install and update rules, platforms, storage, and tests
 - `tests/` — Vitest suites for extensions and reconciliation behavior, run with `npm test`
 
 The bootstrap script is plain Node.js; the pi extensions in `extensions/` are TypeScript.

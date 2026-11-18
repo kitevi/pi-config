@@ -35,6 +35,15 @@ Use Context7 for library and API documentation. Resolve the library, then query 
 
 For that shell fallback, use `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" <url>`. If access is blocked, report the block.
 
+# Code search
+
+Answer where-is, who-calls, what-calls, and does-it-exist questions about code from a code graph before grep or find:
+
+1. When the repository's instructions (AGENTS.md, CLAUDE.md, or docs they point to) name a code-search tool, use that tool exactly as they describe, with their project names and index commands.
+2. Otherwise use the `codebase-search` skill.
+
+Use grep for literal text, configuration, logs, and files the graph does not index. Read the lines a graph answer cites before relying on it.
+
 # Code navigation
 
 - Cite code as `relative/path/to/file.ts:45` on verified 1-based lines, naming the symbol that line supports.

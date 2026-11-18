@@ -25,6 +25,7 @@ const DEFAULT_SKILL_GUIDE_CONFIG: SkillGuideConfig = {
 	summaryOverrides: {
 		"blast-radius": "What could this diff break?",
 		buku: "Bookmark search/add/cleanup.",
+		"codebase-search": "Where is X? Who calls X?",
 		grilling: "Want your idea challenged.",
 		handoff: "Passing work to next session.",
 		planning: "Feature needs a plan first.",

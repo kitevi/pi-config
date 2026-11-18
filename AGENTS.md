@@ -37,6 +37,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 - `opendesign` models (`models.json`) record the gateway's `context_budget` and `output_budget`, never a catalog's `context_limit` — see `docs/opendesign.md`.
 - `deploy` models (`models.json`) need `compat.supportsDeveloperRole: false` because the gateway silently ignores `developer` messages while reasoning, and they record the measured `prompt + completion` limit as `contextWindow` — see `docs/deploy.md`.
 - `extensions/settle-compact.ts` compacts once the agent settles at 90% or more of the model window; `npm:@sting8k/pi-vcc` writes the summary without an LLM call (`pi-vcc-config.json`).
+- `APPEND_SYSTEM.md` sends code-structure questions to a repository's own code-search tool, else to `skills/codebase-search`, whose POSIX sh wrapper `scripts/cbm` downloads codebase-memory-mcp on first use, never during reconciliation — see `docs/codebase-search.md`.
 
 ## External references
 
@@ -46,6 +47,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 | Domain terminology | `CONTEXT.md` |
 | `opendesign` model runbook | `docs/opendesign.md` |
 | `deploy` model runbook | `docs/deploy.md` |
+| `codebase-search` skill spec | `docs/codebase-search.md` |
 
 ## Making a change
 

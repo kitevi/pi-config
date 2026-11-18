@@ -1,0 +1,244 @@
+#!/bin/sh
+# cbm: run codebase-memory-mcp, installing or updating it first.
+#
+#   cbm <codebase-memory-mcp arguments>
+#
+# Installs the official release for this platform on first use, looks for a
+# newer release at most once per CBM_UPDATE_INTERVAL, and verifies every
+# download against the release's SHA-256 checksums. Then it execs the binary,
+# so output, exit status, and signals are the binary's own. Its own messages go
+# to stderr, prefixed "cbm:". It writes only inside CBM_BIN_BASE, and it refuses
+# index calls that would make codebase-memory-mcp write into the repository;
+# indexes stay in codebase-memory-mcp's own cache.
+#
+#   CBM_VERSION          release tag such as v0.12.1, or latest (the default)
+#   CBM_UPDATE_INTERVAL  seconds between release checks, 0 for every run
+#                        (default 86400)
+#   CBM_BIN_BASE         binary store (default
+#                        ${XDG_CACHE_HOME:-$HOME/.cache}/codebase-memory-mcp/bin)
+#
+# Store layout: cbm-<tag>/<binary> per release, plus latest (the tag the last
+# check settled on) and checked-at (its time in epoch seconds). Other wrappers
+# using the same layout share both.
+set -eu
+
+repo=DeusData/codebase-memory-mcp
+agent='Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot'
+
+say() { printf 'cbm: %s\n' "$*" >&2; }
+die() { say "error: $1"; exit "${2:-1}"; }
+
+case ${1-} in
+  install | uninstall | update)
+    die "'$1' is refused: this wrapper installs and updates codebase-memory-mcp" 2 ;;
+esac
+
+# Indexing must not write into the repository. codebase-memory-mcp 0.12 writes a
+# graph artifact there (.codebase-memory/ and a merge driver in .git/config)
+# when given --persistence true, and on every index of a repository that
+# already holds one, whatever the flag says. So the wrapper reads
+# index_repository's flags itself and refuses both cases.
+guard_index() {
+  shift # cli
+  while [ $# -gt 0 ] && [ "${1#-}" != "$1" ]; do shift; done
+  [ "${1-}" = index_repository ] || return 0
+  shift
+  target=
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --help | -h) return 0 ;;
+      --repo-path) target=${2-}; if [ $# -gt 1 ]; then shift; fi ;;
+      --repo-path=*) target=${1#*=} ;;
+      --persistence) [ "${2-}" = false ] || die "--persistence is refused: it writes into the repository" 2; shift ;;
+      --persistence=false) ;;
+      --persistence=*) die "--persistence is refused: it writes into the repository" 2 ;;
+      --args-file | --args-file=* | '{'*)
+        die "index_repository takes flags here, not JSON, so the wrapper can check them" 2 ;;
+    esac
+    shift
+  done
+  [ -n "$target" ] || die "index_repository needs --repo-path here" 2
+  if [ -e "$target/.codebase-memory" ]; then
+    die "$target holds a .codebase-memory/ graph artifact, which indexing would rewrite along with .git/config; search it with grep instead" 2
+  fi
+}
+if [ "${1-}" = cli ]; then guard_index "$@"; fi
+
+# vMAJOR.MINOR.PATCH with digits only, so a tag is safe in paths and URLs.
+is_tag() {
+  case $1 in v*.*.*) ;; *) return 1 ;; esac
+  case ${1#v} in *[!0-9.]* | .* | *. | *..* | *.*.*.*) return 1 ;; esac
+}
+
+# A decimal number without leading zeros and at most 12 digits.
+is_count() {
+  case $1 in '' | *[!0-9]* | 0?* | ?????????????*) return 1 ;; esac
+}
+
+version=${CBM_VERSION:-latest}
+interval=${CBM_UPDATE_INTERVAL:-86400}
+base=${CBM_BIN_BASE:-${XDG_CACHE_HOME:-$HOME/.cache}/codebase-memory-mcp/bin}
+[ "$version" = latest ] || is_tag "$version" ||
+  die "CBM_VERSION must be latest or a tag such as v0.12.1, not '$version'" 2
+is_count "$interval" ||
+  die "CBM_UPDATE_INTERVAL must be a whole number of seconds, not '$interval'" 2
+
+# The release asset for this machine, named as upstream publishes it.
+case $(uname -m) in
+  x86_64 | amd64) arch=amd64 ;;
+  aarch64 | arm64) arch=arm64 ;;
+  *) die "unsupported CPU: $(uname -m)" ;;
+esac
+case $(uname -s) in
+  Linux) asset=linux-$arch-portable.tar.gz exe=codebase-memory-mcp ;;
+  Darwin)
+    # A Rosetta shell reports x86_64 on Apple silicon; take the native build.
+    if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = 1 ]; then arch=arm64; fi
+    asset=darwin-$arch.tar.gz exe=codebase-memory-mcp ;;
+  MINGW* | MSYS* | CYGWIN*) asset=windows-$arch.zip exe=codebase-memory-mcp.exe ;;
+  *) die "unsupported OS: $(uname -s)" ;;
+esac
+asset=codebase-memory-mcp-$asset
+
+work=
+cleanup() { if [ -n "$work" ]; then rm -rf "$work" || :; fi; }
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+installed() { [ -x "$base/cbm-$1/$exe" ]; }
+
+# Scratch space inside the store, so an install ends in a rename on one
+# filesystem. Directories left by processes that no longer run are swept first.
+workdir() {
+  [ -z "$work" ] || return 0
+  for dir in "$base"/.work.*; do
+    [ -d "$dir" ] || continue
+    kill -0 "${dir##*.}" 2>/dev/null || rm -rf "$dir"
+  done
+  rm -rf "$base/.work.$$" && mkdir "$base/.work.$$" || return 1
+  work=$base/.work.$$
+}
+
+fetch() { # fetch URL FILE
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --proto =https --proto-redir =https --connect-timeout 15 \
+      --speed-limit 1024 --speed-time 30 --retry 2 -A "$agent" -o "$2" "$1"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -T 30 -U "$agent" -O "$2" "$1"
+  else
+    say "error: downloading needs curl or wget"
+    return 1
+  fi
+}
+
+sha256() { # sha256 FILE: print the file's SHA-256 in hex
+  if command -v sha256sum >/dev/null 2>&1; then set -- "$(sha256sum <"$1")"
+  elif command -v shasum >/dev/null 2>&1; then set -- "$(shasum -a 256 <"$1")"
+  elif command -v openssl >/dev/null 2>&1; then set -- "$(openssl dgst -sha256 -r <"$1")"
+  else
+    say "error: verifying needs sha256sum, shasum, or openssl"
+    return 1
+  fi
+  printf '%s\n' "${1%% *}"
+}
+
+# Sets release to the newest stable tag; /releases/latest skips prereleases.
+lookup_latest() {
+  workdir && fetch "https://api.github.com/repos/$repo/releases/latest" "$work/release.json" ||
+    return 1
+  release=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$work/release.json")
+  is_tag "$release" || { say "error: GitHub named no usable release tag"; return 1; }
+}
+
+install_release() { # install_release TAG
+  url=https://github.com/$repo/releases/download/$1
+  say "installing codebase-memory-mcp $1 ($asset, about 50 MB)"
+  workdir &&
+    fetch "$url/checksums.txt" "$work/checksums.txt" &&
+    fetch "$url/$asset" "$work/$asset" || return 1
+  # checksums.txt lines read "<sha256>  <file>" or "<sha256> *<file>".
+  expected=$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1; exit }' "$work/checksums.txt")
+  case $expected in
+    '' | *[!0-9a-f]*) say "error: checksums.txt of $1 has no SHA-256 for $asset"; return 1 ;;
+  esac
+  actual=$(sha256 "$work/$asset") || return 1
+  if [ "$actual" != "$expected" ]; then
+    say "error: $asset failed verification: SHA-256 $actual, expected $expected"
+    return 1
+  fi
+  # Upstream archives keep the binary at their root.
+  mkdir "$work/unpacked" || return 1
+  case $asset in
+    *.zip) unzip -q "$work/$asset" "$exe" -d "$work/unpacked" ;;
+    *) tar -xzf "$work/$asset" -C "$work/unpacked" "$exe" ;;
+  esac || { say "error: could not unpack $exe from $asset"; return 1; }
+  binary=$work/unpacked/$exe
+  chmod +x "$binary"
+  if ! "$binary" --version >/dev/null 2>&1; then
+    say "error: $exe $1 does not start; if $base is on a noexec mount, set CBM_BIN_BASE to a directory that allows programs"
+    return 1
+  fi
+  # A rename within one filesystem: the binary appears whole or not at all.
+  # On Windows it fails while a concurrent run executes the same release.
+  if mkdir -p "$base/cbm-$1" && mv -f "$binary" "$base/cbm-$1/$exe"; then return 0; fi
+  installed "$1"
+}
+
+record() { # record TAG: remember the tag and the time of this check
+  workdir &&
+    printf '%s\n' "$1" >"$work/latest" &&
+    date +%s >"$work/checked-at" &&
+    mv -f "$work/latest" "$base/latest" &&
+    mv -f "$work/checked-at" "$base/checked-at"
+}
+
+fresh() { # true while the last check is younger than the interval
+  now=$(date +%s) && checked=$(cat "$base/checked-at" 2>/dev/null) || return 1
+  is_count "$now" && is_count "$checked" && [ "$interval" -gt 0 ] &&
+    [ "$now" -ge "$checked" ] && [ $((now - checked)) -lt "$interval" ]
+}
+
+newest_installed() { # print the highest installed tag
+  for dir in "$base"/cbm-v*; do
+    t=${dir##*/cbm-}
+    if is_tag "$t" && installed "$t"; then printf '%s\n' "${t#v}"; fi
+  done | sort -t . -k 1,1n -k 2,2n -k 3,3n | sed -n '$s/^/v/p'
+}
+
+prune() { # prune KEEP...: delete every other installed release
+  for dir in "$base"/cbm-v*; do
+    [ -d "$dir" ] || continue
+    case " $* " in *" ${dir##*/cbm-} "*) continue ;; esac
+    rm -rf "$dir" 2>/dev/null || :
+  done
+}
+
+mkdir -p "$base" || die "cannot create $base"
+previous=$(cat "$base/latest" 2>/dev/null) || previous=
+is_tag "$previous" || previous=
+
+if [ "$version" != latest ]; then
+  tag=$version
+  installed "$tag" || install_release "$tag" || exit 1
+elif fresh && installed "$previous"; then
+  tag=$previous
+else
+  if lookup_latest && { installed "$release" || install_release "$release"; }; then
+    tag=$release
+    # Keep the release a concurrent run may still be starting.
+    if [ -n "$previous" ] && [ "$previous" != "$tag" ]; then prune "$tag" "$previous"; fi
+  else
+    tag=$(newest_installed)
+    [ -n "$tag" ] || die "codebase-memory-mcp is not installed in $base and could not be downloaded"
+    say "warning: update failed; running $tag until the next check"
+  fi
+  # Recorded even after a failure, so an offline machine waits a full interval
+  # instead of timing out on every run.
+  record "$tag" || say "warning: could not record the release check in $base"
+fi
+
+cleanup
+trap - EXIT HUP INT TERM
+exec "$base/cbm-$tag/$exe" "$@"
