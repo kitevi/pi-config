@@ -18,6 +18,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 3. Never treat `~/.pi/agent/npm/` as configuration. Packages are declared in `settings.json` (`npm:` package ids); keep sources unpinned — no npm versions, git tags, or commits.
 4. `deviceId` is runtime installation identity, not configuration. Reconciliation preserves it; never commit it.
 5. `bootstrap.mjs` reconciles only declared paths, so leftovers from removed packages, renamed config, or older bootstrap versions survive setup by design; never add deletion logic for undeclared paths. For a large change, delete `~/.pi`, rerun setup, and reload Pi.
+6. The model-facing code-search guidance — the "Code search" section of `APPEND_SYSTEM.md` and `skills/codebase-search/SKILL.md` — is tuned and validated empirically: Opus 5.5 tested it in isolated pi runs with DeepSeek Flash V4.1 across several repositories. Treat it as frozen. Do not reword, restructure, trim, or extend it while making an unrelated change; change it only when the user explicitly asks, and make that the change's whole scope.
 
 ## Sources and runtime targets
 
