@@ -37,12 +37,11 @@ For that shell fallback, use `curl -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, li
 
 # Code search
 
-Answer where-is, who-calls, what-calls, and does-it-exist questions about code from a code graph before grep or find:
+When a request needs you to search or explore a repository's code (where something is defined or handled, what calls or uses it, what it calls, whether it exists, how the parts connect, what a change affects), your first tool call starts the `codebase-search` skill, unless the repository names its own code-search tool (below): read `~/.pi/agent/skills/codebase-search/SKILL.md` (once per session) and run `~/.pi/agent/skills/codebase-search/scripts/cbm cli index_repository --repo-path "$(git rev-parse --show-toplevel)"`. Do not call grep, find, or ls before the graph has answered.
 
-1. When the repository's instructions (AGENTS.md, CLAUDE.md, or docs they point to) name a code-search tool, use that tool exactly as they describe, with their project names and index commands.
-2. Otherwise use the `codebase-search` skill.
+The only exception: when the repository's instructions (AGENTS.md, CLAUDE.md, or docs they point to) name a code-search tool, that tool replaces the `codebase-search` skill, also when it is the repository's own codebase-memory-mcp (cbm) wrapper. Use it exactly as they describe, with their project names, index commands, and docs, and don't read or run the skill. A preferred text-search command, such as `rg` over `grep`, is not a code-search tool.
 
-Use grep for literal text, configuration, logs, and files the graph does not index. Read the lines a graph answer cites before relying on it.
+Symbol names are code, not text: find their definitions and callers in the graph, not with grep. A request for text rather than code structure needs no graph: go straight to grep, find, ls, or read for string literals, comments such as TODOs, configuration values, logs, a named file or directory, and files the graph does not index. Read the lines a graph answer cites before relying on it.
 
 # Code navigation
 

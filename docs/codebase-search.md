@@ -28,23 +28,50 @@ Facts about cbm below were checked against codebase-memory-mcp 0.12.1 on
 | Installs cbm on first use and keeps it current without help | `scripts/cbm` |
 | Linux, macOS, and Windows (Git Bash), on x86-64 and ARM64 | [Platforms](#platforms) |
 | A repository's own code-search tool takes precedence | `APPEND_SYSTEM.md` "Code search", skill rule 1 |
-| The model uses it without being asked | No `disable-model-invocation`; the description names the questions it answers; `APPEND_SYSTEM.md` routes to it |
+| The model starts every code search with it without being asked, small models included | No `disable-model-invocation`; the description says to use it first; `APPEND_SYSTEM.md` "Code search" names the first tool call ([Routing](#routing)) |
 | Plain POSIX sh | ShellCheck as `sh` in the tests |
 | Reconciliation stays offline | The download happens on first use, never in `bootstrap.mjs` |
 
 ## Routing
 
 1. **Repository tool.** When the repository's AGENTS.md, CLAUDE.md, or the docs
-   they point to name a code-search tool, the model uses it as described. Such a
-   tool can pin the project name, the index location, and the version that the
-   repository's instructions rely on; the skill there would build a second index
-   under a name those instructions never use.
-2. **This skill** everywhere else.
-3. **grep and find** for literal text, configuration, logs, files the index
-   skips, and whenever the wrapper fails.
+   they point to name a code-search tool, the model uses it as described and
+   leaves this skill unread, also when that tool is the repository's own
+   codebase-memory-mcp wrapper. Such a tool can pin the project name, the index
+   location, and the version that the repository's instructions rely on; the
+   skill there would build a second index under a name those instructions never
+   use. A preferred text-search command, such as `rg` over `grep`, is not a
+   code-search tool.
+2. **This skill** for every other search or exploration of code: where something
+   is defined or handled, what calls or uses it, what it calls, whether it
+   exists, how the parts connect, and what a change affects. The first tool call
+   reads `SKILL.md` and indexes the repository root; grep, find, and ls wait
+   until the graph has answered.
+3. **grep, find, ls, and read** straight away for text rather than code
+   structure (string literals, comments such as TODOs, configuration values,
+   logs, a named file or directory), for files the index skips, and whenever the
+   wrapper fails.
 
 `APPEND_SYSTEM.md` states this order for every session; rule 1 of `SKILL.md`
 repeats the first step for a model that loads the skill directly.
+
+`APPEND_SYSTEM.md` spells out the first tool call and its two commands because a
+small model skips a looser rule. On 2026-11-18,
+`coralbricks/deepseek-v4.1-flash-fast` at thinking `max`, one prompt per fresh
+session in a Rust repository, started 3 of 15 code searches with the graph alone
+when the section only named the question types and said to ask the graph before
+grep or find. Naming the first tool call raised that to 15 of 15, while none of
+15 text lookups (a version in `Cargo.toml`, a directory listing, TODO comments,
+a literal string, a README summary) touched the graph, and all 6 searches in a
+repository that names its own tool used that tool.
+
+The first sentence points to the exception, and the exception names a
+repository's own cbm wrapper, because a repository can route code search through
+its own codebase-memory-mcp wrapper under a heading that is also called codebase
+search. In such a Java repository the same model never ran this skill's wrapper,
+but it read this `SKILL.md` within its first two tool calls in 10 of 15 sessions;
+with both changes it did so in 3 of 35, while code searches in the Rust
+repository still started with the graph in 34 of 35.
 
 ## Wrapper contract
 
