@@ -18,7 +18,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 3. Never treat `~/.pi/agent/npm/` as configuration. Packages are declared in `settings.json` (`npm:` package ids); keep sources unpinned — no npm versions, git tags, or commits.
 4. `deviceId` is runtime installation identity, not configuration. Reconciliation preserves it; never commit it.
 5. `bootstrap.mjs` reconciles only declared paths, so leftovers from removed packages, renamed config, or older bootstrap versions survive setup by design; never add deletion logic for undeclared paths. For a large change, delete `~/.pi`, rerun setup, and reload Pi.
-6. The model-facing code-search guidance — the "Code search" section of `APPEND_SYSTEM.md` and `skills/codebase-search/SKILL.md` — is tuned and validated empirically: Opus 5.5 tested it in isolated pi runs with DeepSeek Flash V4.1 across several repositories. Treat it as frozen. Do not reword, restructure, trim, or extend it while making an unrelated change; change it only when the user explicitly asks, and make that the change's whole scope.
+6. The model-facing code-search guidance — the "Code search" section of `APPEND_SYSTEM.md`, the `code_search` tool and parameter descriptions in `extensions/code-search.ts`, and `skills/codebase-search/SKILL.md` — is tuned and validated empirically: Opus 5.5 tested it in isolated pi runs with DeepSeek Flash V4.1 across several repositories. Treat it as frozen. Do not reword, restructure, trim, or extend it while making an unrelated change; change it only when the user explicitly asks, and make that the change's whole scope.
 
 ## Sources and runtime targets
 
@@ -38,7 +38,8 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 - `opendesign` models (`models.json`) record the gateway's `context_budget` and `output_budget`, never a catalog's `context_limit` — see `docs/opendesign.md`.
 - `deploy` models (`models.json`) need `compat.supportsDeveloperRole: false` because the gateway silently ignores `developer` messages while reasoning, and they record the measured `prompt + completion` limit as `contextWindow` — see `docs/deploy.md`.
 - `extensions/settle-compact.ts` compacts once the agent settles at 90% or more of the model window; `npm:@sting8k/pi-vcc` writes the summary without an LLM call (`pi-vcc-config.json`).
-- `APPEND_SYSTEM.md` makes the first tool call of every code search use a repository's own code-search tool, else `skills/codebase-search`, and leaves literal text to grep; the skill's POSIX sh wrapper `scripts/cbm` downloads codebase-memory-mcp on first use, never during reconciliation — see `docs/codebase-search.md`.
+- `APPEND_SYSTEM.md` makes the first tool call of every code search use a repository's own code-search tool, which then holds for the whole session, else `code_search` (`extensions/code-search.ts`), and leaves literal text to grep. `code_search` runs probe without an index and downloads it on first use, never during reconciliation — see `docs/code-search.md`.
+- `skills/codebase-search` is hidden from the model (`disable-model-invocation: true`): it runs codebase-memory-mcp through its POSIX sh wrapper `scripts/cbm` only after the user types `/skill:codebase-search`, and its graph then replaces `code_search` for that session — see `docs/codebase-search.md`.
 
 ## External references
 
@@ -48,6 +49,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 | Domain terminology | `CONTEXT.md` |
 | `opendesign` model runbook | `docs/opendesign.md` |
 | `deploy` model runbook | `docs/deploy.md` |
+| `code_search` tool spec | `docs/code-search.md` |
 | `codebase-search` skill spec | `docs/codebase-search.md` |
 
 ## Making a change

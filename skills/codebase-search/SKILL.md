@@ -2,6 +2,7 @@
 name: codebase-search
 description: "Find code by structure, not text: where something is defined or handled, who calls it, what it calls, what a file contains, how a codebase is laid out, and what a change affects. Use first for every search of a repository's code, before grep, find, or ls, unless the repository's instructions name a code-search tool, such as their own cbm wrapper; literal text such as comments, string literals, and configuration values stays with grep. Runs codebase-memory-mcp, which its wrapper installs and updates."
 compatibility: "POSIX sh with curl or wget, tar (unzip on Windows), and sha256sum, shasum, or openssl. Linux, macOS, or Windows Git Bash, on x86-64 or ARM64."
+disable-model-invocation: true
 ---
 
 # Codebase search
