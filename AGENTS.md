@@ -7,6 +7,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 | Task | Command |
 |------|---------|
 | Install dependencies (first time) | `npm install` |
+| Update dependencies to their latest releases (`npm install` keeps installed versions) | `npm update` |
 | Reconcile `~/.pi/agent/` | `npm run setup` |
 | All tests | `npm test` |
 | One test file | `npx vitest run tests/<name>.test.ts` |
