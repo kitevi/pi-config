@@ -110,7 +110,10 @@ const veil = {
 	install(): void {
 		if (!this.originalFooterRender) {
 			const original = FooterComponent.prototype.render;
-			FooterComponent.prototype.render = function renderWithFooterVeil(width: number): string[] {
+			// Follows pi's declared return type, which may narrow to readonly string[] (#9549).
+			FooterComponent.prototype.render = function renderWithFooterVeil(
+				width: number,
+			): ReturnType<FooterComponent["render"]> {
 				const lines = withVeiledExtensionStatuses(
 					this,
 					!veil.shown,
