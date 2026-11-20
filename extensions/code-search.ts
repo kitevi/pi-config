@@ -18,7 +18,7 @@ import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const LATEST_RELEASE_API = "https://api.github.com/repos/probelabs/probe/releases/latest";
