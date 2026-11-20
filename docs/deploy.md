@@ -98,13 +98,17 @@ entry leaves `thinkingTokenBudgetField` unset.
 "compat": { "supportsDeveloperRole": false }
 ```
 
-Pi sends the system prompt as a `developer` message to reasoning models on any
-host it doesn't recognize. Deploy returns 200 and **ignores the instruction
+Pi sends the system prompt as a `developer` message to a reasoning model when
+`supportsDeveloperRole` is true, and as `system` otherwise. Before 1.6.0 it
+assumed `developer` on any host it didn't recognize; since 1.6.0 it assumes it
+only for OpenAI (provider `openai` or a base URL on `api.openai.com`), so Deploy
+already gets `system`. The flag pins that against a change in pi's host
+detection, because Deploy returns 200 and **ignores a `developer` instruction
 silently** while reasoning is on. In 4 of 4 runs, a `developer` message saying
 "Always reply in French" got English replies, while the same text as `system`
 got French. With `reasoning_effort: "none"`, `developer` was honored. A pi
-session without this flag would run with its system prompt mostly ignored and
-no error to show it.
+session that sent `developer` would run with its system prompt mostly ignored
+and no error to show it.
 
 Each of these was probed and returned 200, so it needs no override:
 

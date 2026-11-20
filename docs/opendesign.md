@@ -63,8 +63,11 @@ Stream deltas carry `reasoning` and `reasoning_details`, and usage reports
 Two flags from pi's OpenRouter catalog entry are **not** needed here, and were
 probed to confirm it: an assistant message replayed without reasoning still
 returns 200 (so not `requiresReasoningContentOnAssistantMessages`), and a
-`developer` message returns 200 (so not `supportsDeveloperRole: false`). Do not
-add compat flags without that kind of probe.
+`developer` message returns 200 (so not `supportsDeveloperRole: false`). Since
+pi 1.6.0 that flag would change nothing here anyway: pi sends a reasoning
+model's system prompt as `developer` only to OpenAI and as `system` to every
+other host, this gateway included. Do not add compat flags without that kind of
+probe.
 
 ## `claude-haiku-5.5`
 
