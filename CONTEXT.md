@@ -22,8 +22,9 @@ _Avoid_: Prompt template (not the same thing—skills are behavioral guidance, n
 **Overlay**:
 A repository-owned JSON config file that reconciliation installs over its target
 under `~/.pi/agent/` (e.g. `settings.json`). The repository file replaces local
-preferences. The only retained runtime field is Pi's installation `deviceId`
-in `settings.json`; it is not committed.
+preferences. The only retained runtime fields are Pi's installation `deviceId`
+and its changelog markers (`lastChangelogVersion`, `extensionChangelogVersions`)
+in `settings.json`; they are not committed.
 _Avoid_: Patch, diff.
 
 **Symlink**:
@@ -61,7 +62,8 @@ This repo selectively loads only the pieces it wants through `settings.json`.
 at runtime (`settings.json`). Reconciliation replaces preferences with the
 repository file, so local preference changes do not survive; declare them in
 the repo instead. Pi's
-runtime-generated installation `deviceId` is preserved, not configured here.
+runtime-generated installation `deviceId` and changelog markers are preserved,
+not configured here.
 Overlays are written atomically, and a target whose source left the repository is
 copied to `<target>.bak` before removal.
 - **Symlink** is used for static assets that pi only reads: `prompts/` and
@@ -99,7 +101,8 @@ manages *configuration*, not *credentials*.
 > **Domain expert:** "Yes, pi writes runtime state into that file. Reconciliation
 > replaces preferences with the repository version, so local preference changes
 > do not survive — declare them in the repo instead. The installation `deviceId`
-> is runtime identity and is preserved automatically, never committed."
+> and the changelog markers are runtime state and are preserved automatically,
+> never committed."
 >
 > **Dev:** "And if I delete `~/.pi/agent/` entirely?"
 >

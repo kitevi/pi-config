@@ -16,7 +16,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 1. Never edit anything under `~/.pi/` to change pi configuration; edit the repo-owned source file that controls it. Reconciliation replaces, clears, or symlinks every managed path, so direct edits are silently lost.
 2. Add a missing pi setting to `settings.json` in this repo, never to `~/.pi/agent/settings.json`.
 3. Never treat `~/.pi/agent/npm/` as configuration. Packages are declared in `settings.json` (`npm:` package ids); keep sources unpinned — no npm versions, git tags, or commits.
-4. `deviceId` is runtime installation identity, not configuration. Reconciliation preserves it; never commit it.
+4. `deviceId` (installation identity) and the changelog markers `lastChangelogVersion` and `extensionChangelogVersions` are runtime state, not configuration. Reconciliation preserves them; never commit them.
 5. `bootstrap.mjs` reconciles only declared paths, so leftovers from removed packages, renamed config, or older bootstrap versions survive setup by design; never add deletion logic for undeclared paths. For a large change, delete `~/.pi`, rerun setup, and reload Pi.
 6. The model-facing code-search guidance — the "Code search" section of `APPEND_SYSTEM.md`, the `code_search` tool and parameter descriptions in `extensions/code-search.ts`, and `skills/codebase-search/SKILL.md` — is tuned and validated empirically: Opus 5.5 tested it in isolated pi runs with DeepSeek Flash V4.1 across several repositories. Treat it as frozen. Do not reword, restructure, trim, or extend it while making an unrelated change; change it only when the user explicitly asks, and make that the change's whole scope.
 
@@ -24,7 +24,7 @@ Declares the desired state of `~/.pi/agent/` for the pi coding agent; `npm run s
 
 | Repo path | Installed as |
 |-----------|--------------|
-| `settings.json` | overlay at `~/.pi/agent/settings.json`, keeps the local `deviceId` |
+| `settings.json` | overlay at `~/.pi/agent/settings.json`, keeps the local `deviceId` and changelog markers |
 | `APPEND_SYSTEM.md`, `pi-vcc-config.json`, `mcp.json`, `models.json` | overlay at `~/.pi/agent/` |
 | `coralbricks.json` | overlay at `~/.pi/agent/extensions/` |
 | `extensions/*.ts`, `prompts/`, `skills/`, `reminders/`, `keybindings.json` | symlinked into `~/.pi/agent/` |

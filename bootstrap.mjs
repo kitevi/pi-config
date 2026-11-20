@@ -42,7 +42,9 @@ const OVERLAYS = [
     source: join(REPO_DIR, "settings.json"),
     target: join(PI_DIR, "settings.json"),
     label: "pi settings",
-    preserve: ["deviceId"],
+    // Without the changelog markers, pi treats the next launch as a fresh
+    // install: it skips What's New and reports the install again.
+    preserve: ["deviceId", "lastChangelogVersion", "extensionChangelogVersions"],
   },
   {
     source: join(REPO_DIR, "mcp.json"),
@@ -52,8 +54,11 @@ const OVERLAYS = [
 ];
 
 // A malformed preserved value is skipped, so reconciliation replaces it.
+const isNonEmptyString = (value) => typeof value === "string" && value.trim() !== "";
 const PRESERVED_KEY_GUARDS = {
-  deviceId: (value) => typeof value === "string" && value.trim() !== "",
+  deviceId: isNonEmptyString,
+  lastChangelogVersion: isNonEmptyString,
+  extensionChangelogVersions: (value) => isObject(value) && Object.values(value).every(isNonEmptyString),
 };
 
 // Every managed path lives inside ~/.pi/agent; anything else is a bug.

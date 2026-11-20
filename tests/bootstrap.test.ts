@@ -80,14 +80,17 @@ void describe("bootstrap extension links", () => {
 });
 
 void describe("bootstrap Pi settings", () => {
-	void it("preserves the ChatGPT installation identity but replaces preferences", async () => {
+	void it("preserves the installation identity and changelog markers but replaces preferences", async () => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-settings-"));
 		const agentDir = join(home, ".pi", "agent");
 		const settingsPath = join(agentDir, "settings.json");
+		const packageKey = JSON.stringify({ source: "npm:example-package", scope: "user" });
 
 		try {
 			const settings = SettingsManager.create(repoRoot, agentDir);
 			const deviceId = settings.getOrCreateDeviceId();
+			settings.setLastChangelogVersion("1.6.0");
+			settings.setExtensionChangelogVersion(packageKey, "0.2.0");
 			settings.setTheme("stale-theme");
 			settings.setDefaultModelAndProvider("stale-provider", "stale-model");
 			await settings.flush();
@@ -95,8 +98,16 @@ void describe("bootstrap Pi settings", () => {
 			await runBootstrap(home);
 			const firstOutput = await readFile(settingsPath, "utf8");
 			const repoSettings = JSON.parse(await readFile(join(repoRoot, "settings.json"), "utf8"));
-			assert.deepEqual(JSON.parse(firstOutput), { ...repoSettings, deviceId });
-			assert.equal(SettingsManager.create(repoRoot, agentDir).getOrCreateDeviceId(), deviceId);
+			assert.deepEqual(JSON.parse(firstOutput), {
+				...repoSettings,
+				deviceId,
+				lastChangelogVersion: "1.6.0",
+				extensionChangelogVersions: { [packageKey]: "0.2.0" },
+			});
+			const reloaded = SettingsManager.create(repoRoot, agentDir);
+			assert.equal(reloaded.getOrCreateDeviceId(), deviceId);
+			assert.equal(reloaded.getLastChangelogVersion(), "1.6.0");
+			assert.equal(reloaded.getExtensionChangelogVersion(packageKey), "0.2.0");
 
 			await runBootstrap(home);
 			assert.equal(await readFile(settingsPath, "utf8"), firstOutput);
@@ -105,7 +116,13 @@ void describe("bootstrap Pi settings", () => {
 		}
 	});
 
-	void it.each(["not valid JSON", '{"deviceId":123}'])("replaces invalid existing settings: %s", async (existing) => {
+	void it.each([
+		"not valid JSON",
+		'{"deviceId":123}',
+		'{"lastChangelogVersion":7}',
+		'{"extensionChangelogVersions":{"npm:example-package":2}}',
+		'{"extensionChangelogVersions":["0.2.0"]}',
+	])("replaces invalid existing settings: %s", async (existing) => {
 		const home = await mkdtemp(join(tmpdir(), "pi-config-invalid-settings-"));
 		const settingsPath = join(home, ".pi", "agent", "settings.json");
 
